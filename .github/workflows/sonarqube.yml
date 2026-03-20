@@ -1,0 +1,47 @@
+name: Análisis de Seguridad y Calidad (SonarQube)
+
+on:
+  push:
+    branches:
+      - main
+      - integration
+      - main-dashboard
+      - main-auth
+      - main-ff_broker
+      - main-iot_manager
+
+jobs:
+  sonarqube:
+    name: SAST Scanner
+    runs-on: self-hosted # <--- Aquí le decimos que use tu PC
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enrutador de Microservicios y Análisis (PowerShell)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          $BRANCH = "${{ github.ref_name }}"
+          Write-Host "Ejecutando pipeline para la rama: $BRANCH"
+          
+          # Por defecto, analiza todo (para main o integration)
+          $SRC = "apps,services" 
+          
+          if ($BRANCH -eq "main-auth") {
+            $SRC = "services/auth"
+          } elseif ($BRANCH -eq "main-dashboard") {
+            $SRC = "apps/dashboard"
+          } elseif ($BRANCH -eq "main-ff_broker") {
+            $SRC = "services/ff-broker"
+          } elseif ($BRANCH -eq "main-iot_manager") {
+            $SRC = "services/iot-manager"
+          }
+          
+          Write-Host "Directorio objetivo configurado: $SRC"
+          
+          # Lanzamos el escáner local de tu máquina
+          sonar-scanner -D"sonar.projectKey=TFG-eromero" -D"sonar.sources=$SRC" -D"sonar.host.url=$env:SONAR_HOST_URL" -D"sonar.token=$env:SONAR_TOKEN"
