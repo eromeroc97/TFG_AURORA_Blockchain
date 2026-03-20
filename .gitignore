@@ -137,3 +137,6 @@ dist
 
 # ignore the "ignore" folder
 ignore/
+
+# Ignore .scannerwork folder created from SonarQube
+.scannerwork/
