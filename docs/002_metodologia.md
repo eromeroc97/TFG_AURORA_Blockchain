@@ -24,3 +24,4 @@ Para que la realización de un Caso de Uso se considere finalizada dentro de un 
 1.  El código compila y se despliega correctamente en su contenedor Docker aislado.
 2.  El código supera el *Quality Gate* automatizado en SonarQube (cero vulnerabilidades críticas).
 3.  Los cambios respetan el modelo de ramas establecido (GitFlow adaptado al monorepo).
+
