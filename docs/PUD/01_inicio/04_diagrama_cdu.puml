@@ -1,0 +1,80 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+
+' --- ACTORES PRINCIPALES (Izquierda) ---
+actor "Usuario Propietario" as Propietario
+actor "Auditor / Admin" as Auditor
+actor "Nodo IoT / Gateway" as NodoIoT
+
+' --- ACTORES SECUNDARIOS (Derecha) ---
+actor "Hyperledger Fabric\n<<Infraestructura DLT>>" as Blockchain
+actor "Sistema Análisis\n<<Sistema Externo>>" as SIEM
+
+' --- FRONTERA DEL SISTEMA ---
+rectangle "AURORA Blockchain" {
+
+    package "1. Gestión de Identidades (IAM)" {
+        usecase "CU-01: Registrar Admin/Auditor" as CU01
+        usecase "CU-02: Registrar Propietario" as CU02
+        usecase "CU-03: Registrar Ecosistema" as CU03
+        usecase "CU-04: Aprovisionar Nodo IoT" as CU04
+        usecase "CU-05: Autenticar Usuario" as CU05
+        usecase "CU-06: Autenticar Nodo IoT" as CU06
+        usecase "CU-07: Revocar Identidad" as CU07
+    }
+
+    package "2. Ingesta y Trazabilidad" {
+        usecase "CU-08: Transmitir Telemetría" as CU08
+        usecase "CU-09: Almacenar Off-Chain" as CU09
+        usecase "CU-10: Anclar Evidencia On-Chain" as CU10
+    }
+
+    package "3. Autorización (Web App)" {
+        usecase "CU-11: Visualizar Estado" as CU11
+        usecase "CU-12: Autorizar Acceso" as CU12
+        usecase "CU-13: Revocar Acceso" as CU13
+    }
+
+    package "4. Auditoría y Seguridad" {
+        usecase "CU-14: Validar Integridad" as CU14
+        usecase "CU-15: Consultar Veredicto" as CU15
+        usecase "CU-16: Visualizar Logs" as CU16
+    }
+}
+
+' --- RELACIONES ACTORES PRINCIPALES ---
+Auditor --> CU01
+Auditor --> CU02
+Auditor --> CU03
+Auditor --> CU04
+Auditor --> CU05
+Auditor --> CU07
+Auditor --> CU14
+Auditor --> CU16
+
+Propietario --> CU05
+Propietario --> CU07
+Propietario --> CU11
+Propietario --> CU12
+Propietario --> CU13
+
+NodoIoT --> CU06
+NodoIoT --> CU08
+
+' --- RELACIONES INTERNAS (INCLUDES) ---
+' Opcional pero recomendado en PUD para mostrar dependencia
+CU08 ..> CU09 : <<include>>
+CU09 ..> CU10 : <<include>>
+
+' --- RELACIONES ACTORES SECUNDARIOS ---
+CU04 --> Blockchain : "Emite Certificado"
+CU06 --> Blockchain : "Valida Certificado"
+CU07 --> Blockchain : "Revoca Certificado"
+CU10 --> Blockchain : "Guarda Hash"
+CU14 --> Blockchain : "Consulta Hash"
+
+CU15 --> SIEM : "Envía Eventos"
+
+@enduml

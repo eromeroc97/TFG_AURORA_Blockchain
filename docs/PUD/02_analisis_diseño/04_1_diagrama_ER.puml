@@ -1,0 +1,54 @@
+@startuml
+hide circle
+skinparam linetype ortho
+skinparam entity {
+    BackgroundColor White
+    BorderColor Black
+}
+
+entity "users" as users {
+  * id : UUID <<PK>>
+  --
+  * email : VARCHAR(255) <<UNIQUE>>
+  * password_hash : VARCHAR(255)
+  * role : VARCHAR(50) <<ADMIN, OWNER>>
+  * fabric_did : VARCHAR(255) <<UNIQUE>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "ecosystems" as ecosystems {
+  * id : UUID <<PK>>
+  --
+  * name : VARCHAR(100)
+  * owner_id : UUID <<FK>>
+  created_at : TIMESTAMP
+}
+
+entity "devices" as devices {
+  * id : UUID <<PK>>
+  --
+  * mac_address : VARCHAR(17) <<UNIQUE>>
+  * type : VARCHAR(50)
+  * status : VARCHAR(20) <<ACTIVE, REVOKED>>
+  * ecosystem_id : UUID <<FK>>
+  * fabric_did : VARCHAR(255) <<UNIQUE>>
+  created_at : TIMESTAMP
+}
+
+entity "authorizations" as authorizations {
+  * id : UUID <<PK>>
+  --
+  * owner_id : UUID <<FK>>
+  * granted_to_user_id : UUID <<FK>>
+  * ecosystem_id : UUID <<FK>>
+  * status : VARCHAR(20) <<ACTIVE, REVOKED>>
+  created_at : TIMESTAMP
+  revoked_at : TIMESTAMP
+}
+
+users ||--o{ ecosystems : "1:N (posee)"
+ecosystems ||--o{ devices : "1:N (agrupa)"
+users ||--o{ authorizations : "1:N (otorga/recibe)"
+ecosystems ||--o{ authorizations : "1:N (objetivo)"
+@enduml

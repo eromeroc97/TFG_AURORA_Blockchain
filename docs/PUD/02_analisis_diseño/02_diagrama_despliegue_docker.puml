@@ -1,0 +1,88 @@
+@startuml
+' Configuración visual
+skinparam node {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam componentStyle uml2
+left to right direction
+
+' --- NODOS EXTERNOS ---
+node "Dispositivo Propietario" <<Device>> {
+    component "Navegador Web\n(SPA React)" as Browser
+}
+
+node "Nodo IoT / Gateway" <<Device>> {
+    component "Firmware Sensor" as Sensor
+}
+
+' --- ENTORNO DE EJECUCIÓN PRINCIPAL (TFG) ---
+node "Servidor TFG (Host)" <<Execution Environment>> {
+    
+    node "Docker Engine" <<Execution Environment>> {
+        
+        node "aurora-secure-net" <<Docker Bridge Network>> {
+            
+            node "Contenedor: api-gateway" <<Container>> {
+                component "Traefik" as Traefik
+            }
+            
+            node "Contenedor: web-app" <<Container>> {
+                component "Next.js (BFF)" as BFF
+            }
+            
+            node "Contenedor: auth-service" <<Container>> {
+                component "NestJS App" as AuthApp
+            }
+            
+            node "Contenedor: iot-manager" <<Container>> {
+                component "Fastify App" as IoTApp
+            }
+            
+            node "Contenedor: bc-service" <<Container>> {
+                component "Zero-Trust Proxy" as BCApp
+            }
+            
+            node "Contenedor: postgres-db" <<Container>> {
+                database "Identity Vault" as PG
+            }
+            
+            node "Contenedor: mongo-db" <<Container>> {
+                database "Time Series DB" as Mongo
+            }
+        }
+    }
+}
+
+' --- INFRAESTRUCTURA EXTERNA ---
+node "Infraestructura Blockchain" <<Execution Environment>> {
+    node "Contenedor: firefly" <<Container>> {
+        component "Hyperledger FireFly" as Firefly
+    }
+    cloud "Hyperledger Fabric\n(Red Permisionada)" as Fabric
+}
+
+' --- CONEXIONES Y PROTOCOLOS ---
+Browser ==[#red]==> Traefik : "HTTPS (UI / Puertos 80, 443)"
+Sensor ==[#red]==> Traefik : "HTTPS (Telemetría)"
+
+Traefik --> BFF : "HTTP (Rutas /)"
+Traefik --> AuthApp : "HTTP (/api/auth)"
+Traefik --> IoTApp : "HTTP (/api/telemetry)"
+
+' Comunicaciones internas aisladas
+BFF --> AuthApp : "HTTP Interno\n(Permisos)"
+BFF --> IoTApp : "HTTP Interno\n(Estado)"
+
+AuthApp --> PG : "TCP: 5432"
+IoTApp --> Mongo : "TCP: 27017"
+
+' Flujo Zero-Trust
+AuthApp --> BCApp : "HTTP + JWT Interno"
+IoTApp --> BCApp : "HTTP + JWT Interno"
+
+' Salida a DLT
+BCApp ==[#blue]==> Firefly : "mTLS"
+Firefly --> Fabric : "gRPC / WebSockets"
+
+@enduml
