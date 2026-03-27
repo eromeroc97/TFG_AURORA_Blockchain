@@ -3,6 +3,13 @@ services:
     build:
       context: ./services/auth-service
       dockerfile: Dockerfile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.services.auth.loadbalancer.server.port=3001"
+      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api/auth"
+      - "traefik.http.routers.auth.middlewares=auth-strip"
     networks:
       - aurora-secure-net
     expose:
@@ -18,6 +25,13 @@ services:
     build:
       context: ./services/iot-manager
       dockerfile: Dockerfile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.telemetry.rule=PathPrefix(`/api/telemetry`)"
+      - "traefik.http.routers.telemetry.entrypoints=web"
+      - "traefik.http.services.telemetry.loadbalancer.server.port=3002"
+      - "traefik.http.middlewares.telemetry-strip.stripprefix.prefixes=/api/telemetry"
+      - "traefik.http.routers.telemetry.middlewares=telemetry-strip"
     networks:
       - aurora-secure-net
     expose:
