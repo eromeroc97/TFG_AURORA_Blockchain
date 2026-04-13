@@ -10,15 +10,14 @@ RUN npm run build
 FROM node:20-alpine AS production
 WORKDIR /app
 
-RUN chown -R node:node /app
-USER node
-
 ENV NODE_ENV=production
 
-COPY --chown=node:node package*.json ./
+COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY --chown=node:node --from=build /app/dist ./dist
+COPY --from=build /app/dist ./dist
+
+USER node
 
 EXPOSE 3001
 
