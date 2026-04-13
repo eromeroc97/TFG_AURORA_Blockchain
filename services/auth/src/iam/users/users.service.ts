@@ -1,11 +1,48 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(createUserDto: CreateUserDto) {
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: createUserDto.email },
+      });
+
+      if (existingUser) {
+        throw new ConflictException('A user with this email already exists');
+      }
+
+      const passwordHash = await argon2.hash(createUserDto.password);
+
+      const createdUser = await this.prisma.user.create({
+        data: {
+          email: createUserDto.email,
+          passwordHash,
+          role: createUserDto.role,
+          did: createUserDto.did,
+          isActive: createUserDto.isActive,
+        },
+      });
+
+      const { passwordHash: _, ...sanitizedUser } = createdUser;
+      return sanitizedUser;
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Failed to create user');
+    }
   }
 
   findAll() {
