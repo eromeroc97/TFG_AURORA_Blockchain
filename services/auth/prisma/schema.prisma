@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  GLOBAL_ADMIN
+  AUDITOR
+  OWNER
+}
+
+enum EcosystemStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+model User {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique
+  passwordHash String
+  role         Role        @default(OWNER)
+  isActive     Boolean     @default(true)
+
+  // DID para no repudio: identidad humana para firmar/atribuir acciones en la red DLT.
+  did          String?     @unique
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  ecosystems   Ecosystem[]
+}
+
+model Ecosystem {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+
+  ownerId    String   @db.Uuid
+  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  // El Gateway concentra autenticacion Zero-Trust y trazabilidad blockchain para aislar sensores limitados.
+  did                    String?          @unique
+  certificateFingerprint String?          @unique
+  status                 EcosystemStatus  @default(PENDING)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  devices    Device[]
+
+  @@index([ownerId])
+}
+
+model Device {
+  id                     String       @id @default(uuid()) @db.Uuid
+
+  ecosystemId            String       @db.Uuid
+  ecosystem              Ecosystem    @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
+
+  name                   String
+  localType              String
+
+  // Sensor logico: inventario local sin carga criptografica; la seguridad/trazabilidad vive en el Gateway.
+
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@index([ecosystemId])
+}
