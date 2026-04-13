@@ -1,4 +1,5 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { UsersService } from './users.service';
@@ -11,7 +12,7 @@ jest.mock('argon2', () => ({
 
 describe('UsersService', () => {
   let service: UsersService;
-  let prismaMock: {
+  let prismaServiceMock: {
     user: {
       findUnique: ReturnType<typeof jest.fn>;
       create: ReturnType<typeof jest.fn>;
@@ -30,7 +31,7 @@ describe('UsersService', () => {
   const createdUserRecord = {
     id: 'a4a98bc5-a6a3-4e13-8cb7-4f2cbf3a4c75',
     email: createUserDto.email,
-    passwordHash: 'argon2$hash',
+    passwordHash: 'hashed_password',
     role: 'OWNER',
     did: createUserDto.did,
     isActive: createUserDto.isActive,
@@ -38,55 +39,57 @@ describe('UsersService', () => {
     updatedAt: new Date('2026-04-13T10:00:00.000Z'),
   };
 
-  beforeEach(() => {
-    prismaMock = {
-      user: {
-        findUnique: jest.fn(),
-        create: jest.fn(),
-      },
-    };
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        {
+          provide: PrismaService,
+          useFactory: () => ({
+            user: {
+              findUnique: jest.fn(),
+              create: jest.fn(),
+            },
+          }),
+        },
+      ],
+    }).compile();
 
-    service = new UsersService(prismaMock as unknown as PrismaService);
+    service = module.get<UsersService>(UsersService);
+    prismaServiceMock = module.get(PrismaService) as unknown as typeof prismaServiceMock;
     jest.clearAllMocks();
   });
 
   it('should hash password and create user', async () => {
-    prismaMock.user.findUnique.mockResolvedValue(null);
-    mockHash.mockResolvedValue('argon2$hash' as never);
-    prismaMock.user.create.mockResolvedValue(createdUserRecord);
+    prismaServiceMock.user.findUnique.mockResolvedValue(null);
+    mockHash.mockResolvedValue('hashed_password' as never);
+    prismaServiceMock.user.create.mockResolvedValue(createdUserRecord);
 
-    await service.create(createUserDto);
+    const result = await service.create(createUserDto);
 
+    expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+      where: { email: createUserDto.email },
+    });
     expect(mockHash).toHaveBeenCalledWith(createUserDto.password);
-    expect(prismaMock.user.create).toHaveBeenCalledWith({
+    expect(prismaServiceMock.user.create).toHaveBeenCalledWith({
       data: {
         email: createUserDto.email,
-        passwordHash: 'argon2$hash',
+        passwordHash: 'hashed_password',
         role: createUserDto.role,
         did: createUserDto.did,
         isActive: createUserDto.isActive,
       },
     });
 
-    const prismaCreateArg = prismaMock.user.create.mock.calls[0][0];
+    const findUniqueCallOrder = prismaServiceMock.user.findUnique.mock.invocationCallOrder[0];
+    const hashCallOrder = mockHash.mock.invocationCallOrder[0];
+    const createCallOrder = prismaServiceMock.user.create.mock.invocationCallOrder[0];
+
+    expect(findUniqueCallOrder).toBeLessThan(hashCallOrder);
+    expect(hashCallOrder).toBeLessThan(createCallOrder);
+
+    const prismaCreateArg = prismaServiceMock.user.create.mock.calls[0][0];
     expect(prismaCreateArg.data.passwordHash).not.toBe(createUserDto.password);
-  });
-
-  it('should throw ConflictException', async () => {
-    prismaMock.user.findUnique.mockResolvedValue(createdUserRecord);
-
-    await expect(service.create(createUserDto)).rejects.toBeInstanceOf(ConflictException);
-
-    expect(prismaMock.user.create).not.toHaveBeenCalled();
-    expect(mockHash).not.toHaveBeenCalled();
-  });
-
-  it('should sanitize output', async () => {
-    prismaMock.user.findUnique.mockResolvedValue(null);
-    mockHash.mockResolvedValue('argon2$hash' as never);
-    prismaMock.user.create.mockResolvedValue(createdUserRecord);
-
-    const result = await service.create(createUserDto);
 
     expect(result).not.toHaveProperty('passwordHash');
     expect(result).toMatchObject({
@@ -96,5 +99,24 @@ describe('UsersService', () => {
       did: createdUserRecord.did,
       isActive: createdUserRecord.isActive,
     });
+  });
+
+  it('should throw ConflictException', async () => {
+    prismaServiceMock.user.findUnique.mockResolvedValue(createdUserRecord);
+
+    await expect(service.create(createUserDto)).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prismaServiceMock.user.create).not.toHaveBeenCalled();
+    expect(mockHash).not.toHaveBeenCalled();
+  });
+
+  it('should throw InternalServerErrorException when database creation fails', async () => {
+    prismaServiceMock.user.findUnique.mockResolvedValue(null);
+    mockHash.mockResolvedValue('hashed_password' as never);
+    prismaServiceMock.user.create.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(service.create(createUserDto)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
   });
 });
