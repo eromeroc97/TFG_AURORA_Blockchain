@@ -6,7 +6,15 @@ const config: Config = {
   roots: ['<rootDir>/src'],
   testRegex: '.*\\.spec\\.ts$',
   moduleFileExtensions: ['ts', 'js', 'json'],
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.spec.ts'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.spec.ts',
+    '!src/**/*.module.ts',
+    '!src/**/*.dto.ts',
+    '!src/**/*.entity.ts',
+    '!src/main.ts',
+    '!src/prisma/**'
+  ],
   coverageDirectory: 'coverage',
   clearMocks: true,
 };

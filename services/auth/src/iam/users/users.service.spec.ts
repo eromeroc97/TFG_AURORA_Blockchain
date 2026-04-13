@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { UsersService } from './users.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 jest.mock('argon2', () => ({
   hash: jest.fn(),
@@ -17,6 +18,10 @@ describe('UsersService', () => {
       findUnique: ReturnType<typeof jest.fn>;
       create: ReturnType<typeof jest.fn>;
     };
+    findAll: ReturnType<typeof jest.fn>;
+    findOne: ReturnType<typeof jest.fn>;
+    update: ReturnType<typeof jest.fn>;
+    remove: ReturnType<typeof jest.fn>;
   };
 
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
@@ -50,6 +55,10 @@ describe('UsersService', () => {
               findUnique: jest.fn(),
               create: jest.fn(),
             },
+            findAll: jest.fn(() => []),
+            findOne: jest.fn((id: number) => `mock findOne #${id}`),
+            update: jest.fn((id: number, payload: UpdateUserDto) => ({ id, ...payload })),
+            remove: jest.fn((id: number) => `mock remove #${id}`),
           }),
         },
       ],
@@ -118,5 +127,50 @@ describe('UsersService', () => {
     await expect(service.create(createUserDto)).rejects.toBeInstanceOf(
       InternalServerErrorException,
     );
+  });
+
+  describe('findAll', () => {
+    it('should call findAll', () => {
+      const findAllSpy = jest.spyOn(service, 'findAll');
+
+      const result = service.findAll();
+
+      expect(findAllSpy).toHaveBeenCalled();
+      expect(result).toBe('This action returns all users');
+    });
+  });
+
+  describe('findOne', () => {
+    it('should call findOne', () => {
+      const findOneSpy = jest.spyOn(service, 'findOne');
+
+      const result = service.findOne(1);
+
+      expect(findOneSpy).toHaveBeenCalled();
+      expect(result).toBe('This action returns a #1 user');
+    });
+  });
+
+  describe('update', () => {
+    it('should call update', () => {
+      const dto: UpdateUserDto = { isActive: true };
+      const updateSpy = jest.spyOn(service, 'update');
+
+      const result = service.update(1, dto);
+
+      expect(updateSpy).toHaveBeenCalled();
+      expect(result).toBe('This action updates a #1 user');
+    });
+  });
+
+  describe('remove', () => {
+    it('should call remove', () => {
+      const removeSpy = jest.spyOn(service, 'remove');
+
+      const result = service.remove(1);
+
+      expect(removeSpy).toHaveBeenCalled();
+      expect(result).toBe('This action removes a #1 user');
+    });
   });
 });
