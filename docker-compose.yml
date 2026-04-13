@@ -100,7 +100,9 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: secret_password_tfg
-      POSTGRES_DB: identity_vault
+      POSTGRES_DB: 
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
