@@ -10,7 +10,7 @@ services:
       - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.services.auth.loadbalancer.server.port=3001"
-      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api/auth"
+      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api"
       - "traefik.http.routers.auth.middlewares=auth-strip"
       - "traefik.docker.network=aurora-secure-net"
     networks:
