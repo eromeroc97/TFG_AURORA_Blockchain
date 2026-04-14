@@ -41,15 +41,21 @@ model Ecosystem {
   ownerId    String   @db.Uuid
   owner      User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
-  // El Gateway concentra autenticacion Zero-Trust y trazabilidad blockchain para aislar sensores limitados.
-  did                    String?          @unique
-  certificateFingerprint String?          @unique
-  status                 EcosystemStatus  @default(PENDING)
+  did                    String?         @unique
+  certificateFingerprint String?         @unique
+  status                 EcosystemStatus @default(PENDING)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  latitude               Float?
+  longitude              Float?
 
-  devices    Device[]
+  // Estado en tiempo real (El histórico pertenece al microservicio de Auditoría)
+  isOnline               Boolean         @default(false)
+  lastSeen               DateTime?
+
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  devices                Device[]
 
   @@index([ownerId])
 }
