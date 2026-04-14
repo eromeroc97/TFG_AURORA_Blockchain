@@ -1,18 +1,23 @@
 import { MailerModule } from '@nestjs-modules/mailer';
 import { Module } from '@nestjs/common';
 import { join } from 'path';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { MailService } from './mail.service';
 
 @Module({
   imports: [
     MailerModule.forRootAsync({
-      useFactory: () => ({
-        transport: {
-          host: process.env.SMTP_HOST ?? 'mailpit',
-          port: Number(process.env.SMTP_PORT ?? 1025),
-          secure: false,
-        },
+      useFactory: () => {
+        const smtpUser = process.env.SMTP_USER?.trim();
+        const smtpPass = process.env.SMTP_PASS?.trim();
+
+        return {
+          transport: {
+            host: process.env.SMTP_HOST ?? 'mailpit',
+            port: Number(process.env.SMTP_PORT ?? 1025),
+            secure: false,
+            auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
+          },
         defaults: {
           from: 'noreply@aurora-gsya.uclm.es',
         },
@@ -23,7 +28,8 @@ import { MailService } from './mail.service';
             strict: true,
           },
         },
-      }),
+        };
+      },
     }),
   ],
   providers: [MailService],
