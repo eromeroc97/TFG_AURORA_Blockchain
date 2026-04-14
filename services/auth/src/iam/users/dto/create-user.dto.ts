@@ -39,10 +39,10 @@ export class CreateUserDto {
 	password!: string;
 
 	@ApiProperty({
-		description: 'Rol del usuario. Si no se envia, Prisma asigna OWNER por defecto.',
+		description: 'Rol del usuario. Si no se envia, Prisma asigna USER por defecto.',
 		enum: Role,
 		required: false,
-		example: Role.OWNER,
+		example: Role.USER,
 	})
 	@IsOptional()
 	@IsEnum(Role)

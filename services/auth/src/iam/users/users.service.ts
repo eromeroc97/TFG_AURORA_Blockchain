@@ -47,6 +47,7 @@ export class UsersService {
         throw error;
       }
 
+      console.error('[UsersService] Error real al crear usuario:', error);
       throw new InternalServerErrorException('Failed to create user');
     }
   }
