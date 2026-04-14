@@ -6,9 +6,16 @@ import { UsersService } from './users.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { MailService } from '../../shared/mail/mail.service';
+import { randomBytes } from 'crypto';
 
 jest.mock('argon2', () => ({
   hash: jest.fn(),
+}));
+
+jest.mock('crypto', () => ({
+  ...(jest.requireActual('crypto') as typeof import('crypto')),
+  randomBytes: jest.fn(),
 }));
 
 describe('UsersService', () => {
@@ -23,12 +30,16 @@ describe('UsersService', () => {
     update: ReturnType<typeof jest.fn>;
     remove: ReturnType<typeof jest.fn>;
   };
-  let fireflyServiceMock: {
+  let mailServiceMock: {
+    sendWelcomeEmail: ReturnType<typeof jest.fn>;
+  };
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
+  const mockRandomBytes = randomBytes as jest.MockedFunction<typeof randomBytes>;
+  const generatedPasswordBuffer = Buffer.from('temporary-password-123456');
+  const generatedPassword = generatedPasswordBuffer.toString('base64url');
 
   const createUserDto: CreateUserDto = {
     email: 'admin@aurora.local',
-    isActive: true,
   };
 
   const createdUserRecord = {
@@ -59,25 +70,35 @@ describe('UsersService', () => {
             remove: jest.fn((id: number) => `mock remove #${id}`),
           }),
         },
+        {
+          provide: MailService,
+          useFactory: () => ({
+            sendWelcomeEmail: jest.fn(),
+          }),
+        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     prismaServiceMock = module.get(PrismaService) as unknown as typeof prismaServiceMock;
+    mailServiceMock = module.get(MailService) as unknown as typeof mailServiceMock;
     jest.clearAllMocks();
   });
 
   it('should hash password and create user', async () => {
     prismaServiceMock.user.findUnique.mockResolvedValue(null);
     mockHash.mockResolvedValue('hashed_password' as never);
+    mockRandomBytes.mockReturnValue(generatedPasswordBuffer as never);
     prismaServiceMock.user.create.mockResolvedValue(createdUserRecord);
+    mailServiceMock.sendWelcomeEmail.mockResolvedValue(undefined);
 
     const result = await service.create(createUserDto);
 
     expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
       where: { email: createUserDto.email },
     });
-    expect(mockHash).toHaveBeenCalledTimes(1);
+    expect(mockRandomBytes).toHaveBeenCalledWith(24);
+    expect(mockHash).toHaveBeenCalledWith(generatedPassword);
     expect(prismaServiceMock.user.create).toHaveBeenCalledWith({
       data: {
         email: createUserDto.email,
@@ -85,18 +106,24 @@ describe('UsersService', () => {
         role: 'USER',
         did: null,
         isActive: false,
+        status: 'PENDING',
       },
     });
+    expect(mailServiceMock.sendWelcomeEmail).toHaveBeenCalledWith(createUserDto.email, generatedPassword);
 
     const findUniqueCallOrder = prismaServiceMock.user.findUnique.mock.invocationCallOrder[0];
+    const randomBytesCallOrder = mockRandomBytes.mock.invocationCallOrder[0];
     const hashCallOrder = mockHash.mock.invocationCallOrder[0];
     const createCallOrder = prismaServiceMock.user.create.mock.invocationCallOrder[0];
+    const mailCallOrder = mailServiceMock.sendWelcomeEmail.mock.invocationCallOrder[0];
 
-    expect(findUniqueCallOrder).toBeLessThan(hashCallOrder);
+    expect(findUniqueCallOrder).toBeLessThan(randomBytesCallOrder);
+    expect(randomBytesCallOrder).toBeLessThan(hashCallOrder);
     expect(hashCallOrder).toBeLessThan(createCallOrder);
+    expect(createCallOrder).toBeLessThan(mailCallOrder);
 
     const prismaCreateArg = prismaServiceMock.user.create.mock.calls[0][0];
-    expect(prismaCreateArg.data.passwordHash).not.toBe(createUserDto.password);
+    expect(prismaCreateArg.data.passwordHash).not.toBe(generatedPassword);
 
     expect(result).not.toHaveProperty('passwordHash');
     expect(result).toMatchObject({
@@ -115,10 +142,12 @@ describe('UsersService', () => {
 
     expect(prismaServiceMock.user.create).not.toHaveBeenCalled();
     expect(mockHash).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendWelcomeEmail).not.toHaveBeenCalled();
   });
 
   it('should throw InternalServerErrorException when database creation fails', async () => {
     prismaServiceMock.user.findUnique.mockResolvedValue(null);
+    mockRandomBytes.mockReturnValue(generatedPasswordBuffer as never);
     mockHash.mockResolvedValue('hashed_password' as never);
     prismaServiceMock.user.create.mockRejectedValue(new Error('database unavailable'));
 
@@ -151,7 +180,7 @@ describe('UsersService', () => {
 
   describe('update', () => {
     it('should call update', () => {
-      const dto: UpdateUserDto = { isActive: true };
+      const dto: UpdateUserDto = {};
       const updateSpy = jest.spyOn(service, 'update');
 
       const result = service.update(1, dto);

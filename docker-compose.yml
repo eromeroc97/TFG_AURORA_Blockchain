@@ -5,8 +5,11 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql://admin:secret_password_tfg@postgres-db:5432/identity_vault?schema=public
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
     depends_on:
       - postgres-db
+      - mailpit
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)"
@@ -25,6 +28,24 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  mailpit:
+    image: axllent/mailpit:latest
+    command: ["--webroot", "/mail"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailpit.rule=PathPrefix(`/mail`)"
+      - "traefik.http.routers.mailpit.entrypoints=web"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+      - "traefik.docker.network=aurora-secure-net"
+    networks:
+      - aurora-secure-net
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    expose:
+      - "1025"
+      - "8025"
 
   iot-manager:
     build:

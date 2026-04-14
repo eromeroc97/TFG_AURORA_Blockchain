@@ -42,7 +42,6 @@ describe('UsersController', () => {
   it('create should call UsersService.create with dto and return service response', async () => {
     const dto: CreateUserDto = {
       email: 'owner@aurora.local',
-      isActive: true,
     };
 
     const serviceResponse = {
@@ -80,7 +79,7 @@ describe('UsersController', () => {
 
   describe('update', () => {
     it('should call UsersService.update', () => {
-      const dto: UpdateUserDto = { isActive: false };
+      const dto: UpdateUserDto = {};
 
       controller.update('1', dto);
 

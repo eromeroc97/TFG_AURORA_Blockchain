@@ -9,7 +9,7 @@ describe('UsersController (e2e) - POST /users', () => {
   let app: INestApplication;
 
   const usersServiceMock = {
-    create: jest.fn(async (dto: { email: string; isActive?: boolean }) => ({
+    create: jest.fn(async (dto: { email: string }) => ({
       id: '9fdacfd7-31de-4f37-8e4b-cc05c6c416b4',
       email: dto.email,
       role: 'USER',

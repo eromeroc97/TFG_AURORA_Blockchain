@@ -9,10 +9,14 @@ import { randomBytes } from 'crypto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../../shared/mail/mail.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     try {
@@ -37,6 +41,12 @@ export class UsersService {
           isActive: false,
         },
       });
+
+      try {
+        await this.mailService.sendWelcomeEmail(createUserDto.email, generatedPassword);
+      } catch (mailError) {
+        console.warn('[UsersService] No se pudo enviar el email de bienvenida:', mailError);
+      }
 
       const { passwordHash: _, ...sanitizedUser } = createdUser;
       return sanitizedUser;

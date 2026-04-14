@@ -1,11 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import {
-	IsBoolean,
-	IsEmail,
-	IsNotEmpty,
-	IsString,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateUserDto {
 	@ApiProperty({
@@ -18,13 +13,4 @@ export class CreateUserDto {
 	@IsEmail()
 	email!: string;
 
-	@ApiProperty({
-		description: 'Indica si la cuenta esta habilitada para autenticacion.',
-		required: false,
-		example: true,
-		default: true,
-	})
-	@Type(() => Boolean)
-	@IsBoolean()
-	isActive?: boolean;
 }
