@@ -10,7 +10,7 @@ services:
       - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.services.auth.loadbalancer.server.port=3001"
-      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api"
+      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api/auth"
       - "traefik.http.routers.auth.middlewares=auth-strip"
       - "traefik.docker.network=aurora-secure-net"
     networks:
@@ -100,7 +100,7 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: secret_password_tfg
-      POSTGRES_DB: 
+      POSTGRES_DB: identity_vault
     ports:
       - "127.0.0.1:5432:5432"
     volumes:

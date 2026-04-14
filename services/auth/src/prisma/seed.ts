@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Role, UserStatus } from '@prisma/client';
 import axios from 'axios';
 import * as argon2 from 'argon2';
 
@@ -17,8 +17,8 @@ async function main() {
 		adapter,
 	});
 
-	async function getFireflyDid() {
-		const fallbackDid = 'did:firefly:offline-generated-org';
+	async function getAdminDid() {
+		const fallbackDid = 'did:firefly:offline-generated-admin';
 		const baseUrl = process.env.FIREFLY_API_URL;
 
 		if (!baseUrl) {
@@ -26,8 +26,22 @@ async function main() {
 		}
 
 		try {
-			const orgRes = await axios.get(`${process.env.FIREFLY_API_URL}/identities?type=org`);
-			const did = orgRes.data?.[0]?.did;
+			const statusRes = await axios.get(`${baseUrl}/status`);
+			const orgId = statusRes.data.org.id;
+			const defaultKey = statusRes.data?.org?.verifiers?.[0]?.value;
+
+			const key =
+				defaultKey ??
+				((await axios.get(`${baseUrl}/verifiers`)).data?.[0]?.value);
+
+			const identityRes = await axios.post(`${baseUrl}/identities`, {
+				name: 'admin_global',
+				type: 'custom',
+				parent: orgId,
+				key,
+			});
+
+			const did = identityRes.data?.did ?? identityRes.data?.id;
 
 			if (typeof did === 'string' && did.length > 0) {
 				return did;
@@ -43,20 +57,24 @@ async function main() {
 
 	try {
 		const passwordHash = await argon2.hash('Admin123!');
-		const did = await getFireflyDid();
+		const did = await getAdminDid();
 
 		const createdAdmin = await prisma.user.upsert({
 			where: { email: 'admin@uclm.es' },
 			update: {
 				passwordHash,
 				role: Role.GLOBAL_ADMIN,
+				status: UserStatus.ACTIVE,
 				did,
+				isActive: true,
 			},
 			create: {
 				email: 'admin@uclm.es',
 				passwordHash,
 				role: Role.GLOBAL_ADMIN,
+				status: UserStatus.ACTIVE,
 				did,
+				isActive: true,
 			},
 			select: {
 				id: true,
