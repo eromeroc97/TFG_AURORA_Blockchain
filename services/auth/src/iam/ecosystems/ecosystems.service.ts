@@ -18,7 +18,7 @@ export class EcosystemsService {
 
   async create(createEcosystemDto: CreateEcosystemDto, ownerId: string) {
     try {
-      const did = await this.fireflyService.registerIdentity(createEcosystemDto.name);
+      const did = await this.fireflyService.getOrganizationDid();
 
       return await this.prisma.ecosystem.create({
         data: {

@@ -1,6 +1,5 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class FireflyService {
@@ -8,50 +7,24 @@ export class FireflyService {
 
   constructor(private readonly httpService: HttpService) {}
 
-  async registerIdentity(email: string): Promise<string> {
+  async getOrganizationDid(): Promise<string> {
     const baseUrl = process.env.FIREFLY_API_URL;
 
     if (!baseUrl) {
-      const fallbackDid = `did:firefly:offline-generated-${Date.now()}`;
-      console.warn('FIREFLY_API_URL is not configured. Using fallback DID.', {
-        email,
-        fallbackDid,
-      });
-      return fallbackDid;
+      return 'did:firefly:offline-generated-org';
     }
 
     try {
-      const response = await firstValueFrom(
-        this.httpService.post(`${baseUrl}/identities`, {
-          name: email,
-          description: 'IAM User',
-        }),
-      );
+      const orgRes = await this.httpService.axiosRef.get(`${process.env.FIREFLY_API_URL}/identities?type=org`);
 
-      const generatedDid = response.data?.did ?? response.data?.id;
-
-      if (typeof generatedDid === 'string' && generatedDid.length > 0) {
-        return generatedDid;
+      if (Array.isArray(orgRes.data) && orgRes.data.length > 0 && typeof orgRes.data[0]?.did === 'string') {
+        return orgRes.data[0].did;
       }
 
-      const fallbackDid = `did:firefly:offline-generated-${Date.now()}`;
-      console.warn('FireFly response did not contain did/id. Using fallback DID.', {
-        email,
-        fallbackDid,
-        responseData: response.data,
-      });
-
-      return fallbackDid;
+      return 'did:firefly:offline-generated-org';
     } catch (error) {
-      const fallbackDid = `did:firefly:offline-generated-${Date.now()}`;
-      this.logger.warn(`FireFly identity registration failed for ${email}`, error as Error);
-      console.warn('FireFly identity registration failed. Using fallback DID.', {
-        email,
-        fallbackDid,
-        error,
-      });
-
-      return fallbackDid;
+      this.logger.warn('FireFly organization DID lookup failed. Using fallback DID.', error as Error);
+      return 'did:firefly:offline-generated-org';
     }
   }
 }

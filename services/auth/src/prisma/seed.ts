@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role } from '@prisma/client';
+import axios from 'axios';
 import * as argon2 from 'argon2';
 
 async function main() {
@@ -16,35 +17,56 @@ async function main() {
 		adapter,
 	});
 
-	try {
-		const existingGlobalAdmin = await prisma.user.findFirst({
-			where: { role: Role.GLOBAL_ADMIN },
-			select: { id: true, email: true },
-		});
+	async function getFireflyDid() {
+		const fallbackDid = 'did:firefly:offline-generated-org';
+		const baseUrl = process.env.FIREFLY_API_URL;
 
-		if (existingGlobalAdmin) {
-			console.log(
-				`[seed] GLOBAL_ADMIN already exists: ${existingGlobalAdmin.email} (${existingGlobalAdmin.id})`,
-			);
-			return;
+		if (!baseUrl) {
+			return fallbackDid;
 		}
 
-		const passwordHash = await argon2.hash('Admin123!');
+		try {
+			const orgRes = await axios.get(`${process.env.FIREFLY_API_URL}/identities?type=org`);
+			const did = orgRes.data?.[0]?.did;
 
-		const createdAdmin = await prisma.user.create({
-			data: {
-				email: 'admin@aurora.local',
+			if (typeof did === 'string' && did.length > 0) {
+				return did;
+			}
+		} catch (error) {
+			const axiosError = error as { response?: { data?: unknown }; message?: string };
+			console.error('[seed] FireFly Error Details:', axiosError.response?.data || axiosError.message);
+			return fallbackDid;
+		}
+
+		return fallbackDid;
+	}
+
+	try {
+		const passwordHash = await argon2.hash('Admin123!');
+		const did = await getFireflyDid();
+
+		const createdAdmin = await prisma.user.upsert({
+			where: { email: 'admin@uclm.es' },
+			update: {
 				passwordHash,
 				role: Role.GLOBAL_ADMIN,
+				did,
+			},
+			create: {
+				email: 'admin@uclm.es',
+				passwordHash,
+				role: Role.GLOBAL_ADMIN,
+				did,
 			},
 			select: {
 				id: true,
 				email: true,
 				role: true,
+				did: true,
 			},
 		});
 
-		console.log(`[seed] GLOBAL_ADMIN created successfully: ${createdAdmin.email}`);
+		console.log(`[seed] GLOBAL_ADMIN upserted successfully: ${createdAdmin.email} (${createdAdmin.id})`);
 	} catch (error) {
 		console.error('[seed] Error while running database seed', error);
 	} finally {

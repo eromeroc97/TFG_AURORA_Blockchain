@@ -27,7 +27,7 @@ export class UsersService {
       }
 
       const passwordHash = await argon2.hash(createUserDto.password);
-      const did = await this.fireflyService.registerIdentity(createUserDto.email);
+      const did = await this.fireflyService.getOrganizationDid();
 
       const createdUser = await this.prisma.user.create({
         data: {
