@@ -4,13 +4,17 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { FireflyService } from '../../blockchain/firefly.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fireflyService: FireflyService,
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     try {
@@ -23,13 +27,14 @@ export class UsersService {
       }
 
       const passwordHash = await argon2.hash(createUserDto.password);
+      const did = await this.fireflyService.registerIdentity(createUserDto.email);
 
       const createdUser = await this.prisma.user.create({
         data: {
           email: createUserDto.email,
           passwordHash,
           role: createUserDto.role,
-          did: createUserDto.did,
+          did,
           isActive: createUserDto.isActive,
         },
       });
