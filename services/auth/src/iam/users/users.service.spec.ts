@@ -2,7 +2,6 @@ import { ConflictException, InternalServerErrorException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { FireflyService } from '../../blockchain/firefly.service';
 import { UsersService } from './users.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -25,15 +24,10 @@ describe('UsersService', () => {
     remove: ReturnType<typeof jest.fn>;
   };
   let fireflyServiceMock: {
-    registerIdentity: ReturnType<typeof jest.fn>;
-  };
-
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
 
   const createUserDto: CreateUserDto = {
     email: 'admin@aurora.local',
-    password: 'Admin123!',
-    did: 'did:firefly:org-aurora:user:admin-001',
     isActive: true,
   };
 
@@ -41,9 +35,9 @@ describe('UsersService', () => {
     id: 'a4a98bc5-a6a3-4e13-8cb7-4f2cbf3a4c75',
     email: createUserDto.email,
     passwordHash: 'hashed_password',
-    role: 'OWNER',
-    did: createUserDto.did,
-    isActive: createUserDto.isActive,
+    role: 'USER',
+    did: null,
+    isActive: false,
     createdAt: new Date('2026-04-13T10:00:00.000Z'),
     updatedAt: new Date('2026-04-13T10:00:00.000Z'),
   };
@@ -65,25 +59,17 @@ describe('UsersService', () => {
             remove: jest.fn((id: number) => `mock remove #${id}`),
           }),
         },
-        {
-          provide: FireflyService,
-          useFactory: () => ({
-            registerIdentity: jest.fn(),
-          }),
-        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     prismaServiceMock = module.get(PrismaService) as unknown as typeof prismaServiceMock;
-    fireflyServiceMock = module.get(FireflyService) as unknown as typeof fireflyServiceMock;
     jest.clearAllMocks();
   });
 
   it('should hash password and create user', async () => {
     prismaServiceMock.user.findUnique.mockResolvedValue(null);
     mockHash.mockResolvedValue('hashed_password' as never);
-    fireflyServiceMock.registerIdentity.mockResolvedValue('did:firefly:org-aurora:user:admin-001');
     prismaServiceMock.user.create.mockResolvedValue(createdUserRecord);
 
     const result = await service.create(createUserDto);
@@ -91,27 +77,23 @@ describe('UsersService', () => {
     expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
       where: { email: createUserDto.email },
     });
-    expect(mockHash).toHaveBeenCalledWith(createUserDto.password);
-    expect(fireflyServiceMock.registerIdentity).toHaveBeenCalledWith(createUserDto.email);
+    expect(mockHash).toHaveBeenCalledTimes(1);
     expect(prismaServiceMock.user.create).toHaveBeenCalledWith({
       data: {
         email: createUserDto.email,
         passwordHash: 'hashed_password',
-        role: createUserDto.role,
-        did: 'did:firefly:org-aurora:user:admin-001',
-        isActive: createUserDto.isActive,
+        role: 'USER',
+        did: null,
+        isActive: false,
       },
     });
 
     const findUniqueCallOrder = prismaServiceMock.user.findUnique.mock.invocationCallOrder[0];
     const hashCallOrder = mockHash.mock.invocationCallOrder[0];
-    const fireflyCallOrder = fireflyServiceMock.registerIdentity.mock.invocationCallOrder[0];
     const createCallOrder = prismaServiceMock.user.create.mock.invocationCallOrder[0];
 
     expect(findUniqueCallOrder).toBeLessThan(hashCallOrder);
     expect(hashCallOrder).toBeLessThan(createCallOrder);
-    expect(hashCallOrder).toBeLessThan(fireflyCallOrder);
-    expect(fireflyCallOrder).toBeLessThan(createCallOrder);
 
     const prismaCreateArg = prismaServiceMock.user.create.mock.calls[0][0];
     expect(prismaCreateArg.data.passwordHash).not.toBe(createUserDto.password);
@@ -133,13 +115,11 @@ describe('UsersService', () => {
 
     expect(prismaServiceMock.user.create).not.toHaveBeenCalled();
     expect(mockHash).not.toHaveBeenCalled();
-    expect(fireflyServiceMock.registerIdentity).not.toHaveBeenCalled();
   });
 
   it('should throw InternalServerErrorException when database creation fails', async () => {
     prismaServiceMock.user.findUnique.mockResolvedValue(null);
     mockHash.mockResolvedValue('hashed_password' as never);
-    fireflyServiceMock.registerIdentity.mockResolvedValue('did:firefly:org-aurora:user:admin-001');
     prismaServiceMock.user.create.mockRejectedValue(new Error('database unavailable'));
 
     await expect(service.create(createUserDto)).rejects.toBeInstanceOf(

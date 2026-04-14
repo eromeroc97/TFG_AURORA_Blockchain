@@ -17,9 +17,9 @@ export class UsersController {
 
   // TODO: [CU-05] Proteger este endpoint con JwtAuthGuard y RolesGuard (Solo GLOBAL_ADMIN)
   @Post()
-  @ApiOperation({ summary: 'Registrar un nuevo usuario (Admin/Auditor/User)' })
+  @ApiOperation({ summary: 'Registrar un nuevo usuario (solo USER, PENDING)' })
   @ApiCreatedResponse({
-    description: 'Usuario creado exitosamente (sin el hash de la contraseña).',
+    description: 'Usuario creado exitosamente con password aleatoria, sin el hash de la contraseña.',
   })
   @ApiConflictResponse({ description: 'Ya existe un usuario con ese email.' })
   @ApiInternalServerErrorResponse({

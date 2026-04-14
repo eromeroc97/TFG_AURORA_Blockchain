@@ -42,17 +42,15 @@ describe('UsersController', () => {
   it('create should call UsersService.create with dto and return service response', async () => {
     const dto: CreateUserDto = {
       email: 'owner@aurora.local',
-      password: 'Admin123!',
-      did: 'did:firefly:org-aurora:user:owner-001',
       isActive: true,
     };
 
     const serviceResponse = {
       id: '2f1c4f9a-3c5f-4a26-8a7b-2df34d00f6e8',
       email: dto.email,
-      role: 'OWNER',
-      did: dto.did,
-      isActive: dto.isActive,
+      role: 'USER',
+      did: null,
+      isActive: false,
     };
 
     usersService.create.mockResolvedValue(serviceResponse);

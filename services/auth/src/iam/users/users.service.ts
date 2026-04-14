@@ -3,19 +3,16 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { UserStatus } from '@prisma/client';
+import { Role, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { FireflyService } from '../../blockchain/firefly.service';
+import { randomBytes } from 'crypto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly fireflyService: FireflyService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
     try {
@@ -27,16 +24,17 @@ export class UsersService {
         throw new ConflictException('A user with this email already exists');
       }
 
-      const passwordHash = await argon2.hash(createUserDto.password);
+      const generatedPassword = randomBytes(24).toString('base64url');
+      const passwordHash = await argon2.hash(generatedPassword);
 
       const createdUser = await this.prisma.user.create({
         data: {
           email: createUserDto.email,
           passwordHash,
-          role: createUserDto.role,
+          role: Role.USER,
           status: UserStatus.PENDING,
           did: null,
-          isActive: createUserDto.isActive,
+          isActive: false,
         },
       });
 

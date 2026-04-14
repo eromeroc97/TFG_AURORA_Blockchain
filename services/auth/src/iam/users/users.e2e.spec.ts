@@ -9,12 +9,12 @@ describe('UsersController (e2e) - POST /users', () => {
   let app: INestApplication;
 
   const usersServiceMock = {
-    create: jest.fn(async (dto: { email: string; did?: string; role?: string; isActive?: boolean }) => ({
+    create: jest.fn(async (dto: { email: string; isActive?: boolean }) => ({
       id: '9fdacfd7-31de-4f37-8e4b-cc05c6c416b4',
       email: dto.email,
-      role: dto.role ?? 'OWNER',
-      isActive: dto.isActive ?? true,
-      did: dto.did ?? null,
+      role: 'USER',
+      isActive: false,
+      did: null,
       createdAt: new Date('2026-04-13T12:00:00.000Z'),
       updatedAt: new Date('2026-04-13T12:00:00.000Z'),
     })),
@@ -56,10 +56,6 @@ describe('UsersController (e2e) - POST /users', () => {
   it('POST /users (Success) should return 201', async () => {
     const payload = {
       email: 'owner@aurora.local',
-      password: 'Admin123!',
-      role: 'OWNER',
-      did: 'did:firefly:org-aurora:user:owner-001',
-      isActive: true,
     };
 
     const response = await request(app.getHttpServer()).post('/users').send(payload).expect(201);
@@ -67,29 +63,15 @@ describe('UsersController (e2e) - POST /users', () => {
     expect(usersServiceMock.create).toHaveBeenCalledTimes(1);
     expect(response.body).toMatchObject({
       email: payload.email,
-      role: payload.role,
-      isActive: true,
-      did: payload.did,
+      role: 'USER',
+      isActive: false,
+      did: null,
     });
-  });
-
-  it('POST /users (Fail - Weak Password) should return 400', async () => {
-    const payload = {
-      email: 'owner@aurora.local',
-      password: 'abc',
-      role: 'OWNER',
-    };
-
-    await request(app.getHttpServer()).post('/users').send(payload).expect(400);
-
-    expect(usersServiceMock.create).not.toHaveBeenCalled();
   });
 
   it('POST /users (Fail - Invalid Email) should return 400', async () => {
     const payload = {
       email: 'owner-aurora.local',
-      password: 'Admin123!',
-      role: 'OWNER',
     };
 
     await request(app.getHttpServer()).post('/users').send(payload).expect(400);
