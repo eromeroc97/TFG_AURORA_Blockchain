@@ -1,15 +1,20 @@
 import Fastify from 'fastify';
 
-const app = Fastify({ logger: true });
+export const buildApp = () => {
+  const app = Fastify({ logger: true });
 
-app.get('/health', async () => {
-  return {
-    status: 'UP',
-    service: 'iot-manager',
-  };
-});
+  app.get('/health', async () => {
+    return {
+      status: 'UP',
+      service: 'iot-manager',
+    };
+  });
+
+  return app;
+};
 
 const start = async () => {
+  const app = buildApp();
   try {
     await app.listen({
       port: 3002,
@@ -21,4 +26,6 @@ const start = async () => {
   }
 };
 
-void start();
+if (require.main === module) {
+  void start();
+}

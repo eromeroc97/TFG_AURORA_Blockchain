@@ -19,4 +19,6 @@ COPY --from=build /app/dist ./dist
 
 EXPOSE 3002
 
+USER node
+
 CMD ["node", "dist/index.js"]
