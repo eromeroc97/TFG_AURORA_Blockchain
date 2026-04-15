@@ -43,7 +43,7 @@ export class UsersService {
       });
 
       try {
-        await this.mailService.sendWelcomeEmail(createUserDto.email, generatedPassword);
+        await this.mailService.sendWelcomeEmail(createUserDto.email);
       } catch (mailError) {
         console.warn('[UsersService] No se pudo enviar el email de bienvenida:', mailError);
       }

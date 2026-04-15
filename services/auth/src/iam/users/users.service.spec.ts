@@ -109,7 +109,7 @@ describe('UsersService', () => {
         status: 'PENDING',
       },
     });
-    expect(mailServiceMock.sendWelcomeEmail).toHaveBeenCalledWith(createUserDto.email, generatedPassword);
+    expect(mailServiceMock.sendWelcomeEmail).toHaveBeenCalledWith(createUserDto.email);
 
     const findUniqueCallOrder = prismaServiceMock.user.findUnique.mock.invocationCallOrder[0];
     const randomBytesCallOrder = mockRandomBytes.mock.invocationCallOrder[0];
