@@ -4,7 +4,6 @@ const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
-  testRegex: '.*\\.spec\\.ts$',
   moduleFileExtensions: ['ts', 'js', 'json'],
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -13,10 +12,13 @@ const config: Config = {
     '!src/**/*.dto.ts',
     '!src/**/*.entity.ts',
     '!src/main.ts',
-    '!src/prisma/**'
+    '!src/prisma/**',
+    '!src/tests/**'
   ],
   coverageDirectory: 'coverage',
   clearMocks: true,
+  setupFilesAfterEnv: ['<rootDir>/src/tests/jest.setup.ts'],
+  testTimeout: 30000,
 };
 
 export default config;
