@@ -13,6 +13,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../shared/mail/mail.service';
 import { FireflyService } from '../../blockchain/firefly.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class UsersService {
@@ -20,6 +21,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly blockchainService: FireflyService,
+    private readonly redisService: RedisService,
   ) {}
 
   private readonly userSelect = {
@@ -201,7 +203,7 @@ export class UsersService {
     }
 
     try {
-      return await this.prisma.user.update({
+      const revokedUser = await this.prisma.user.update({
         where: { id },
         data: {
           status: UserStatus.REVOKED,
@@ -211,6 +213,9 @@ export class UsersService {
         },
         select: this.userSelect,
       });
+
+      await this.redisService.addToBlacklist(id, 300);
+      return revokedUser;
     } catch (error) {
       if (this.isNotFoundError(error)) {
         throw new NotFoundException('User not found');

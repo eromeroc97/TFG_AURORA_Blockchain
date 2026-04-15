@@ -10,6 +10,7 @@ import * as argon2 from 'argon2';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import { FireflyService } from '../../blockchain/firefly.service';
+import { RedisService } from '../redis/redis.service';
 import { MailService } from '../../shared/mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -43,6 +44,10 @@ describe('UsersService', () => {
   };
   let fireflyServiceMock: {
     createIdentity: ReturnType<typeof jest.fn>;
+  };
+  let redisServiceMock: {
+    addToBlacklist: ReturnType<typeof jest.fn>;
+    isBlacklisted: ReturnType<typeof jest.fn>;
   };
 
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
@@ -107,6 +112,13 @@ describe('UsersService', () => {
             createIdentity: jest.fn(),
           }),
         },
+        {
+          provide: RedisService,
+          useFactory: () => ({
+            addToBlacklist: jest.fn(),
+            isBlacklisted: jest.fn(),
+          }),
+        },
       ],
     }).compile();
 
@@ -114,6 +126,7 @@ describe('UsersService', () => {
     prismaServiceMock = module.get(PrismaService) as unknown as typeof prismaServiceMock;
     mailServiceMock = module.get(MailService) as unknown as typeof mailServiceMock;
     fireflyServiceMock = module.get(FireflyService) as unknown as typeof fireflyServiceMock;
+    redisServiceMock = module.get(RedisService) as unknown as typeof redisServiceMock;
     jest.clearAllMocks();
   });
 
@@ -367,6 +380,7 @@ describe('UsersService', () => {
       expect(result.status).toBe(UserStatus.REVOKED);
       expect(result.did).toBe('did:firefly:custom/admin@aurora.local');
       expect(result.email).toBe(`REVOKED_${createdUserRecord.id}`);
+      expect(redisServiceMock.addToBlacklist).toHaveBeenCalledWith(createdUserRecord.id, 300);
     });
 
     it('should throw NotFoundException when user does not exist', async () => {

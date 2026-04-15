@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
+import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 
 describe('AuthService', () => {
@@ -22,6 +23,13 @@ describe('AuthService', () => {
           provide: JwtService,
           useValue: {
             signAsync: jest.fn(),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            addToBlacklist: jest.fn(),
+            isBlacklisted: jest.fn(),
           },
         },
       ],

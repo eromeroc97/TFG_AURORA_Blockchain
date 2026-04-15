@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { StringValue } from 'ms';
+import { RedisModule } from '../redis/redis.module';
 import { UsersModule } from '../users/users.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => {
   if (!rawValue) {
@@ -20,6 +22,7 @@ const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => 
 @Module({
   imports: [
     UsersModule,
+    RedisModule,
     JwtModule.registerAsync({
       useFactory: async () => ({
         privateKey: decodeRsaKey(process.env.JWT_PRIVATE_KEY, 'JWT_PRIVATE_KEY'),
@@ -34,7 +37,7 @@ const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => 
       }),
     }),
   ],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
   exports: [AuthService],
 })

@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
+import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 
 interface AuthPayload {
@@ -17,6 +18,7 @@ export class AuthService {
 	constructor(
 		private readonly usersService: UsersService,
 		private readonly jwtService: JwtService,
+		private readonly redisService: RedisService,
 	) {}
 
 	async validateUser(email: string, pass: string) {
@@ -103,6 +105,7 @@ export class AuthService {
 
 	async logout(userId: string) {
 		await this.usersService.updateRefreshTokenHash(userId, null);
+		await this.redisService.addToBlacklist(userId, 300);
 		return { success: true };
 	}
 }
