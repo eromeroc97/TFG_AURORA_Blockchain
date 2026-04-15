@@ -6,11 +6,13 @@ import * as request from 'supertest';
 import { AppModule } from '../app.module';
 import { JwtTestHelper } from './jwt-test.helper';
 
+const describeAuthE2E = process.env.DATABASE_URL ? describe : describe.skip;
+
 /**
  * E2E Tests - Simula peticiones HTTP reales desde fuera del microservicio
  * Prueba flujos completos: Create → Login → ChangeRole → Logout → AccessDenied
  */
-describe('Auth E2E - Complete Workflow with JWT', () => {
+describeAuthE2E('Auth E2E - Complete Workflow with JWT', () => {
   let app: INestApplication;
   let userId: string;
   let accessToken: string;
@@ -21,9 +23,9 @@ describe('Auth E2E - Complete Workflow with JWT', () => {
   beforeAll(async () => {
     JwtTestHelper.initialize();
 
-    const moduleRef = await Test.createTestingModule()
-      .imports(AppModule)
-      .compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(
@@ -38,7 +40,9 @@ describe('Auth E2E - Complete Workflow with JWT', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   beforeEach(() => {

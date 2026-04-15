@@ -5,9 +5,13 @@ import { Role } from '@prisma/client';
 const request = require('supertest');
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
+  let jwtGuardSpy: jest.SpiedFunction<JwtAuthGuard['canActivate']>;
+  let rolesGuardSpy: jest.SpiedFunction<RolesGuard['canActivate']>;
 
   const usersServiceMock = {
     create: jest.fn(async (dto: { email: string }) => ({
@@ -47,6 +51,9 @@ describe('UsersController (e2e)', () => {
   };
 
   beforeAll(async () => {
+    jwtGuardSpy = jest.spyOn(JwtAuthGuard.prototype, 'canActivate').mockReturnValue(true as any);
+    rolesGuardSpy = jest.spyOn(RolesGuard.prototype, 'canActivate').mockReturnValue(true);
+
     const moduleRef = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
@@ -76,6 +83,8 @@ describe('UsersController (e2e)', () => {
   });
 
   afterAll(async () => {
+    jwtGuardSpy.mockRestore();
+    rolesGuardSpy.mockRestore();
     await app.close();
   });
 

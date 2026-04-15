@@ -1,5 +1,6 @@
 import * as jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
+import { generateKeyPairSync } from 'crypto';
 
 /**
  * Helper para generar JWT tokens de prueba firmados con las claves RSA del .env
@@ -8,7 +9,7 @@ import { Role } from '@prisma/client';
 
 const decodeBase64OrPem = (rawValue: string | undefined): string => {
   if (!rawValue) {
-    throw new Error('JWT key is not configured');
+    return '';
   }
 
   if (rawValue.includes('BEGIN')) {
@@ -25,6 +26,18 @@ export class JwtTestHelper {
   static initialize() {
     this.privateKey = decodeBase64OrPem(process.env.JWT_PRIVATE_KEY);
     this.publicKey = decodeBase64OrPem(process.env.JWT_PUBLIC_KEY);
+
+    // Fallback para entornos de test sin variables JWT configuradas.
+    if (!this.privateKey || !this.publicKey) {
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+
+      this.privateKey = privateKey;
+      this.publicKey = publicKey;
+    }
   }
 
   /**
