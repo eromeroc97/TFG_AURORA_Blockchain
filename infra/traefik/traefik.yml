@@ -13,3 +13,7 @@ providers:
     endpoint: "tcp://docker-socket-proxy:2375"
     exposedByDefault: false
     network: aurora-secure-net
+
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  bufferingSize: 100
