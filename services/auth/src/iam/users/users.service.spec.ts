@@ -41,6 +41,8 @@ describe('UsersService', () => {
   let mailServiceMock: {
     sendWelcomeEmail: ReturnType<typeof jest.fn>;
     sendVerifyEmail: ReturnType<typeof jest.fn>;
+    sendRoleChangedEmail: ReturnType<typeof jest.fn>;
+    sendAccountDeletedEmail: ReturnType<typeof jest.fn>;
   };
   let fireflyServiceMock: {
     createIdentity: ReturnType<typeof jest.fn>;
@@ -104,6 +106,8 @@ describe('UsersService', () => {
           useFactory: () => ({
             sendWelcomeEmail: jest.fn(),
             sendVerifyEmail: jest.fn(),
+            sendRoleChangedEmail: jest.fn(),
+            sendAccountDeletedEmail: jest.fn(),
           }),
         },
         {
@@ -346,8 +350,9 @@ describe('UsersService', () => {
         isActive: false,
         did: 'did:firefly:custom/admin@aurora.local',
       });
+      mailServiceMock.sendAccountDeletedEmail.mockResolvedValue(undefined);
 
-      const result = await service.remove(createdUserRecord.id);
+      const result = await service.remove(createdUserRecord.id, createdUserRecord.id);
 
       expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: createdUserRecord.id },
@@ -381,12 +386,16 @@ describe('UsersService', () => {
       expect(result.did).toBe('did:firefly:custom/admin@aurora.local');
       expect(result.email).toBe(`REVOKED_${createdUserRecord.id}`);
       expect(redisServiceMock.addToBlacklist).toHaveBeenCalledWith(createdUserRecord.id, 300);
+      expect(mailServiceMock.sendAccountDeletedEmail).toHaveBeenCalledWith(
+        createdUserRecord.email,
+        expect.any(String),
+      );
     });
 
     it('should throw NotFoundException when user does not exist', async () => {
       prismaServiceMock.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('missing-id')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.remove('missing-id', 'missing-id')).rejects.toBeInstanceOf(NotFoundException);
       expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
     });
 
@@ -398,8 +407,15 @@ describe('UsersService', () => {
         did: 'did:firefly:custom/admin@aurora.local',
       });
 
-      await expect(service.remove(createdUserRecord.id)).rejects.toBeInstanceOf(ConflictException);
+      await expect(service.remove(createdUserRecord.id, createdUserRecord.id)).rejects.toBeInstanceOf(ConflictException);
       expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when requester is not self and not admin', async () => {
+      await expect(
+        service.remove(createdUserRecord.id, 'other-user-id', Role.USER),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prismaServiceMock.user.findUnique).not.toHaveBeenCalled();
     });
   });
 
@@ -413,10 +429,16 @@ describe('UsersService', () => {
     });
 
     it('should update role when new role is allowed', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: createdUserRecord.email,
+        role: Role.USER,
+      });
       prismaServiceMock.user.update.mockResolvedValue({
         ...selectedUserRecord,
         role: Role.ADMIN,
       });
+      mailServiceMock.sendRoleChangedEmail.mockResolvedValue(undefined);
 
       const result = await service.changeRole(createdUserRecord.id, Role.ADMIN);
 
@@ -434,17 +456,21 @@ describe('UsersService', () => {
           updatedAt: true,
         },
       });
+      expect(mailServiceMock.sendRoleChangedEmail).toHaveBeenCalledWith(
+        createdUserRecord.email,
+        Role.ADMIN,
+        Role.USER,
+      );
       expect(result.role).toBe(Role.ADMIN);
     });
 
     it('should map missing user to NotFoundException', async () => {
-      const p2025Error = Object.assign(new Error('record not found'), { code: 'P2025' });
-      Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
-      prismaServiceMock.user.update.mockRejectedValue(p2025Error);
+      prismaServiceMock.user.findUnique.mockResolvedValue(null);
 
       await expect(service.changeRole('missing-id', Role.ADMIN)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
     });
   });
 

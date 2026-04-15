@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class MailService {
@@ -80,5 +81,32 @@ export class MailService {
     });
 
     this.logger.log(`Test template email sent to ${email}`);
+  }
+
+  async sendRoleChangedEmail(email: string, newRole: Role, previousRole?: Role): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'AURORA - Actualización de Rol de Acceso',
+      template: './role-changed',
+      context: {
+        previous_role: previousRole ?? null,
+        new_role: newRole,
+      },
+    });
+
+    this.logger.log(`Role changed email sent to ${email}`);
+  }
+
+  async sendAccountDeletedEmail(email: string, revokedAt: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'AURORA - Cuenta Revocada',
+      template: './account-deleted',
+      context: {
+        revoked_at: revokedAt,
+      },
+    });
+
+    this.logger.log(`Account deleted email sent to ${email}`);
   }
 }

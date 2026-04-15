@@ -57,7 +57,7 @@ describe('EcosystemsService', () => {
     (prismaMock.user.findUnique as any).mockResolvedValue({
       id: createDto.ownerId,
       role: 'USER',
-      did: 'did:firefly:custom/user@uclm.es',
+      did: 'did:firefly:custom/user@test.test',
     });
     (fireflyMock.createChildIdentity as any).mockResolvedValue('did:firefly:custom/eco-gateway');
     (prismaMock.ecosystem.create as any).mockResolvedValue({ id: 'eco-id' });
@@ -70,7 +70,7 @@ describe('EcosystemsService', () => {
     });
     expect(fireflyMock.createChildIdentity).toHaveBeenCalledWith({
       name: 'eco-gateway',
-      parentDid: 'did:firefly:custom/user@uclm.es',
+      parentDid: 'did:firefly:custom/user@test.test',
     });
 
     expect(prismaMock.ecosystem.create).toHaveBeenCalledWith({
@@ -97,7 +97,7 @@ describe('EcosystemsService', () => {
     (prismaMock.user.findUnique as any).mockResolvedValue({
       id: createDto.ownerId,
       role: 'ADMIN',
-      did: 'did:firefly:custom/admin@uclm.es',
+      did: 'did:firefly:custom/admin@test.test',
     });
 
     await expect(service.create(createDto)).rejects.toBeInstanceOf(ForbiddenException);
@@ -121,7 +121,7 @@ describe('EcosystemsService', () => {
     (prismaMock.user.findUnique as any).mockResolvedValue({
       id: createDto.ownerId,
       role: 'USER',
-      did: 'did:firefly:custom/user@uclm.es',
+      did: 'did:firefly:custom/user@test.test',
     });
     (fireflyMock.createChildIdentity as any).mockRejectedValue(new Error('firefly down'));
 
@@ -177,3 +177,4 @@ describe('EcosystemsService', () => {
     await expect(service.updateHeartbeat('eco')).rejects.toBeInstanceOf(InternalServerErrorException);
   });
 });
+

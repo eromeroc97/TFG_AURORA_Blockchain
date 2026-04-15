@@ -27,7 +27,11 @@ describe('UsersController', () => {
     update: jest.fn((id: string, dto: UpdateUserDto) => ({ id, ...dto })),
     changeRole: jest.fn((id: string, newRole: Role) => ({ id, role: newRole })),
     approveUser: jest.fn((id: string) => ({ id, status: 'ACTIVE' })),
-    remove: jest.fn((id: string) => ({ id })),
+    remove: jest.fn((id: string, requesterId: string, requesterRole?: Role) => ({
+      id,
+      requesterId,
+      requesterRole,
+    })),
   };
 
   beforeEach(async () => {
@@ -95,10 +99,14 @@ describe('UsersController', () => {
   });
 
   describe('remove', () => {
-    it('should call UsersService.remove', () => {
+    it('should call UsersService.remove with self requester by default', () => {
       controller.remove('11111111-1111-1111-1111-111111111111');
 
-      expect(usersService.remove).toHaveBeenCalled();
+      expect(usersService.remove).toHaveBeenCalledWith(
+        '11111111-1111-1111-1111-111111111111',
+        '11111111-1111-1111-1111-111111111111',
+        undefined,
+      );
     });
   });
 

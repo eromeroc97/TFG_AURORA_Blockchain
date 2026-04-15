@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Actualización de rol - AURORA</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f8fa; color: #1f2937; margin: 0; padding: 24px; }
+    .card { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
+    h1 { margin: 0 0 16px; font-size: 24px; color: #0f172a; }
+    .badge { display: inline-block; background: #c60c30; color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: 700; }
+    .box { margin-top: 16px; padding: 16px; background: #f3f4f6; border-left: 4px solid #c60c30; }
+    .muted { color: #6b7280; font-size: 13px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Tu rol de acceso ha sido actualizado</h1>
+    <p>Un administrador de AURORA ha aplicado cambios en tus permisos de acceso.</p>
+
+    <div class="box">
+      {{#if previous_role}}
+      <p><strong>Rol anterior:</strong> {{previous_role}}</p>
+      {{/if}}
+      <p><strong>Nuevo rol asignado:</strong> <span class="badge">{{new_role}}</span></p>
+    </div>
+
+    <p class="muted">Si no reconoces este cambio, contacta inmediatamente con el equipo de seguridad IAM.</p>
+  </div>
+</body>
+</html>

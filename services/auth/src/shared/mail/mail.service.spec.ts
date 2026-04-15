@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { Role } from '@prisma/client';
 import { MailerService } from '@nestjs-modules/mailer';
 import { MailService } from './mail.service';
 
@@ -109,6 +110,42 @@ describe('MailService', () => {
         template: './test',
         context: {
           email: 'test@test.com',
+        },
+      });
+    });
+  });
+
+  describe('sendRoleChangedEmail', () => {
+    it('should send role changed email with previous and new role', async () => {
+      (mailerServiceMock.sendMail as any).mockResolvedValue(undefined);
+
+      await service.sendRoleChangedEmail('user@test.test', Role.ADMIN, Role.USER);
+
+      expect(mailerServiceMock.sendMail).toHaveBeenCalledWith({
+        to: 'user@test.test',
+        subject: 'AURORA - Actualización de Rol de Acceso',
+        template: './role-changed',
+        context: {
+          previous_role: Role.USER,
+          new_role: Role.ADMIN,
+        },
+      });
+    });
+  });
+
+  describe('sendAccountDeletedEmail', () => {
+    it('should send account deleted email with revocation timestamp', async () => {
+      (mailerServiceMock.sendMail as any).mockResolvedValue(undefined);
+      const revokedAt = '2026-04-15T16:30:00.000Z';
+
+      await service.sendAccountDeletedEmail('user@test.test', revokedAt);
+
+      expect(mailerServiceMock.sendMail).toHaveBeenCalledWith({
+        to: 'user@test.test',
+        subject: 'AURORA - Cuenta Revocada',
+        template: './account-deleted',
+        context: {
+          revoked_at: revokedAt,
         },
       });
     });

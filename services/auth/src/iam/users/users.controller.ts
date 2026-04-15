@@ -6,6 +6,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import { UsersService } from './users.service';
 import { ApproveUserDto } from './dto/approve-user.dto';
 import { ChangeRoleDto } from './dto/change-role.dto';
@@ -46,6 +47,7 @@ export class UsersController {
   }
 
   @Patch(':id/role')
+  // TODO: @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
   changeRole(@Param('id') id: string, @Body() changeRoleDto: ChangeRoleDto) {
     return this.usersService.changeRole(id, changeRoleDto.newRole);
   }
@@ -57,7 +59,14 @@ export class UsersController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @Body()
+    actor?: {
+      requesterId?: string;
+      requesterRole?: Role;
+    },
+  ) {
+    return this.usersService.remove(id, actor?.requesterId ?? id, actor?.requesterRole);
   }
 }

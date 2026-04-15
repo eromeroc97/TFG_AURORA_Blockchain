@@ -37,6 +37,13 @@ describe('UsersController (e2e)', () => {
       did: 'did:firefly:custom/owner@aurora.local',
       approvedBy: adminDid,
     })),
+    remove: jest.fn(async (id: string, requesterId: string, requesterRole?: Role) => ({
+      id,
+      requesterId,
+      requesterRole,
+      status: 'REVOKED',
+      isActive: false,
+    })),
   };
 
   beforeAll(async () => {
@@ -156,5 +163,20 @@ describe('UsersController (e2e)', () => {
       .expect(400);
 
     expect(usersServiceMock.approveUser).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /users/:id (Success self) should return 200', async () => {
+    const userId = '9fdacfd7-31de-4f37-8e4b-cc05c6c416b4';
+
+    const response = await request(app.getHttpServer())
+      .delete(`/users/${userId}`)
+      .send({ requesterId: userId })
+      .expect(200);
+
+    expect(usersServiceMock.remove).toHaveBeenCalledWith(userId, userId, undefined);
+    expect(response.body).toMatchObject({
+      id: userId,
+      status: 'REVOKED',
+    });
   });
 });

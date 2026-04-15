@@ -183,7 +183,15 @@ export class UsersService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, requesterId: string = id, requesterRole?: Role) {
+    const isAdminRequester =
+      requesterRole === Role.ADMIN || requesterRole === Role.GLOBAL_ADMIN;
+    const isSelfRequester = requesterId === id;
+
+    if (!isAdminRequester && !isSelfRequester) {
+      throw new ForbiddenException('No tienes permisos para revocar esta cuenta');
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -215,6 +223,7 @@ export class UsersService {
       });
 
       await this.redisService.addToBlacklist(id, 300);
+      await this.mailService.sendAccountDeletedEmail(user.email, new Date().toISOString());
       return revokedUser;
     } catch (error) {
       if (this.isNotFoundError(error)) {
@@ -232,12 +241,33 @@ export class UsersService {
       );
     }
 
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    if (!currentUser) {
+      throw new NotFoundException('User not found');
+    }
+
     try {
-      return await this.prisma.user.update({
+      const updatedUser = await this.prisma.user.update({
         where: { id: targetUserId },
         data: { role: newRole },
         select: this.userSelect,
       });
+
+      await this.mailService.sendRoleChangedEmail(
+        currentUser.email,
+        newRole,
+        currentUser.role,
+      );
+
+      return updatedUser;
     } catch (error) {
       if (this.isNotFoundError(error)) {
         throw new NotFoundException('User not found');
