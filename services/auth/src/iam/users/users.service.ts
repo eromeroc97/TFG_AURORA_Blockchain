@@ -37,6 +37,7 @@ export class UsersService {
     id: true,
     email: true,
     passwordHash: true,
+    hashedRefreshToken: true,
     role: true,
     status: true,
     isActive: true,
@@ -127,6 +128,34 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async findAuthUserById(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: this.authUserSelect,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  async updateRefreshTokenHash(userId: string, hashedRefreshToken: string | null) {
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { hashedRefreshToken },
+      });
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException('User not found');
+      }
+
+      throw new InternalServerErrorException('Failed to update refresh token');
+    }
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {

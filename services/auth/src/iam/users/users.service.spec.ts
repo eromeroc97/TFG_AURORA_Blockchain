@@ -297,6 +297,7 @@ describe('UsersService', () => {
           id: true,
           email: true,
           passwordHash: true,
+          hashedRefreshToken: true,
           role: true,
           status: true,
           isActive: true,

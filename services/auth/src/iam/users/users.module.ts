@@ -9,5 +9,6 @@ import { MailModule } from '../../shared/mail/mail.module';
   imports: [PrismaModule, MailModule, BlockchainModule],
   controllers: [UsersController],
   providers: [UsersService],
+  exports: [UsersService],
 })
 export class UsersModule {}
