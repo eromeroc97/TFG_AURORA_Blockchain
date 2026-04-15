@@ -12,12 +12,14 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../shared/mail/mail.service';
+import { FireflyService } from '../../blockchain/firefly.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly blockchainService: FireflyService,
   ) {}
 
   private readonly userSelect = {
@@ -157,7 +159,7 @@ export class UsersService {
     }
   }
 
-  async approveUser(id: string, _adminDid: string = '') {
+  async approveUser(id: string, adminDid: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -175,14 +177,17 @@ export class UsersService {
       throw new ConflictException('El usuario no está en PENDING');
     }
 
-    const mockDid = `did:firefly:custom/${user.email}`;
+    const userDid = await this.blockchainService.createIdentity({
+      name: user.email,
+      parent: adminDid,
+    });
 
     const approvedUser = await this.prisma.user.update({
       where: { id },
       data: {
         status: UserStatus.ACTIVE,
         isActive: true,
-        did: mockDid,
+        did: userDid,
       },
       select: this.userSelect,
     });

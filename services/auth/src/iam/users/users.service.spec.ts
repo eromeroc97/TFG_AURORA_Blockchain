@@ -9,6 +9,7 @@ import { Prisma, Role, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { randomBytes } from 'crypto';
+import { FireflyService } from '../../blockchain/firefly.service';
 import { MailService } from '../../shared/mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -38,6 +39,9 @@ describe('UsersService', () => {
   let mailServiceMock: {
     sendWelcomeEmail: ReturnType<typeof jest.fn>;
     sendVerifyEmail: ReturnType<typeof jest.fn>;
+  };
+  let fireflyServiceMock: {
+    createIdentity: ReturnType<typeof jest.fn>;
   };
 
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
@@ -95,12 +99,19 @@ describe('UsersService', () => {
             sendVerifyEmail: jest.fn(),
           }),
         },
+        {
+          provide: FireflyService,
+          useFactory: () => ({
+            createIdentity: jest.fn(),
+          }),
+        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     prismaServiceMock = module.get(PrismaService) as unknown as typeof prismaServiceMock;
     mailServiceMock = module.get(MailService) as unknown as typeof mailServiceMock;
+    fireflyServiceMock = module.get(FireflyService) as unknown as typeof fireflyServiceMock;
     jest.clearAllMocks();
   });
 
@@ -341,24 +352,25 @@ describe('UsersService', () => {
   });
 
   describe('approveUser', () => {
-    it('should approve user in PENDING, assign mock DID and send verify email', async () => {
+    it('should approve user in PENDING, assign DID from FireFly and send verify email', async () => {
+      const adminDid = 'did:firefly:custom/admin@aurora.local';
+      const issuedDid = `did:firefly:custom/${createdUserRecord.email}`;
+
       prismaServiceMock.user.findUnique.mockResolvedValue({
         id: createdUserRecord.id,
         email: createdUserRecord.email,
         status: UserStatus.PENDING,
       });
+      fireflyServiceMock.createIdentity.mockResolvedValue(issuedDid);
       prismaServiceMock.user.update.mockResolvedValue({
         ...selectedUserRecord,
         status: UserStatus.ACTIVE,
         isActive: true,
-        did: `did:firefly:custom/${createdUserRecord.email}`,
+        did: issuedDid,
       });
       mailServiceMock.sendVerifyEmail.mockResolvedValue(undefined);
 
-      const result = await service.approveUser(
-        createdUserRecord.id,
-        'did:firefly:custom/admin@aurora.local',
-      );
+      const result = await service.approveUser(createdUserRecord.id, adminDid);
 
       expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: createdUserRecord.id },
@@ -368,12 +380,16 @@ describe('UsersService', () => {
           status: true,
         },
       });
+      expect(fireflyServiceMock.createIdentity).toHaveBeenCalledWith({
+        name: createdUserRecord.email,
+        parent: adminDid,
+      });
       expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
         where: { id: createdUserRecord.id },
         data: {
           status: UserStatus.ACTIVE,
           isActive: true,
-          did: `did:firefly:custom/${createdUserRecord.email}`,
+          did: issuedDid,
         },
         select: {
           id: true,
@@ -396,7 +412,10 @@ describe('UsersService', () => {
     it('should throw NotFoundException when user does not exist', async () => {
       prismaServiceMock.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.approveUser('missing-id')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.approveUser('missing-id', 'did:firefly:custom/admin@aurora.local'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(fireflyServiceMock.createIdentity).not.toHaveBeenCalled();
       expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
       expect(mailServiceMock.sendVerifyEmail).not.toHaveBeenCalled();
     });
@@ -408,26 +427,49 @@ describe('UsersService', () => {
         status: UserStatus.ACTIVE,
       });
 
-      await expect(service.approveUser(createdUserRecord.id)).rejects.toBeInstanceOf(ConflictException);
+      await expect(
+        service.approveUser(createdUserRecord.id, 'did:firefly:custom/admin@aurora.local'),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(fireflyServiceMock.createIdentity).not.toHaveBeenCalled();
       expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
       expect(mailServiceMock.sendVerifyEmail).not.toHaveBeenCalled();
     });
 
     it('should propagate mail errors after activation update', async () => {
+      const issuedDid = `did:firefly:custom/${createdUserRecord.email}`;
+
       prismaServiceMock.user.findUnique.mockResolvedValue({
         id: createdUserRecord.id,
         email: createdUserRecord.email,
         status: UserStatus.PENDING,
       });
+      fireflyServiceMock.createIdentity.mockResolvedValue(issuedDid);
       prismaServiceMock.user.update.mockResolvedValue({
         ...selectedUserRecord,
         status: UserStatus.ACTIVE,
         isActive: true,
-        did: `did:firefly:custom/${createdUserRecord.email}`,
+        did: issuedDid,
       });
       mailServiceMock.sendVerifyEmail.mockRejectedValue(new Error('smtp down'));
 
-      await expect(service.approveUser(createdUserRecord.id)).rejects.toThrow('smtp down');
+      await expect(
+        service.approveUser(createdUserRecord.id, 'did:firefly:custom/admin@aurora.local'),
+      ).rejects.toThrow('smtp down');
+    });
+
+    it('should propagate FireFly identity errors and avoid activation update', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: createdUserRecord.email,
+        status: UserStatus.PENDING,
+      });
+      fireflyServiceMock.createIdentity.mockRejectedValue(new Error('firefly down'));
+
+      await expect(
+        service.approveUser(createdUserRecord.id, 'did:firefly:custom/admin@aurora.local'),
+      ).rejects.toThrow('firefly down');
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+      expect(mailServiceMock.sendVerifyEmail).not.toHaveBeenCalled();
     });
   });
 });

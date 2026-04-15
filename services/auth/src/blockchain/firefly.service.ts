@@ -1,6 +1,17 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 
+interface FireflyIdentity {
+  id: string;
+  did: string;
+  parent?: string;
+}
+
+interface FireflyCreateIdentityRequest {
+  name: string;
+  parent: string;
+}
+
 @Injectable()
 export class FireflyService {
   private readonly logger = new Logger(FireflyService.name);
@@ -25,6 +36,27 @@ export class FireflyService {
     } catch (error) {
       this.logger.warn('FireFly organization DID lookup failed. Using fallback DID.', error as Error);
       return 'did:firefly:offline-generated-org';
+    }
+  }
+
+  async createIdentity(payload: FireflyCreateIdentityRequest): Promise<string> {
+    try {
+      const response = await this.httpService.axiosRef.post<FireflyIdentity>(
+        '/identities',
+        payload,
+      );
+      const did = response.data?.did;
+      if (!did) {
+        throw new Error('FireFly identity response missing DID');
+      }
+      return did;
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo crear identidad en FireFly, se genera fallback local: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return `did:firefly:custom/${payload.name}`;
     }
   }
 }

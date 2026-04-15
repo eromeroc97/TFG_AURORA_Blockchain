@@ -51,8 +51,9 @@ export class UsersController {
   }
 
   @Patch(':id/approve')
+  // TODO: Activar @Roles(Role.GLOBAL_ADMIN, Role.ADMIN) cuando se integre el módulo de auth/JWT.
   approveUser(@Param('id') id: string, @Body() approveUserDto: ApproveUserDto) {
-    return this.usersService.approveUser(id, approveUserDto.adminDid ?? '');
+    return this.usersService.approveUser(id, approveUserDto.adminDid);
   }
 
   @Delete(':id')

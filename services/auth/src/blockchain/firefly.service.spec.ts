@@ -9,6 +9,7 @@ describe('FireflyService', () => {
   const httpServiceMock = {
     axiosRef: {
       get: jest.fn(),
+      post: jest.fn(),
     },
   };
 
@@ -65,5 +66,40 @@ describe('FireflyService', () => {
     const did = await service.getOrganizationDid();
 
     expect(did).toBe('did:firefly:offline-generated-org');
+  });
+
+  describe('createIdentity', () => {
+    const payload = {
+      name: 'user@aurora.local',
+      parent: 'did:firefly:custom/admin@aurora.local',
+    };
+
+    it('should return did from FireFly when available', async () => {
+      (httpServiceMock.axiosRef.post as jest.Mock).mockResolvedValue({
+        data: {
+          id: 'identity-001',
+          did: 'did:firefly:custom/user@aurora.local',
+          parent: payload.parent,
+        },
+      } as never);
+
+      const did = await service.createIdentity(payload);
+
+      expect(httpServiceMock.axiosRef.post).toHaveBeenCalledWith(
+        '/identities',
+        payload,
+      );
+      expect(did).toBe('did:firefly:custom/user@aurora.local');
+    });
+
+    it('should fallback to deterministic did when FireFly fails', async () => {
+      (httpServiceMock.axiosRef.post as jest.Mock).mockRejectedValue(
+        new Error('network failure') as never,
+      );
+
+      const did = await service.createIdentity(payload);
+
+      expect(did).toBe('did:firefly:custom/user@aurora.local');
+    });
   });
 });

@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class ApproveUserDto {
   @ApiProperty({
     description: 'DID del administrador que aprueba el alta Zero-Trust.',
     example: 'did:firefly:custom/admin@aurora.local',
-    required: false,
+    required: true,
   })
-  @IsOptional()
   @IsString()
-  adminDid?: string;
+  @IsNotEmpty()
+  adminDid!: string;
 }

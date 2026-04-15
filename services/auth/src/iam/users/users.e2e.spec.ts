@@ -28,14 +28,14 @@ describe('UsersController (e2e)', () => {
       isActive: false,
       did: null,
     })),
-    approveUser: jest.fn(async (id: string, adminDid?: string) => ({
+    approveUser: jest.fn(async (id: string, adminDid: string) => ({
       id,
       email: 'owner@aurora.local',
       role: 'USER',
       status: 'ACTIVE',
       isActive: true,
       did: 'did:firefly:custom/owner@aurora.local',
-      approvedBy: adminDid ?? null,
+      approvedBy: adminDid,
     })),
   };
 
@@ -139,12 +139,12 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  it('PATCH /users/:id/approve (Success without adminDid) should return 200', async () => {
+  it('PATCH /users/:id/approve (Fail - Missing adminDid) should return 400', async () => {
     const userId = '9fdacfd7-31de-4f37-8e4b-cc05c6c416b4';
 
-    await request(app.getHttpServer()).patch(`/users/${userId}/approve`).send({}).expect(200);
+    await request(app.getHttpServer()).patch(`/users/${userId}/approve`).send({}).expect(400);
 
-    expect(usersServiceMock.approveUser).toHaveBeenCalledWith(userId, '');
+    expect(usersServiceMock.approveUser).not.toHaveBeenCalled();
   });
 
   it('PATCH /users/:id/approve (Fail - Invalid adminDid type) should return 400', async () => {
