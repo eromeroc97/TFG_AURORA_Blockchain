@@ -2,8 +2,9 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
-import { Role, UserStatus } from '@prisma/client';
+import { Prisma, Role, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -17,6 +18,21 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
   ) {}
+
+  private readonly userSelect = {
+    id: true,
+    email: true,
+    role: true,
+    status: true,
+    isActive: true,
+    did: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const;
+
+  private isNotFoundError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+  }
 
   async create(createUserDto: CreateUserDto) {
     try {
@@ -61,18 +77,60 @@ export class UsersService {
   }
 
   findAll() {
-    return `This action returns all users`;
+    return this.prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: this.userSelect,
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: this.userSelect,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    try {
+      const { password, ...rest } = updateUserDto;
+      const data: Prisma.UserUpdateInput = { ...rest };
+
+      if (password) {
+        data.passwordHash = await argon2.hash(password);
+      }
+
+      return await this.prisma.user.update({
+        where: { id },
+        data,
+        select: this.userSelect,
+      });
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException('User not found');
+      }
+
+      throw new InternalServerErrorException('Failed to update user');
+    }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async remove(id: string) {
+    try {
+      return await this.prisma.user.delete({
+        where: { id },
+        select: this.userSelect,
+      });
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException('User not found');
+      }
+
+      throw new InternalServerErrorException('Failed to remove user');
+    }
   }
 }

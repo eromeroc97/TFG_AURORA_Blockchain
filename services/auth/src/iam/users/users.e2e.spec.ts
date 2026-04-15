@@ -13,6 +13,7 @@ describe('UsersController (e2e) - POST /users', () => {
       id: '9fdacfd7-31de-4f37-8e4b-cc05c6c416b4',
       email: dto.email,
       role: 'USER',
+      status: 'PENDING',
       isActive: false,
       did: null,
       createdAt: new Date('2026-04-13T12:00:00.000Z'),

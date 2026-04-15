@@ -18,9 +18,9 @@ describe('UsersController', () => {
   const usersServiceMock = {
     create: jest.fn(),
     findAll: jest.fn(() => []),
-    findOne: jest.fn((id: number) => ({ id })),
-    update: jest.fn((id: number, dto: UpdateUserDto) => ({ id, ...dto })),
-    remove: jest.fn((id: number) => ({ id })),
+    findOne: jest.fn((id: string) => ({ id })),
+    update: jest.fn((id: string, dto: UpdateUserDto) => ({ id, ...dto })),
+    remove: jest.fn((id: string) => ({ id })),
   };
 
   beforeEach(async () => {
@@ -71,7 +71,7 @@ describe('UsersController', () => {
 
   describe('findOne', () => {
     it('should call UsersService.findOne', () => {
-      controller.findOne('1');
+      controller.findOne('11111111-1111-1111-1111-111111111111');
 
       expect(usersService.findOne).toHaveBeenCalled();
     });
@@ -81,7 +81,7 @@ describe('UsersController', () => {
     it('should call UsersService.update', () => {
       const dto: UpdateUserDto = {};
 
-      controller.update('1', dto);
+      controller.update('11111111-1111-1111-1111-111111111111', dto);
 
       expect(usersService.update).toHaveBeenCalled();
     });
@@ -89,7 +89,7 @@ describe('UsersController', () => {
 
   describe('remove', () => {
     it('should call UsersService.remove', () => {
-      controller.remove('1');
+      controller.remove('11111111-1111-1111-1111-111111111111');
 
       expect(usersService.remove).toHaveBeenCalled();
     });

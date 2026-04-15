@@ -24,62 +24,70 @@ enum EcosystemStatus {
   REVOKED
 }
 
+enum DeviceStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
 model User {
-  id           String      @id @default(uuid()) @db.Uuid
-  email        String      @unique
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
   passwordHash String
-  role         Role        @default(USER)
-  status       UserStatus  @default(PENDING)
-  isActive     Boolean     @default(true)
+  role         Role       @default(USER)
+  status       UserStatus @default(PENDING)
+  isActive     Boolean    @default(true)
 
   // DID para no repudio: identidad humana para firmar/atribuir acciones en la red DLT.
-  did          String?     @unique
+  did String? @unique
 
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  ecosystems   Ecosystem[]
+  ecosystems Ecosystem[]
 }
 
 model Ecosystem {
-  id         String   @id @default(uuid()) @db.Uuid
-  name       String
+  id   String @id @default(uuid()) @db.Uuid
+  name String
 
-  ownerId    String   @db.Uuid
-  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  ownerId String @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
   did                    String?         @unique
   certificateFingerprint String?         @unique
   status                 EcosystemStatus @default(PENDING)
 
-  latitude               Float?
-  longitude              Float?
+  latitude  Float?
+  longitude Float?
 
   // Estado en tiempo real (El histórico pertenece al microservicio de Auditoría)
-  isOnline               Boolean         @default(false)
-  lastSeen               DateTime?
+  isOnline Boolean   @default(false)
+  lastSeen DateTime?
 
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  devices                Device[]
+  devices Device[]
 
   @@index([ownerId])
 }
 
 model Device {
-  id                     String       @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  ecosystemId            String       @db.Uuid
-  ecosystem              Ecosystem    @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
+  ecosystemId String    @db.Uuid
+  ecosystem   Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
 
-  name                   String
-  localType              String
+  name        String
+  fingerprint String       @unique
+  status      DeviceStatus @default(PENDING)
+  did         String?      @unique
 
-  // Sensor logico: inventario local sin carga criptografica; la seguridad/trazabilidad vive en el Gateway.
+  // Identidad Zero-Trust de la maquina: activa solo tras validacion y/o provisionado blockchain.
 
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ecosystemId])
 }

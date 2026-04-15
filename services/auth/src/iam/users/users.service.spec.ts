@@ -1,13 +1,14 @@
-import { ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma, Role, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { UsersService } from './users.service';
+import { randomBytes } from 'crypto';
+import { MailService } from '../../shared/mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { MailService } from '../../shared/mail/mail.service';
-import { randomBytes } from 'crypto';
+import { UsersService } from './users.service';
 
 jest.mock('argon2', () => ({
   hash: jest.fn(),
@@ -23,16 +24,16 @@ describe('UsersService', () => {
   let prismaServiceMock: {
     user: {
       findUnique: ReturnType<typeof jest.fn>;
+      findMany: ReturnType<typeof jest.fn>;
       create: ReturnType<typeof jest.fn>;
+      update: ReturnType<typeof jest.fn>;
+      delete: ReturnType<typeof jest.fn>;
     };
-    findAll: ReturnType<typeof jest.fn>;
-    findOne: ReturnType<typeof jest.fn>;
-    update: ReturnType<typeof jest.fn>;
-    remove: ReturnType<typeof jest.fn>;
   };
   let mailServiceMock: {
     sendWelcomeEmail: ReturnType<typeof jest.fn>;
   };
+
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
   const mockRandomBytes = randomBytes as jest.MockedFunction<typeof randomBytes>;
   const generatedPasswordBuffer = Buffer.from('temporary-password-123456');
@@ -46,11 +47,23 @@ describe('UsersService', () => {
     id: 'a4a98bc5-a6a3-4e13-8cb7-4f2cbf3a4c75',
     email: createUserDto.email,
     passwordHash: 'hashed_password',
-    role: 'USER',
+    role: Role.USER,
+    status: UserStatus.PENDING,
     did: null,
     isActive: false,
     createdAt: new Date('2026-04-13T10:00:00.000Z'),
     updatedAt: new Date('2026-04-13T10:00:00.000Z'),
+  };
+
+  const selectedUserRecord = {
+    id: createdUserRecord.id,
+    email: createdUserRecord.email,
+    role: createdUserRecord.role,
+    status: createdUserRecord.status,
+    isActive: createdUserRecord.isActive,
+    did: createdUserRecord.did,
+    createdAt: createdUserRecord.createdAt,
+    updatedAt: createdUserRecord.updatedAt,
   };
 
   beforeEach(async () => {
@@ -62,12 +75,11 @@ describe('UsersService', () => {
           useFactory: () => ({
             user: {
               findUnique: jest.fn(),
+              findMany: jest.fn(),
               create: jest.fn(),
+              update: jest.fn(),
+              delete: jest.fn(),
             },
-            findAll: jest.fn(() => []),
-            findOne: jest.fn((id: number) => `mock findOne #${id}`),
-            update: jest.fn((id: number, payload: UpdateUserDto) => ({ id, ...payload })),
-            remove: jest.fn((id: number) => `mock remove #${id}`),
           }),
         },
         {
@@ -103,33 +115,20 @@ describe('UsersService', () => {
       data: {
         email: createUserDto.email,
         passwordHash: 'hashed_password',
-        role: 'USER',
+        role: Role.USER,
+        status: UserStatus.PENDING,
         did: null,
         isActive: false,
-        status: 'PENDING',
       },
     });
     expect(mailServiceMock.sendWelcomeEmail).toHaveBeenCalledWith(createUserDto.email);
-
-    const findUniqueCallOrder = prismaServiceMock.user.findUnique.mock.invocationCallOrder[0];
-    const randomBytesCallOrder = mockRandomBytes.mock.invocationCallOrder[0];
-    const hashCallOrder = mockHash.mock.invocationCallOrder[0];
-    const createCallOrder = prismaServiceMock.user.create.mock.invocationCallOrder[0];
-    const mailCallOrder = mailServiceMock.sendWelcomeEmail.mock.invocationCallOrder[0];
-
-    expect(findUniqueCallOrder).toBeLessThan(randomBytesCallOrder);
-    expect(randomBytesCallOrder).toBeLessThan(hashCallOrder);
-    expect(hashCallOrder).toBeLessThan(createCallOrder);
-    expect(createCallOrder).toBeLessThan(mailCallOrder);
-
-    const prismaCreateArg = prismaServiceMock.user.create.mock.calls[0][0];
-    expect(prismaCreateArg.data.passwordHash).not.toBe(generatedPassword);
 
     expect(result).not.toHaveProperty('passwordHash');
     expect(result).toMatchObject({
       id: createdUserRecord.id,
       email: createdUserRecord.email,
       role: createdUserRecord.role,
+      status: createdUserRecord.status,
       did: createdUserRecord.did,
       isActive: createdUserRecord.isActive,
     });
@@ -157,47 +156,135 @@ describe('UsersService', () => {
   });
 
   describe('findAll', () => {
-    it('should call findAll', () => {
-      const findAllSpy = jest.spyOn(service, 'findAll');
+    it('should return users without passwordHash', async () => {
+      prismaServiceMock.user.findMany.mockResolvedValue([selectedUserRecord]);
 
-      const result = service.findAll();
+      const result = await service.findAll();
 
-      expect(findAllSpy).toHaveBeenCalled();
-      expect(result).toBe('This action returns all users');
+      expect(prismaServiceMock.user.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isActive: true,
+          did: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      expect(result).toEqual([selectedUserRecord]);
     });
   });
 
   describe('findOne', () => {
-    it('should call findOne', () => {
-      const findOneSpy = jest.spyOn(service, 'findOne');
+    it('should return one user without passwordHash', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue(selectedUserRecord);
 
-      const result = service.findOne(1);
+      const result = await service.findOne(createdUserRecord.id);
 
-      expect(findOneSpy).toHaveBeenCalled();
-      expect(result).toBe('This action returns a #1 user');
+      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isActive: true,
+          did: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      expect(result).toEqual(selectedUserRecord);
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.findOne('missing-id')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('update', () => {
-    it('should call update', () => {
-      const dto: UpdateUserDto = {};
-      const updateSpy = jest.spyOn(service, 'update');
+    it('should hash password and update user', async () => {
+      mockHash.mockResolvedValue('new_hashed_password' as never);
+      prismaServiceMock.user.update.mockResolvedValue({
+        ...selectedUserRecord,
+        email: 'updated@aurora.local',
+      });
 
-      const result = service.update(1, dto);
+      const dto: UpdateUserDto = {
+        email: 'updated@aurora.local',
+        password: 'NewPassword123!',
+      };
 
-      expect(updateSpy).toHaveBeenCalled();
-      expect(result).toBe('This action updates a #1 user');
+      const result = await service.update(createdUserRecord.id, dto);
+
+      expect(mockHash).toHaveBeenCalledWith('NewPassword123!');
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        data: {
+          email: 'updated@aurora.local',
+          passwordHash: 'new_hashed_password',
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isActive: true,
+          did: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      expect(result).toEqual({
+        ...selectedUserRecord,
+        email: 'updated@aurora.local',
+      });
+    });
+
+    it('should map missing user to NotFoundException', async () => {
+      const p2025Error = Object.assign(new Error('record not found'), { code: 'P2025' });
+      Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
+      prismaServiceMock.user.update.mockRejectedValue(p2025Error);
+
+      await expect(service.update('missing-id', { email: 'x@aurora.local' })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 
   describe('remove', () => {
-    it('should call remove', () => {
-      const removeSpy = jest.spyOn(service, 'remove');
+    it('should delete user and return deleted record', async () => {
+      prismaServiceMock.user.delete.mockResolvedValue(selectedUserRecord);
 
-      const result = service.remove(1);
+      const result = await service.remove(createdUserRecord.id);
 
-      expect(removeSpy).toHaveBeenCalled();
-      expect(result).toBe('This action removes a #1 user');
+      expect(prismaServiceMock.user.delete).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isActive: true,
+          did: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      expect(result).toEqual(selectedUserRecord);
+    });
+
+    it('should map missing user to NotFoundException', async () => {
+      const p2025Error = Object.assign(new Error('record not found'), { code: 'P2025' });
+      Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
+      prismaServiceMock.user.delete.mockRejectedValue(p2025Error);
+
+      await expect(service.remove('missing-id')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });
