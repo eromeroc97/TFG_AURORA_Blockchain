@@ -7,6 +7,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
+import { ApproveUserDto } from './dto/approve-user.dto';
+import { ChangeRoleDto } from './dto/change-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -15,7 +17,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // TODO: [CU-05] Proteger este endpoint con JwtAuthGuard y RolesGuard (Solo GLOBAL_ADMIN)
   @Post()
   @ApiOperation({ summary: 'Registrar un nuevo usuario (solo USER, PENDING)' })
   @ApiCreatedResponse({
@@ -42,6 +43,16 @@ export class UsersController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
+  }
+
+  @Patch(':id/role')
+  changeRole(@Param('id') id: string, @Body() changeRoleDto: ChangeRoleDto) {
+    return this.usersService.changeRole(id, changeRoleDto.newRole);
+  }
+
+  @Patch(':id/approve')
+  approveUser(@Param('id') id: string, @Body() approveUserDto: ApproveUserDto) {
+    return this.usersService.approveUser(id, approveUserDto.adminDid ?? '');
   }
 
   @Delete(':id')

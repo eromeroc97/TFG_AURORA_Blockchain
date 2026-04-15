@@ -1,0 +1,135 @@
+import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { DeviceStatus, Prisma } from '@prisma/client';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateDeviceDto } from './dto/create-device.dto';
+import { DevicesService } from './devices.service';
+
+describe('DevicesService', () => {
+  let service: DevicesService;
+
+  const prismaMock = {
+    device: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+  };
+
+  const createDto: CreateDeviceDto = {
+    name: 'sensor-01',
+    fingerprint: 'AA:BB:CC:DD:EE:FF',
+    ecosystemId: '11111111-1111-4111-8111-111111111111',
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        DevicesService,
+        {
+          provide: PrismaService,
+          useValue: prismaMock,
+        },
+      ],
+    }).compile();
+
+    service = module.get<DevicesService>(DevicesService);
+    jest.clearAllMocks();
+  });
+
+  it('create persists device with default PENDING status', async () => {
+    (prismaMock.device.create as any).mockResolvedValue({ id: 'device-id' });
+
+    await service.create(createDto);
+
+    expect(prismaMock.device.create).toHaveBeenCalledWith({
+      data: {
+        name: createDto.name,
+        fingerprint: createDto.fingerprint,
+        ecosystemId: createDto.ecosystemId,
+        status: DeviceStatus.PENDING,
+        did: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        fingerprint: true,
+        status: true,
+        did: true,
+        ecosystemId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  });
+
+  it('delegates findAll to prisma', async () => {
+    (prismaMock.device.findMany as any).mockResolvedValue([{ id: 'device-id' }]);
+
+    await service.findAll();
+
+    expect(prismaMock.device.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        fingerprint: true,
+        status: true,
+        did: true,
+        ecosystemId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  });
+
+  it('findOne returns device when exists', async () => {
+    (prismaMock.device.findUnique as any).mockResolvedValue({ id: 'device-id' });
+
+    const result = await service.findOne('device-id');
+
+    expect(prismaMock.device.findUnique).toHaveBeenCalled();
+    expect(result).toEqual({ id: 'device-id' });
+  });
+
+  it('findOne throws NotFoundException when missing', async () => {
+    (prismaMock.device.findUnique as any).mockResolvedValue(null);
+
+    await expect(service.findOne('missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('update maps P2025 to NotFoundException', async () => {
+    const p2025Error = Object.assign(new Error('record not found'), { code: 'P2025' });
+    Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
+    (prismaMock.device.update as any).mockRejectedValue(p2025Error);
+
+    await expect(service.update('missing', { name: 'x' })).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('update maps unknown errors to InternalServerErrorException', async () => {
+    (prismaMock.device.update as any).mockRejectedValue(new Error('db down'));
+
+    await expect(service.update('device-id', { name: 'x' })).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+  });
+
+  it('remove maps P2025 to NotFoundException', async () => {
+    const p2025Error = Object.assign(new Error('record not found'), { code: 'P2025' });
+    Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
+    (prismaMock.device.delete as any).mockRejectedValue(p2025Error);
+
+    await expect(service.remove('missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('remove maps unknown errors to InternalServerErrorException', async () => {
+    (prismaMock.device.delete as any).mockRejectedValue(new Error('db down'));
+
+    await expect(service.remove('device-id')).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+  });
+});

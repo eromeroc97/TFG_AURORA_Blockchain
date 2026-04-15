@@ -1,0 +1,7 @@
+-- Add ADMIN role to IAM RBAC enum
+DO $$
+BEGIN
+  ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'ADMIN';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

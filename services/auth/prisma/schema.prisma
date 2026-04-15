@@ -7,9 +7,10 @@ datasource db {
 }
 
 enum Role {
-  GLOBAL_ADMIN
-  AUDITOR
   USER
+  AUDITOR
+  ADMIN
+  GLOBAL_ADMIN
 }
 
 enum UserStatus {

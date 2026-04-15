@@ -2,9 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { MailerService } from '@nestjs-modules/mailer';
 import { MailService } from './mail.service';
-import { MailModule } from './mail.module';
-import { join } from 'path';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 
 describe('MailService', () => {
   let service: MailService;
@@ -99,60 +96,21 @@ describe('MailService', () => {
       });
     });
 
-    it('should send real test email to Mailpit for template verification', async () => {
-      // This test sends a real email to test@test.com on Mailpit without creating a user
-      // Skip this test in CI or if Mailpit is not available locally
-      if (process.env.CI === 'true' || process.env.SKIP_MAILPIT_TEST === 'true') {
-        console.log('⊘ Skipping Mailpit integration test');
-        expect(true).toBe(true);
-        return;
-      }
+    it('should call MailerService.sendMail for test@test.com without integration try/catch', async () => {
+      const sendMailSpy = jest
+        .spyOn(mailerServiceMock, 'sendMail')
+        .mockResolvedValue(undefined as never);
 
-      try {
-        const nodemailer = require('nodemailer');
-        
-        // Create direct connection to Mailpit (not through Docker network)
-        const transporter = nodemailer.createTransport({
-          host: 'localhost',
-          port: 1025,
-          secure: false,
-        });
+      await service.sendTestEmail('test@test.com');
 
-        const testEmail = 'test@test.com';
-        
-        // Send a simple HTML email using the test template structure
-        const result = await transporter.sendMail({
-          from: 'noreply@aurora-gsya.uclm.es',
-          to: testEmail,
-          subject: 'AURORA - Correo de Prueba del Sistema (Integration Test)',
-          html: `
-            <div style="max-width: 680px; margin: 0 auto; padding: 32px 16px;">
-              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 28px;">
-                <div style="background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%); color: #f8fafc; padding: 28px; text-align: center;">
-                  <h1 style="margin: 0; font-size: 24px;">🧪 ENTORNO DE PRUEBAS</h1>
-                  <p style="margin: 10px 0 0; opacity: 0.92; font-size: 14px;">Plantilla de verificación del sistema de correos electrónicos</p>
-                </div>
-                <div style="padding: 28px;">
-                  <p>Este es un email de prueba enviado desde los tests para verificar que las plantillas se renderizan correctamente en Mailpit.</p>
-                  <p><strong>Email de prueba:</strong> ${testEmail}</p>
-                  <p style="margin-top: 20px; color: #666;">Si recibes este email, las plantillas están funcionando correctamente.</p>
-                </div>
-              </div>
-            </div>
-          `,
-        });
-
-        console.log(`✓ Test email successfully sent to ${testEmail}`);
-        console.log(`  Message ID: ${result.messageId}`);
-        console.log(`  View in Mailpit: http://localhost:8025`);
-        
-        expect(result).toBeDefined();
-        expect(result.accepted).toContain(testEmail);
-      } catch (error) {
-        // If Mailpit is not available, skip the test gracefully
-        console.log('⊘ Mailpit not available locally, skipping integration test');
-        expect(true).toBe(true);
-      }
-    }, 30000); // 30 second timeout for integration test
+      expect(sendMailSpy).toHaveBeenCalledWith({
+        to: 'test@test.com',
+        subject: 'AURORA - Correo de Prueba del Sistema',
+        template: './test',
+        context: {
+          email: 'test@test.com',
+        },
+      });
+    });
   });
 });

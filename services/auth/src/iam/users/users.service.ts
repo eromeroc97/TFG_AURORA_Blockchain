@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -132,5 +133,65 @@ export class UsersService {
 
       throw new InternalServerErrorException('Failed to remove user');
     }
+  }
+
+  async changeRole(targetUserId: string, newRole: Role) {
+    if (newRole === Role.GLOBAL_ADMIN) {
+      throw new ForbiddenException(
+        'No se puede asignar el rol GLOBAL_ADMIN a través de la API.',
+      );
+    }
+
+    try {
+      return await this.prisma.user.update({
+        where: { id: targetUserId },
+        data: { role: newRole },
+        select: this.userSelect,
+      });
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException('User not found');
+      }
+
+      throw new InternalServerErrorException('Failed to change user role');
+    }
+  }
+
+  async approveUser(id: string, _adminDid: string = '') {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status !== UserStatus.PENDING) {
+      throw new ConflictException('El usuario no está en PENDING');
+    }
+
+    const mockDid = `did:firefly:custom/${user.email}`;
+
+    const approvedUser = await this.prisma.user.update({
+      where: { id },
+      data: {
+        status: UserStatus.ACTIVE,
+        isActive: true,
+        did: mockDid,
+      },
+      select: this.userSelect,
+    });
+
+    await this.mailService.sendVerifyEmail(
+      user.email,
+      'http://localhost/reset-password?token=mock-token',
+    );
+
+    return approvedUser;
   }
 }

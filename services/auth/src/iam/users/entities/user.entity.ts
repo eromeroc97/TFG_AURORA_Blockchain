@@ -1,1 +1,6 @@
-export class User {}
+export class User {
+	id!: string;
+	email!: string;
+	role!: string;
+	status!: string;
+}

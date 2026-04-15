@@ -1,4 +1,9 @@
-import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma, Role, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -32,6 +37,7 @@ describe('UsersService', () => {
   };
   let mailServiceMock: {
     sendWelcomeEmail: ReturnType<typeof jest.fn>;
+    sendVerifyEmail: ReturnType<typeof jest.fn>;
   };
 
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
@@ -86,6 +92,7 @@ describe('UsersService', () => {
           provide: MailService,
           useFactory: () => ({
             sendWelcomeEmail: jest.fn(),
+            sendVerifyEmail: jest.fn(),
           }),
         },
       ],
@@ -285,6 +292,142 @@ describe('UsersService', () => {
       prismaServiceMock.user.delete.mockRejectedValue(p2025Error);
 
       await expect(service.remove('missing-id')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('changeRole', () => {
+    it('should throw ForbiddenException when trying to assign GLOBAL_ADMIN', async () => {
+      await expect(service.changeRole(createdUserRecord.id, Role.GLOBAL_ADMIN)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+    });
+
+    it('should update role when new role is allowed', async () => {
+      prismaServiceMock.user.update.mockResolvedValue({
+        ...selectedUserRecord,
+        role: Role.ADMIN,
+      });
+
+      const result = await service.changeRole(createdUserRecord.id, Role.ADMIN);
+
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        data: { role: Role.ADMIN },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isActive: true,
+          did: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      expect(result.role).toBe(Role.ADMIN);
+    });
+
+    it('should map missing user to NotFoundException', async () => {
+      const p2025Error = Object.assign(new Error('record not found'), { code: 'P2025' });
+      Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
+      prismaServiceMock.user.update.mockRejectedValue(p2025Error);
+
+      await expect(service.changeRole('missing-id', Role.ADMIN)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('approveUser', () => {
+    it('should approve user in PENDING, assign mock DID and send verify email', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: createdUserRecord.email,
+        status: UserStatus.PENDING,
+      });
+      prismaServiceMock.user.update.mockResolvedValue({
+        ...selectedUserRecord,
+        status: UserStatus.ACTIVE,
+        isActive: true,
+        did: `did:firefly:custom/${createdUserRecord.email}`,
+      });
+      mailServiceMock.sendVerifyEmail.mockResolvedValue(undefined);
+
+      const result = await service.approveUser(
+        createdUserRecord.id,
+        'did:firefly:custom/admin@aurora.local',
+      );
+
+      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        select: {
+          id: true,
+          email: true,
+          status: true,
+        },
+      });
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        data: {
+          status: UserStatus.ACTIVE,
+          isActive: true,
+          did: `did:firefly:custom/${createdUserRecord.email}`,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          isActive: true,
+          did: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      expect(mailServiceMock.sendVerifyEmail).toHaveBeenCalledWith(
+        createdUserRecord.email,
+        'http://localhost/reset-password?token=mock-token',
+      );
+      expect(result.status).toBe(UserStatus.ACTIVE);
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.approveUser('missing-id')).rejects.toBeInstanceOf(NotFoundException);
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+      expect(mailServiceMock.sendVerifyEmail).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException when user is not PENDING', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: createdUserRecord.email,
+        status: UserStatus.ACTIVE,
+      });
+
+      await expect(service.approveUser(createdUserRecord.id)).rejects.toBeInstanceOf(ConflictException);
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+      expect(mailServiceMock.sendVerifyEmail).not.toHaveBeenCalled();
+    });
+
+    it('should propagate mail errors after activation update', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: createdUserRecord.email,
+        status: UserStatus.PENDING,
+      });
+      prismaServiceMock.user.update.mockResolvedValue({
+        ...selectedUserRecord,
+        status: UserStatus.ACTIVE,
+        isActive: true,
+        did: `did:firefly:custom/${createdUserRecord.email}`,
+      });
+      mailServiceMock.sendVerifyEmail.mockRejectedValue(new Error('smtp down'));
+
+      await expect(service.approveUser(createdUserRecord.id)).rejects.toThrow('smtp down');
     });
   });
 });
