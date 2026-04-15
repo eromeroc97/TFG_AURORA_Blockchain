@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -12,6 +12,7 @@ import { ApproveUserDto } from './dto/approve-user.dto';
 import { ChangeRoleDto } from './dto/change-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Roles, JwtAuthGuard, RolesGuard } from '../auth';
 
 @ApiTags('Users (IAM)')
 @Controller('users')
@@ -47,18 +48,21 @@ export class UsersController {
   }
 
   @Patch(':id/role')
-  // TODO: @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
   changeRole(@Param('id') id: string, @Body() changeRoleDto: ChangeRoleDto) {
     return this.usersService.changeRole(id, changeRoleDto.newRole);
   }
 
   @Patch(':id/approve')
-  // TODO: Activar @Roles(Role.GLOBAL_ADMIN, Role.ADMIN) cuando se integre el módulo de auth/JWT.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GLOBAL_ADMIN, Role.ADMIN)
   approveUser(@Param('id') id: string, @Body() approveUserDto: ApproveUserDto) {
     return this.usersService.approveUser(id, approveUserDto.adminDid);
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   remove(
     @Param('id') id: string,
     @Body()

@@ -5,9 +5,10 @@ import { UsersController } from './users.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { RedisModule } from '../redis/redis.module';
 import { MailModule } from '../../shared/mail/mail.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaModule, MailModule, BlockchainModule, RedisModule],
+  imports: [PrismaModule, MailModule, BlockchainModule, RedisModule, AuthModule],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

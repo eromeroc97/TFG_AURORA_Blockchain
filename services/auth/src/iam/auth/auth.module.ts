@@ -6,6 +6,9 @@ import { UsersModule } from '../users/users.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { Roles } from './decorators/roles.decorator';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 
 const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => {
   if (!rawValue) {
@@ -37,8 +40,8 @@ const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => 
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, Roles],
 })
 export class AuthModule {}
