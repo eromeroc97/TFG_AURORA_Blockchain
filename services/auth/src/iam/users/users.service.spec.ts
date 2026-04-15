@@ -30,6 +30,7 @@ describe('UsersService', () => {
   let prismaServiceMock: {
     user: {
       findUnique: ReturnType<typeof jest.fn>;
+      findFirst: ReturnType<typeof jest.fn>;
       findMany: ReturnType<typeof jest.fn>;
       create: ReturnType<typeof jest.fn>;
       update: ReturnType<typeof jest.fn>;
@@ -85,6 +86,7 @@ describe('UsersService', () => {
           useFactory: () => ({
             user: {
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               findMany: jest.fn(),
               create: jest.fn(),
               update: jest.fn(),
@@ -275,14 +277,81 @@ describe('UsersService', () => {
     });
   });
 
+  describe('findByEmail', () => {
+    it('should return active or pending users with passwordHash for login', async () => {
+      prismaServiceMock.user.findFirst.mockResolvedValue({
+        ...selectedUserRecord,
+        passwordHash: 'hashed_password',
+      });
+
+      const result = await service.findByEmail(createdUserRecord.email);
+
+      expect(prismaServiceMock.user.findFirst).toHaveBeenCalledWith({
+        where: {
+          email: createdUserRecord.email,
+          status: {
+            not: UserStatus.REVOKED,
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          role: true,
+          status: true,
+          isActive: true,
+          did: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      expect(result.passwordHash).toBe('hashed_password');
+    });
+
+    it('should throw NotFoundException when user is revoked or does not exist', async () => {
+      prismaServiceMock.user.findFirst.mockResolvedValue(null);
+
+      await expect(service.findByEmail('revoked@aurora.local')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('remove', () => {
-    it('should delete user and return deleted record', async () => {
-      prismaServiceMock.user.delete.mockResolvedValue(selectedUserRecord);
+    it('should soft delete user, anonymize email and keep DID', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: createdUserRecord.email,
+        status: UserStatus.ACTIVE,
+        did: 'did:firefly:custom/admin@aurora.local',
+      });
+      prismaServiceMock.user.update.mockResolvedValue({
+        ...selectedUserRecord,
+        email: `REVOKED_${createdUserRecord.id}`,
+        status: UserStatus.REVOKED,
+        isActive: false,
+        did: 'did:firefly:custom/admin@aurora.local',
+      });
 
       const result = await service.remove(createdUserRecord.id);
 
-      expect(prismaServiceMock.user.delete).toHaveBeenCalledWith({
+      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: createdUserRecord.id },
+        select: {
+          id: true,
+          email: true,
+          status: true,
+          did: true,
+        },
+      });
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        data: {
+          status: UserStatus.REVOKED,
+          isActive: false,
+          email: `REVOKED_${createdUserRecord.id}`,
+          passwordHash: '*REVOKED_ACCOUNT*',
+        },
         select: {
           id: true,
           email: true,
@@ -294,15 +363,28 @@ describe('UsersService', () => {
           updatedAt: true,
         },
       });
-      expect(result).toEqual(selectedUserRecord);
+      expect(result.status).toBe(UserStatus.REVOKED);
+      expect(result.did).toBe('did:firefly:custom/admin@aurora.local');
+      expect(result.email).toBe(`REVOKED_${createdUserRecord.id}`);
     });
 
-    it('should map missing user to NotFoundException', async () => {
-      const p2025Error = Object.assign(new Error('record not found'), { code: 'P2025' });
-      Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
-      prismaServiceMock.user.delete.mockRejectedValue(p2025Error);
+    it('should throw NotFoundException when user does not exist', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue(null);
 
       await expect(service.remove('missing-id')).rejects.toBeInstanceOf(NotFoundException);
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException when user is already revoked', async () => {
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: `REVOKED_${createdUserRecord.id}`,
+        status: UserStatus.REVOKED,
+        did: 'did:firefly:custom/admin@aurora.local',
+      });
+
+      await expect(service.remove(createdUserRecord.id)).rejects.toBeInstanceOf(ConflictException);
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
     });
   });
 

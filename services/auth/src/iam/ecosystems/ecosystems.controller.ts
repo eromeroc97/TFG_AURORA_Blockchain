@@ -9,12 +9,8 @@ export class EcosystemsController {
 
   @Post()
   create(@Body() createEcosystemDto: CreateEcosystemDto) {
-    const ownerId =
-      createEcosystemDto.ownerId ??
-      process.env.TEST_OWNER_ID ??
-      '11111111-1111-1111-1111-111111111111';
-
-    return this.ecosystemsService.create(createEcosystemDto, ownerId);
+    // TODO: añadir @UseGuards(RolesGuard) y @Roles(Role.USER) cuando activemos JWTs.
+    return this.ecosystemsService.create(createEcosystemDto);
   }
 
   @Get()

@@ -1,9 +1,10 @@
 import {
+  ForbiddenException,
   InternalServerErrorException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EcosystemStatus, Prisma } from '@prisma/client';
+import { EcosystemStatus, Prisma, Role } from '@prisma/client';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
@@ -16,21 +17,49 @@ export class EcosystemsService {
     private readonly fireflyService: FireflyService,
   ) {}
 
-  async create(createEcosystemDto: CreateEcosystemDto, ownerId: string) {
+  async create(createEcosystemDto: CreateEcosystemDto) {
     try {
-      const did = await this.fireflyService.getOrganizationDid();
+      const user = await this.prisma.user.findUnique({
+        where: { id: createEcosystemDto.ownerId },
+        select: {
+          id: true,
+          role: true,
+          did: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.role !== Role.USER) {
+        throw new ForbiddenException('Solo los investigadores con rol USER pueden registrar ecosistemas');
+      }
+
+      if (!user.did || !user.did.trim()) {
+        throw new ForbiddenException('El usuario debe estar validado en la blockchain (tener un DID) antes de registrar ecosistemas');
+      }
+
+      const ecosystemDid = await this.fireflyService.createChildIdentity({
+        name: createEcosystemDto.name,
+        parentDid: user.did,
+      });
 
       return await this.prisma.ecosystem.create({
         data: {
           name: createEcosystemDto.name,
-          ownerId,
-          did,
+          ownerId: createEcosystemDto.ownerId,
+          did: ecosystemDid,
           status: EcosystemStatus.ACTIVE,
           latitude: createEcosystemDto.latitude,
           longitude: createEcosystemDto.longitude,
         },
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+
       throw new InternalServerErrorException('Failed to create ecosystem');
     }
   }

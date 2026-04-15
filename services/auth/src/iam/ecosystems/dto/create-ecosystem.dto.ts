@@ -31,11 +31,12 @@ export class CreateEcosystemDto {
 	@IsLongitude()
 	longitude?: number;
 
-	@ApiPropertyOptional({
-		description: 'Owner del ecosistema. Temporalmente puede venir en el body hasta habilitar JwtGuard.',
+	@ApiProperty({
+		description: 'Owner del ecosistema. Debe ser un usuario aprobado previamente.',
 		example: '11111111-1111-1111-1111-111111111111',
+		required: true,
 	})
-	@IsOptional()
+	@IsNotEmpty()
 	@IsUUID('4')
-	ownerId?: string;
+	ownerId!: string;
 }

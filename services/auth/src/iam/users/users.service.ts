@@ -33,6 +33,18 @@ export class UsersService {
     updatedAt: true,
   } as const;
 
+  private readonly authUserSelect = {
+    id: true,
+    email: true,
+    passwordHash: true,
+    role: true,
+    status: true,
+    isActive: true,
+    did: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const;
+
   private isNotFoundError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
   }
@@ -99,6 +111,24 @@ export class UsersService {
     return user;
   }
 
+  async findByEmail(email: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email,
+        status: {
+          not: UserStatus.REVOKED,
+        },
+      },
+      select: this.authUserSelect,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
   async update(id: string, updateUserDto: UpdateUserDto) {
     try {
       const { password, ...rest } = updateUserDto;
@@ -123,9 +153,33 @@ export class UsersService {
   }
 
   async remove(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        did: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status === UserStatus.REVOKED) {
+      throw new ConflictException('El usuario ya ha sido revocado');
+    }
+
     try {
-      return await this.prisma.user.delete({
+      return await this.prisma.user.update({
         where: { id },
+        data: {
+          status: UserStatus.REVOKED,
+          isActive: false,
+          email: `REVOKED_${user.id}`,
+          passwordHash: '*REVOKED_ACCOUNT*',
+        },
         select: this.userSelect,
       });
     } catch (error) {

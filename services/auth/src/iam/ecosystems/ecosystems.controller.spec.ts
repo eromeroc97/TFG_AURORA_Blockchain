@@ -38,33 +38,18 @@ describe('EcosystemsController', () => {
 
     await controller.create(dto);
 
-    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(
-      dto,
-      'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
-    );
+    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto);
   });
 
-  it('create uses TEST_OWNER_ID when ownerId is absent', async () => {
-    process.env.TEST_OWNER_ID = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
-    const dto: CreateEcosystemDto = { name: 'eco-2' };
+  it('create forwards the full dto to service', async () => {
+    const dto: CreateEcosystemDto = {
+      name: 'eco-2',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    };
 
     await controller.create(dto);
 
-    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(
-      dto,
-      'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
-    );
-  });
-
-  it('create uses static fallback ownerId when both ownerId and TEST_OWNER_ID are absent', async () => {
-    const dto: CreateEcosystemDto = { name: 'eco-3' };
-
-    await controller.create(dto);
-
-    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(
-      dto,
-      '11111111-1111-1111-1111-111111111111',
-    );
+    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto);
   });
 
   it('routes read/write methods to service', async () => {

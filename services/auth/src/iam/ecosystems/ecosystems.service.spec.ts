@@ -1,4 +1,4 @@
-import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EcosystemStatus, Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
@@ -11,6 +11,9 @@ describe('EcosystemsService', () => {
   let service: EcosystemsService;
 
   const prismaMock = {
+    user: {
+      findUnique: jest.fn(),
+    },
     ecosystem: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -21,13 +24,14 @@ describe('EcosystemsService', () => {
   };
 
   const fireflyMock = {
-    getOrganizationDid: jest.fn(),
+    createChildIdentity: jest.fn(),
   };
 
   const createDto: CreateEcosystemDto = {
     name: 'eco-gateway',
     latitude: 40.4168,
     longitude: -3.7038,
+    ownerId: '11111111-1111-4111-8111-111111111111',
   };
 
   beforeEach(async () => {
@@ -49,17 +53,31 @@ describe('EcosystemsService', () => {
     jest.clearAllMocks();
   });
 
-  it('create persists ecosystem with ACTIVE status and organization did', async () => {
-    (fireflyMock.getOrganizationDid as any).mockResolvedValue('did:firefly:org/demo');
+  it('create persists ecosystem with ACTIVE status and child identity', async () => {
+    (prismaMock.user.findUnique as any).mockResolvedValue({
+      id: createDto.ownerId,
+      role: 'USER',
+      did: 'did:firefly:custom/user@uclm.es',
+    });
+    (fireflyMock.createChildIdentity as any).mockResolvedValue('did:firefly:custom/eco-gateway');
     (prismaMock.ecosystem.create as any).mockResolvedValue({ id: 'eco-id' });
 
-    await service.create(createDto, 'owner-id');
+    await service.create(createDto);
+
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { id: createDto.ownerId },
+      select: { id: true, role: true, did: true },
+    });
+    expect(fireflyMock.createChildIdentity).toHaveBeenCalledWith({
+      name: 'eco-gateway',
+      parentDid: 'did:firefly:custom/user@uclm.es',
+    });
 
     expect(prismaMock.ecosystem.create).toHaveBeenCalledWith({
       data: {
         name: 'eco-gateway',
-        ownerId: 'owner-id',
-        did: 'did:firefly:org/demo',
+        ownerId: createDto.ownerId,
+        did: 'did:firefly:custom/eco-gateway',
         status: EcosystemStatus.ACTIVE,
         latitude: 40.4168,
         longitude: -3.7038,
@@ -67,10 +85,47 @@ describe('EcosystemsService', () => {
     });
   });
 
-  it('create throws InternalServerErrorException on failure', async () => {
-    (fireflyMock.getOrganizationDid as any).mockRejectedValue(new Error('firefly down'));
+  it('create throws NotFoundException when owner does not exist', async () => {
+    (prismaMock.user.findUnique as any).mockResolvedValue(null);
 
-    await expect(service.create(createDto, 'owner-id')).rejects.toBeInstanceOf(
+    await expect(service.create(createDto)).rejects.toBeInstanceOf(NotFoundException);
+    expect(fireflyMock.createChildIdentity).not.toHaveBeenCalled();
+    expect(prismaMock.ecosystem.create).not.toHaveBeenCalled();
+  });
+
+  it('create throws ForbiddenException when owner role is not USER', async () => {
+    (prismaMock.user.findUnique as any).mockResolvedValue({
+      id: createDto.ownerId,
+      role: 'ADMIN',
+      did: 'did:firefly:custom/admin@uclm.es',
+    });
+
+    await expect(service.create(createDto)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(fireflyMock.createChildIdentity).not.toHaveBeenCalled();
+    expect(prismaMock.ecosystem.create).not.toHaveBeenCalled();
+  });
+
+  it('create throws ForbiddenException when owner has no DID', async () => {
+    (prismaMock.user.findUnique as any).mockResolvedValue({
+      id: createDto.ownerId,
+      role: 'USER',
+      did: null,
+    });
+
+    await expect(service.create(createDto)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(fireflyMock.createChildIdentity).not.toHaveBeenCalled();
+    expect(prismaMock.ecosystem.create).not.toHaveBeenCalled();
+  });
+
+  it('create throws InternalServerErrorException on failure', async () => {
+    (prismaMock.user.findUnique as any).mockResolvedValue({
+      id: createDto.ownerId,
+      role: 'USER',
+      did: 'did:firefly:custom/user@uclm.es',
+    });
+    (fireflyMock.createChildIdentity as any).mockRejectedValue(new Error('firefly down'));
+
+    await expect(service.create(createDto)).rejects.toBeInstanceOf(
       InternalServerErrorException,
     );
   });

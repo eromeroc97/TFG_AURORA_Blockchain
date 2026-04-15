@@ -40,10 +40,17 @@ export class FireflyService {
   }
 
   async createIdentity(payload: FireflyCreateIdentityRequest): Promise<string> {
+    return this.createChildIdentity({ name: payload.name, parentDid: payload.parent });
+  }
+
+  async createChildIdentity(payload: { name: string; parentDid: string }): Promise<string> {
     try {
       const response = await this.httpService.axiosRef.post<FireflyIdentity>(
         '/identities',
-        payload,
+        {
+          name: payload.name,
+          parent: payload.parentDid,
+        },
       );
       const did = response.data?.did;
       if (!did) {
