@@ -1,22 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { ArrowRight, LockKeyhole, Mail } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import auroraLogo from '../assets/aurora-logo.png'
+import gsyaLogo from '../assets/gsya_logo.png'
+import uclmLogo from '../assets/uclm_logo.png'
 
 const logoSrc = auroraLogo
 
-const auroraMeanings = [
-  {
-    language: 'ES',
-    text: 'Investigación Unificada Avanzada sobre Análisis de Riesgos de Ciberseguridad y Sostenibilidad en Hogares Inteligentes',
-  },
-  {
-    language: 'EN',
-    text: 'Advanced and Unified Research On cybersecurity Risk Analysis and sustainability in smart homes',
-  },
-]
+const auroraMeaning =
+  'Advanced and Unified Research On cybersecurity Risk Analysis and sustainability in smart homes'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -26,28 +20,6 @@ export default function Login() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [logoFailed, setLogoFailed] = useState(false)
-  const [meaningIndex, setMeaningIndex] = useState(0)
-  const [isMeaningVisible, setIsMeaningVisible] = useState(true)
-
-  useEffect(() => {
-    let timeoutId: number | undefined
-
-    const intervalId = window.setInterval(() => {
-      setIsMeaningVisible(false)
-
-      timeoutId = window.setTimeout(() => {
-        setMeaningIndex((previous) => (previous + 1) % auroraMeanings.length)
-        setIsMeaningVisible(true)
-      }, 350)
-    }, 3000)
-
-    return () => {
-      window.clearInterval(intervalId)
-      if (timeoutId) {
-        window.clearTimeout(timeoutId)
-      }
-    }
-  }, [])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -72,45 +44,33 @@ export default function Login() {
           <div className="flex flex-col justify-between gap-8 bg-primary p-8 text-surface sm:p-10 lg:p-12">
             <div className="max-w-lg space-y-6">
               <div className="flex items-center gap-4">
-                {!logoFailed ? (
-                  <img
-                    src={logoSrc}
-                    alt="Logotipo de AURORA"
-                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                    onError={() => setLogoFailed(true)}
-                  />
-                ) : (
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/90 text-sm font-bold text-primary">
-                    AU
-                  </div>
-                )}
+                <img
+                src={logoSrc}
+                alt="Logotipo de AURORA"
+                className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
+                onError={() => setLogoFailed(true)}
+                />
 
-                <div>
-                  <p className="font-heading text-sm font-semibold tracking-[0.32em] text-white/90">
-                    AURORA
-                  </p>
-                  <p className="text-sm text-white/70">Acceso seguro con cookies HttpOnly</p>
-                </div>
+                <img
+                  src={gsyaLogo}
+                  alt="Logotipo de GSYA"
+                  className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
+                />
+
+                <img
+                  src={uclmLogo}
+                  alt="Logotipo de UCLM"
+                  className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
+                />
               </div>
 
               <div className="space-y-4">
-                <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-white/80">
-                  Login · WebApp
+                <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-primary/80">
+                  Proyecto de Investigación <b>SBPLY/24/180225/000074</b>
                 </span>
-                <h1 className="font-heading text-4xl font-semibold leading-tight sm:text-5xl">
-                  AURORA
+                <h1 className="font-heading text-2xl font-semibold leading-tight text-primary/95 sm:text-3xl">
+                  {auroraMeaning}
                 </h1>
-                <div
-                  className={`max-w-md space-y-3 transition-opacity duration-300 ${isMeaningVisible ? 'opacity-100' : 'opacity-0'}`}
-                  aria-live="polite"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
-                    {auroraMeanings[meaningIndex].language}
-                  </p>
-                  <p className="text-base leading-7 text-white/75 sm:text-lg">
-                    {auroraMeanings[meaningIndex].text}
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -122,7 +82,7 @@ export default function Login() {
               ].map((item) => (
                 <div
                   key={item}
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white/85"
+                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-primary/85"
                 >
                   {item}
                 </div>
@@ -140,8 +100,7 @@ export default function Login() {
                   Accede al panel de AURORA
                 </h2>
                 <p className="text-sm leading-6 text-muted">
-                  Usa tus credenciales corporativas. El backend gestionará la sesión por
-                  cookies.
+                  Usa tus credenciales para acceder a la plataforma. Si aún no tienes cuenta, puedes registrar una nueva cuenta.
                 </p>
               </div>
 
@@ -190,7 +149,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-aurora disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary shadow-aurora disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isSubmitting ? 'Entrando...' : 'Entrar'}
                 <ArrowRight className="size-4" />
