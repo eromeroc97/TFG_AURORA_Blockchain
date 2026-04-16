@@ -7,6 +7,12 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 const REFRESH_COOKIE_NAME = 'refreshToken';
 
+type PublicAuthTokens = {
+	accessToken: string;
+	accessTokenExpiresIn: string;
+	refreshTokenExpiresIn: string;
+};
+
 const parseExpiresToMs = (expiresIn: string | undefined, fallbackMs: number): number => {
 	if (!expiresIn) {
 		return fallbackMs;
@@ -34,12 +40,43 @@ const parseExpiresToMs = (expiresIn: string | undefined, fallbackMs: number): nu
 	return fallbackMs;
 };
 
-const setRefreshCookie = (res: Response, refreshToken: string, expiresIn: string | undefined) => {
-	res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+const parseBoolean = (rawValue: string | undefined, fallback: boolean): boolean => {
+	if (!rawValue) {
+		return fallback;
+	}
+
+	const normalized = rawValue.trim().toLowerCase();
+	if (normalized === 'true') return true;
+	if (normalized === 'false') return false;
+
+	return fallback;
+};
+
+const parseSameSite = (rawValue: string | undefined): 'lax' | 'strict' | 'none' => {
+	const normalized = rawValue?.trim().toLowerCase();
+	if (normalized === 'strict' || normalized === 'none') {
+		return normalized;
+	}
+
+	return 'lax';
+};
+
+const getRefreshCookiePolicy = () => {
+	const secure = parseBoolean(process.env.REFRESH_COOKIE_SECURE, false);
+	const sameSite = parseSameSite(process.env.REFRESH_COOKIE_SAMESITE);
+
+	return {
 		httpOnly: true,
-		secure: true,
-		sameSite: 'strict',
+		secure,
+		sameSite,
 		path: '/',
+	};
+};
+
+const setRefreshCookie = (res: Response, refreshToken: string, expiresIn: string | undefined) => {
+	const policy = getRefreshCookiePolicy();
+	res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+		...policy,
 		maxAge: parseExpiresToMs(expiresIn, 24 * 60 * 60 * 1000),
 	});
 };
@@ -65,15 +102,21 @@ const parseCookies = (req?: Request): Record<string, string> => {
 };
 
 const clearSessionCookies = (res: Response) => {
-	const refreshOptions = {
-		httpOnly: true,
-		secure: true,
-		sameSite: 'strict' as const,
-		path: '/',
-	};
+ 	const refreshOptions = getRefreshCookiePolicy();
 
 	res.clearCookie(REFRESH_COOKIE_NAME, refreshOptions);
 };
+
+const toPublicAuthTokens = (tokens: {
+	accessToken: string;
+	refreshToken: string;
+	accessTokenExpiresIn: string;
+	refreshTokenExpiresIn: string;
+}): PublicAuthTokens => ({
+	accessToken: tokens.accessToken,
+	accessTokenExpiresIn: tokens.accessTokenExpiresIn,
+	refreshTokenExpiresIn: tokens.refreshTokenExpiresIn,
+});
 
 @Controller('auth')
 export class AuthController {
@@ -88,7 +131,7 @@ export class AuthController {
 			setRefreshCookie(res, tokens.refreshToken, tokens.refreshTokenExpiresIn);
 		}
 
-		return tokens;
+		return toPublicAuthTokens(tokens);
 	}
 
 	@Post('refresh')
@@ -116,7 +159,7 @@ export class AuthController {
 			setRefreshCookie(res, tokens.refreshToken, tokens.refreshTokenExpiresIn);
 		}
 
-		return tokens;
+		return toPublicAuthTokens(tokens);
 	}
 
 	@Post('logout')

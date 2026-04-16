@@ -21,6 +21,12 @@ describe('AuthController - API Endpoints', () => {
     refreshTokenExpiresIn: '24h',
   };
 
+  const mockPublicTokens = {
+    accessToken: mockTokens.accessToken,
+    accessTokenExpiresIn: mockTokens.accessTokenExpiresIn,
+    refreshTokenExpiresIn: mockTokens.refreshTokenExpiresIn,
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -44,7 +50,7 @@ describe('AuthController - API Endpoints', () => {
   });
 
   describe('POST /auth/login', () => {
-    it('should return access and refresh tokens on successful login', async () => {
+    it('should return access token metadata on successful login', async () => {
       authService.validateUser.mockResolvedValue(mockUser);
       authService.login.mockResolvedValue(mockTokens);
 
@@ -53,7 +59,7 @@ describe('AuthController - API Endpoints', () => {
         password: 'password123',
       });
 
-      expect(result).toEqual(mockTokens);
+      expect(result).toEqual(mockPublicTokens);
       expect(authService.validateUser).toHaveBeenCalledWith(
         'auth-test@test.test',
         'password123',
@@ -74,16 +80,22 @@ describe('AuthController - API Endpoints', () => {
   });
 
   describe('POST /auth/refresh', () => {
-    it('should return new tokens on successful refresh', async () => {
+    it('should return new access token metadata on successful refresh', async () => {
       const newTokens = { ...mockTokens, accessToken: 'new_access_token' };
       authService.refreshTokens.mockResolvedValue(newTokens);
+
+      const expectedPublicTokens = {
+        accessToken: newTokens.accessToken,
+        accessTokenExpiresIn: newTokens.accessTokenExpiresIn,
+        refreshTokenExpiresIn: newTokens.refreshTokenExpiresIn,
+      };
 
       const result = await controller.refresh({
         userId: 'user-123',
         refreshToken: 'refresh_token_b64url_encoded_here',
       }, undefined);
 
-      expect(result).toEqual(newTokens);
+      expect(result).toEqual(expectedPublicTokens);
       expect(authService.refreshTokens).toHaveBeenCalledWith(
         'user-123',
         'refresh_token_b64url_encoded_here',
@@ -128,7 +140,8 @@ describe('AuthController - API Endpoints', () => {
 
       expect(loginResult).toMatchObject({
         accessToken: expect.any(String),
-        refreshToken: expect.any(String),
+        accessTokenExpiresIn: expect.any(String),
+        refreshTokenExpiresIn: expect.any(String),
       });
 
       // 2. Refresh
@@ -137,7 +150,7 @@ describe('AuthController - API Endpoints', () => {
 
       const refreshResult = await controller.refresh({
         userId: 'user-123',
-        refreshToken: loginResult.refreshToken,
+        refreshToken: mockTokens.refreshToken,
       }, undefined);
 
       expect(refreshResult.accessToken).toBe('new_access_token');

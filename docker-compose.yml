@@ -5,10 +5,6 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./services/auth/.env
-    environment:
-      DATABASE_URL: postgresql://admin:secret_password_tfg@postgres-db:5432/identity_vault?schema=public
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
     depends_on:
       - postgres-db
       - mailpit
