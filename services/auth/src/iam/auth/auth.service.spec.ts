@@ -42,6 +42,7 @@ describe('AuthService - Complete Authentication Flows', () => {
           provide: JwtService,
           useValue: {
             signAsync: jest.fn(),
+            verifyAsync: jest.fn(),
           },
         },
         {
@@ -120,23 +121,26 @@ describe('AuthService - Complete Authentication Flows', () => {
 
   describe('generateTokens', () => {
     it('should generate access and refresh tokens', async () => {
-      jwtService.signAsync.mockResolvedValue('access_token_1');
+      jwtService.signAsync
+        .mockResolvedValueOnce('access_token_1')
+        .mockResolvedValueOnce('refresh_token_1');
 
       const result = await service.generateTokens(mockUser);
 
       expect(result).toMatchObject({
         accessToken: 'access_token_1',
-        refreshToken: expect.any(String),
+        refreshToken: 'refresh_token_1',
         accessTokenExpiresIn: expect.any(String),
         refreshTokenExpiresIn: expect.any(String),
       });
-      expect(result.refreshToken.length).toBeGreaterThan(50); // Base64url
     });
   });
 
   describe('login', () => {
     it('should complete full login flow', async () => {
-      jwtService.signAsync.mockResolvedValue('access_token');
+      jwtService.signAsync
+        .mockResolvedValueOnce('access_token')
+        .mockResolvedValueOnce('refresh_token');
       usersService.updateRefreshTokenHash.mockResolvedValue(undefined);
       (argon2.hash as jest.Mock).mockResolvedValue('hashed_refresh_token');
 
@@ -158,7 +162,10 @@ describe('AuthService - Complete Authentication Flows', () => {
       const userForRefresh = { ...mockUser, hashedRefreshToken: 'hashed_token' };
       usersService.findAuthUserById.mockResolvedValue(userForRefresh);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
-      jwtService.signAsync.mockResolvedValue('new_access_token');
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
+      jwtService.signAsync
+        .mockResolvedValueOnce('new_access_token')
+        .mockResolvedValueOnce('new_refresh_token');
 
       const result = await service.refreshTokens(mockUser.id, 'raw_refresh_token');
 
@@ -172,6 +179,7 @@ describe('AuthService - Complete Authentication Flows', () => {
     it('should reject refresh when user is pending', async () => {
       const pendingUser = { ...mockUser, status: UserStatus.PENDING };
       usersService.findAuthUserById.mockResolvedValue(pendingUser);
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
 
       await expect(service.refreshTokens(mockUser.id, 'token')).rejects.toThrow(
         UnauthorizedException,
@@ -181,6 +189,7 @@ describe('AuthService - Complete Authentication Flows', () => {
     it('should reject refresh when user is revoked', async () => {
       const revokedUser = { ...mockUser, status: UserStatus.REVOKED };
       usersService.findAuthUserById.mockResolvedValue(revokedUser);
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
 
       await expect(service.refreshTokens(mockUser.id, 'token')).rejects.toThrow(
         UnauthorizedException,
@@ -190,6 +199,7 @@ describe('AuthService - Complete Authentication Flows', () => {
     it('should reject refresh when refresh token is invalid', async () => {
       usersService.findAuthUserById.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(false);
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
 
       await expect(service.refreshTokens(mockUser.id, 'invalid_token')).rejects.toThrow(
         UnauthorizedException,
@@ -199,6 +209,7 @@ describe('AuthService - Complete Authentication Flows', () => {
     it('should reject refresh when user has no refresh token hash', async () => {
       const userNoRefresh = { ...mockUser, hashedRefreshToken: null };
       usersService.findAuthUserById.mockResolvedValue(userNoRefresh);
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
 
       await expect(service.refreshTokens(mockUser.id, 'token')).rejects.toThrow(
         UnauthorizedException,
@@ -222,7 +233,9 @@ describe('AuthService - Complete Authentication Flows', () => {
   describe('Complete workflows', () => {
     it('SCENARIO: Login → Refresh → Logout', async () => {
       // 1. Login
-      jwtService.signAsync.mockResolvedValue('access_token_1');
+      jwtService.signAsync
+        .mockResolvedValueOnce('access_token_1')
+        .mockResolvedValueOnce('refresh_token_1');
       usersService.updateRefreshTokenHash.mockResolvedValue(undefined);
 
       const loginResult = await service.login(mockUser);
@@ -232,7 +245,10 @@ describe('AuthService - Complete Authentication Flows', () => {
       const userWithRefresh = { ...mockUser, hashedRefreshToken: 'some_hash' };
       usersService.findAuthUserById.mockResolvedValue(userWithRefresh);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
-      jwtService.signAsync.mockResolvedValue('access_token_2');
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
+      jwtService.signAsync
+        .mockResolvedValueOnce('access_token_2')
+        .mockResolvedValueOnce('refresh_token_2');
 
       const refreshResult = await service.refreshTokens(mockUser.id, loginResult.refreshToken);
       expect(refreshResult.accessToken).toBeDefined();
@@ -241,6 +257,24 @@ describe('AuthService - Complete Authentication Flows', () => {
       redisService.addToBlacklist.mockResolvedValue(undefined);
       const logoutResult = await service.logout(mockUser.id);
       expect(logoutResult.success).toBe(true);
+    });
+  });
+
+  describe('resolveUserIdFromRefreshToken', () => {
+    it('should return user id when refresh token is valid', async () => {
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
+
+      const userId = await service.resolveUserIdFromRefreshToken('refresh_token');
+
+      expect(userId).toBe(mockUser.id);
+    });
+
+    it('should reject when token type is not refresh', async () => {
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'access' });
+
+      await expect(service.resolveUserIdFromRefreshToken('refresh_token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

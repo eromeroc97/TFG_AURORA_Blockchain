@@ -2,7 +2,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { randomBytes } from 'crypto';
 import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 
@@ -12,6 +11,18 @@ interface AuthPayload {
 	role: string;
 	did: string | null;
 }
+
+const decodePublicKey = (rawValue: string | undefined): string => {
+	if (!rawValue) {
+		throw new Error('JWT_PUBLIC_KEY is not configured');
+	}
+
+	if (rawValue.includes('BEGIN')) {
+		return rawValue.replace(/\\n/g, '\n');
+	}
+
+	return Buffer.from(rawValue, 'base64').toString('utf8');
+};
 
 @Injectable()
 export class AuthService {
@@ -55,19 +66,46 @@ export class AuthService {
 			role: user.role,
 			did: user.did,
 		};
+		const refreshTokenExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN ?? '7d';
 
 		const accessToken = await this.jwtService.signAsync(payload, {
 			algorithm: 'RS256',
 		});
 
-		const refreshToken = randomBytes(64).toString('base64url');
+		const refreshToken = await this.jwtService.signAsync(
+			{ sub: user.id, type: 'refresh' },
+			{
+				algorithm: 'RS256',
+				expiresIn: refreshTokenExpiresIn,
+			},
+		);
 
 		return {
 			accessToken,
 			refreshToken,
 			accessTokenExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '30m',
-			refreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+			refreshTokenExpiresIn,
 		};
+	}
+
+	async resolveUserIdFromRefreshToken(refreshToken: string): Promise<string> {
+		try {
+			const payload = await this.jwtService.verifyAsync<{ sub?: string; type?: string }>(
+				refreshToken,
+				{
+					algorithms: ['RS256'],
+					secret: decodePublicKey(process.env.JWT_PUBLIC_KEY),
+				},
+			);
+
+			if (!payload?.sub || payload.type !== 'refresh') {
+				throw new UnauthorizedException('Refresh token inválido');
+			}
+
+			return payload.sub;
+		} catch {
+			throw new UnauthorizedException('Refresh token inválido');
+		}
 	}
 
 	async updateRefreshToken(userId: string, refreshToken: string) {
@@ -82,6 +120,11 @@ export class AuthService {
 	}
 
 	async refreshTokens(userId: string, refreshToken: string) {
+		const tokenUserId = await this.resolveUserIdFromRefreshToken(refreshToken);
+		if (tokenUserId !== userId) {
+			throw new UnauthorizedException('Refresh token inválido');
+		}
+
 		const user = await this.usersService.findAuthUserById(userId);
 
 		if (
