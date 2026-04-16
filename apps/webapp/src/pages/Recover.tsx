@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ArrowRight, KeyRound, Mail } from 'lucide-react'
+import { ArrowRight, Mail } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { apiClient } from '../api/axios'
