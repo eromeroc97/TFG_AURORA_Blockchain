@@ -3,6 +3,26 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { RedisService } from '../../redis/redis.service';
 
+const COOKIE_NAME = 'access_token';
+
+const extractTokenFromCookie = (req: { headers?: { cookie?: string } } | undefined): string | null => {
+  const cookieHeader = req?.headers?.cookie;
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const chunks = cookieHeader.split(';');
+  for (const chunk of chunks) {
+    const [rawName, ...rawValue] = chunk.trim().split('=');
+    if (rawName === COOKIE_NAME) {
+      const value = rawValue.join('=');
+      return value ? decodeURIComponent(value) : null;
+    }
+  }
+
+  return null;
+};
+
 const decodePublicKey = (rawValue: string | undefined): string => {
   if (!rawValue) {
     throw new Error('JWT_PUBLIC_KEY is not configured');
@@ -19,7 +39,10 @@ const decodePublicKey = (rawValue: string | undefined): string => {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly redisService: RedisService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        extractTokenFromCookie,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       algorithms: ['RS256'],
       secretOrKey: decodePublicKey(process.env.JWT_PUBLIC_KEY),
