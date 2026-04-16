@@ -3,6 +3,13 @@ import { render, screen } from '@testing-library/react'
 import { AuthProvider } from '../context/AuthProvider'
 import Login from './Login'
 
+jest.mock('../api/axios', () => ({
+  apiClient: {
+    post: jest.fn().mockRejectedValue(new Error('No session available for test')),
+  },
+  setUnauthorizedHandler: jest.fn(),
+}))
+
 describe('Login page', () => {
   it('renders AURORA title and initial meaning text', () => {
     render(

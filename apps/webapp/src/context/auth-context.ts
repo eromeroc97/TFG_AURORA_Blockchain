@@ -1,8 +1,13 @@
-import { createContext, useContext, type Dispatch, type SetStateAction } from 'react'
+import { createContext, useContext } from 'react'
+import type { AuthClaims } from './auth-session'
 
 export type AuthContextValue = {
+  accessToken: string | null
+  authClaims: AuthClaims | null
   isAuthenticated: boolean
-  setIsAuthenticated: Dispatch<SetStateAction<boolean>>
+  isHydrating: boolean
+  setSession: (accessToken: string) => void
+  clearSession: () => void
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

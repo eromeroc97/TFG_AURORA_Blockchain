@@ -16,7 +16,7 @@ const auroraMeaning =
 
 export default function Login() {
   const navigate = useNavigate()
-  const { setIsAuthenticated } = useAuth()
+  const { setSession } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -29,8 +29,8 @@ export default function Login() {
     setErrorMessage('')
 
     try {
-      await apiClient.post('/auth/login', { email, password })
-      setIsAuthenticated(true)
+      const response = await apiClient.post('/auth/login', { email, password })
+      setSession(response.data.accessToken)
       navigate('/dashboard', { replace: true })
     } catch {
       setErrorMessage('No se pudo iniciar sesión. Revisa tus credenciales e inténtalo de nuevo.')

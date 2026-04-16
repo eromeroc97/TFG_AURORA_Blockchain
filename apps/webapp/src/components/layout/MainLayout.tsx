@@ -1,14 +1,21 @@
 import { LogOut, Sparkles } from 'lucide-react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { apiClient } from '../../api/axios'
 import { useAuth } from '../../context/auth-context'
 
 export default function MainLayout() {
   const navigate = useNavigate()
-  const { setIsAuthenticated } = useAuth()
+  const { clearSession } = useAuth()
 
-  const handleSignOut = () => {
-    setIsAuthenticated(false)
-    navigate('/login', { replace: true })
+  const handleSignOut = async () => {
+    try {
+      await apiClient.post('/auth/logout', undefined, {
+        skipAuthRefresh: true,
+      })
+    } finally {
+      clearSession()
+      navigate('/login', { replace: true })
+    }
   }
 
   return (
