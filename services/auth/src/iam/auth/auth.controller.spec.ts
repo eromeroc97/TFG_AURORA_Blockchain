@@ -81,7 +81,7 @@ describe('AuthController - API Endpoints', () => {
       const result = await controller.refresh({
         userId: 'user-123',
         refreshToken: 'refresh_token_b64url_encoded_here',
-      });
+      }, undefined);
 
       expect(result).toEqual(newTokens);
       expect(authService.refreshTokens).toHaveBeenCalledWith(
@@ -97,7 +97,7 @@ describe('AuthController - API Endpoints', () => {
         controller.refresh({
           userId: 'user-123',
           refreshToken: 'invalid_token',
-        }),
+        }, undefined),
       ).rejects.toThrow();
     });
   });
@@ -108,7 +108,7 @@ describe('AuthController - API Endpoints', () => {
 
       const result = await controller.logout({
         userId: 'user-123',
-      });
+      }, undefined);
 
       expect(result).toEqual({ success: true });
       expect(authService.logout).toHaveBeenCalledWith('user-123');
@@ -138,7 +138,7 @@ describe('AuthController - API Endpoints', () => {
       const refreshResult = await controller.refresh({
         userId: 'user-123',
         refreshToken: loginResult.refreshToken,
-      });
+      }, undefined);
 
       expect(refreshResult.accessToken).toBe('new_access_token');
 
@@ -147,7 +147,7 @@ describe('AuthController - API Endpoints', () => {
 
       const logoutResult = await controller.logout({
         userId: 'user-123',
-      });
+      }, undefined);
 
       expect(logoutResult.success).toBe(true);
     });
