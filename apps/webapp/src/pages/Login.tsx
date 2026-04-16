@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { ArrowRight, LockKeyhole, Mail } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/axios'
+import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../context/auth-context'
 import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
 import uclmLogo from '../assets/uclm_logo.png'
+import fundingLogos from '../assets/MostrarUE-MA-Feder-Innocam.jpg'
 
 const logoSrc = auroraLogo
 
@@ -19,7 +21,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [logoFailed, setLogoFailed] = useState(false)
+  const [, setLogoFailed] = useState(false)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -44,24 +46,46 @@ export default function Login() {
           <div className="flex flex-col justify-between gap-8 bg-primary p-8 text-surface sm:p-10 lg:p-12">
             <div className="max-w-lg space-y-6">
               <div className="flex items-center gap-4">
-                <img
-                src={logoSrc}
-                alt="Logotipo de AURORA"
-                className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                onError={() => setLogoFailed(true)}
-                />
+                <a
+                  href="https://gsya.esi.uclm.es/AURORA/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition-opacity hover:opacity-85"
+                >
+                  <img
+                    src={logoSrc}
+                    alt="Logotipo de AURORA"
+                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
+                    onError={() => setLogoFailed(true)}
+                  />
+                </a>
 
-                <img
-                  src={gsyaLogo}
-                  alt="Logotipo de GSYA"
-                  className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                />
+                <a
+                  href="https://gsya.esi.uclm.es/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition-opacity hover:opacity-85"
+                >
+                  <img
+                    src={gsyaLogo}
+                    alt="Logotipo de GSYA"
+                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
+                  />
+                </a>
 
-                <img
-                  src={uclmLogo}
-                  alt="Logotipo de UCLM"
-                  className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                />
+                <a
+                  href="https://www.uclm.es/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition-opacity hover:opacity-85"
+                >
+                  <img
+                    src={uclmLogo}
+                    alt="Logotipo de UCLM"
+                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
+                  />
+                </a>
+
               </div>
 
               <div className="space-y-4">
@@ -69,24 +93,24 @@ export default function Login() {
                   Proyecto de Investigación <b>SBPLY/24/180225/000074</b>
                 </span>
                 <h1 className="font-heading text-2xl font-semibold leading-tight text-primary/95 sm:text-3xl">
-                  {auroraMeaning}
+                  <a
+                    href="https://gsya.esi.uclm.es/AURORA/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="transition-opacity hover:opacity-85"
+                  >
+                    {auroraMeaning}
+                  </a>
                 </h1>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                'Cookies HttpOnly',
-                'Acceso por Traefik',
-                'Tema claro exclusivo',
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-primary/85"
-                >
-                  {item}
-                </div>
-              ))}
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+              <img
+                src={fundingLogos}
+                alt="Logotipos de cofinanciación: Unión Europea, Ministerio de Hacienda, Fondos Europeos e INNOCAM"
+                className="h-20 w-full rounded-xl object-contain sm:h-24"
+              />
             </div>
           </div>
 
@@ -126,8 +150,7 @@ export default function Login() {
                   <span className="text-sm font-medium text-primary">Contraseña</span>
                   <div className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-accent">
                     <LockKeyhole className="size-4 shrink-0 text-muted" />
-                    <input
-                      type="password"
+                    <PasswordInput
                       name="password"
                       autoComplete="current-password"
                       required
@@ -155,10 +178,17 @@ export default function Login() {
                 <ArrowRight className="size-4" />
               </button>
 
-              <p className="text-center text-xs leading-6 text-muted">
-                El acceso queda preparado para fluir por cookies seguras; no se usa
-                almacenamiento persistente en el navegador.
-              </p>
+              <div className="grid grid-cols-2 gap-3 text-xs text-muted">
+                <Link to="/register" className="underline-offset-2 transition-colors hover:text-accent hover:underline">
+                  Registrarse
+                </Link>
+                <Link
+                  to="/recover"
+                  className="text-right underline-offset-2 transition-colors hover:text-accent hover:underline"
+                >
+                  He olvidado mi contraseña
+                </Link>
+              </div>
             </form>
           </div>
         </section>
