@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { StringValue } from 'ms';
 import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 
@@ -66,7 +67,7 @@ export class AuthService {
 			role: user.role,
 			did: user.did,
 		};
-		const refreshTokenExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN ?? '7d';
+		const refreshTokenExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as StringValue;
 
 		const accessToken = await this.jwtService.signAsync(payload, {
 			algorithm: 'RS256',
