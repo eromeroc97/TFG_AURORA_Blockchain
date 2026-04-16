@@ -92,7 +92,7 @@ export default function Recover() {
 
               <div className="space-y-4">
                 <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-primary/80">
-                  Soporte de Acceso
+                  Proyecto de Investigación <b>SBPLY/24/180225/000074</b>
                 </span>
                 <h1 className="font-heading text-2xl font-semibold leading-tight text-primary/95 sm:text-3xl">
                   <a
@@ -104,17 +104,13 @@ export default function Recover() {
                     {auroraMeaning}
                   </a>
                 </h1>
-                <p className="text-sm leading-6 text-primary/80">
-                  Inicia el proceso de recuperacion de cuenta introduciendo tu email para recibir
-                  instrucciones de restablecimiento.
-                </p>
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
               <img
                 src={fundingLogos}
-                alt="Logotipos de cofinanciacion: Union Europea, Ministerio de Hacienda, Fondos Europeos e INNOCAM"
+                alt="Logotipos de cofinanciación: Unión Europea, Ministerio de Hacienda, Fondos Europeos e INNOCAM"
                 className="h-20 w-full rounded-xl object-contain sm:h-24"
               />
             </div>
@@ -175,7 +171,7 @@ export default function Recover() {
 
               <div className="grid grid-cols-2 gap-3 text-xs text-muted">
                 <Link to="/login" className="underline-offset-2 transition-colors hover:text-accent hover:underline">
-                  Volver al login
+                  Iniciar sesión
                 </Link>
                 <Link
                   to="/register"
@@ -191,8 +187,7 @@ export default function Recover() {
                   Seguridad de la cuenta
                 </div>
                 <p className="mt-2 leading-5">
-                  Este formulario no confirma publicamente si un email existe o no, para reducir
-                  riesgos de enumeracion de usuarios.
+                  Si tu email es correcto, recibirás un enlace para restablecer tu contraseña.
                 </p>
               </div>
             </form>
