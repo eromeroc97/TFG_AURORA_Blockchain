@@ -36,7 +36,7 @@ export class EcosystemsService {
         throw new ForbiddenException('Solo los investigadores con rol USER pueden registrar ecosistemas');
       }
 
-      if (!user.did || !user.did.trim()) {
+      if (!user.did?.trim()) {
         throw new ForbiddenException('El usuario debe estar validado en la blockchain (tener un DID) antes de registrar ecosistemas');
       }
 

@@ -111,9 +111,9 @@ export class TestFixtures {
    * Configuración de SMTP para tests
    */
   static readonly SMTP = {
-    HOST: process.env.SMTP_HOST || 'mailpit',
-    PORT: parseInt(process.env.SMTP_PORT || '1025'),
-    FROM: process.env.MAIL_FROM || 'noreply@aurora.local',
+    HOST: process.env.SMTP_HOST ?? 'mailpit',
+    PORT: parseInt(process.env.SMTP_PORT ?? '1025'),
+    FROM: process.env.MAIL_FROM ?? 'noreply@aurora.local',
   };
 
   /**

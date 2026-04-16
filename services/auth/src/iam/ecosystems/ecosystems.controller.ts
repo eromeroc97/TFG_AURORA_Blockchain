@@ -1,15 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { EcosystemsService } from './ecosystems.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
+import { Roles, JwtAuthGuard, RolesGuard } from '../auth';
 
 @Controller('ecosystems')
 export class EcosystemsController {
   constructor(private readonly ecosystemsService: EcosystemsService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
   create(@Body() createEcosystemDto: CreateEcosystemDto) {
-    // TODO: añadir @UseGuards(RolesGuard) y @Roles(Role.USER) cuando activemos JWTs.
     return this.ecosystemsService.create(createEcosystemDto);
   }
 
