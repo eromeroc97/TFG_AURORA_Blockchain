@@ -25,17 +25,22 @@ export default function Recover() {
     setIsSubmitting(true)
 
     try {
-      await apiClient.post('/auth/recover', { email })
+      await apiClient.post(
+        '/auth/recover',
+        { email },
+        {
+          skipAuthRefresh: true,
+        },
+      )
       setSuccessMessage('Si el correo existe, recibirás instrucciones para recuperar tu acceso.')
       setEmail('')
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
+      if (axios.isAxiosError(error) && !error.response) {
         setErrorMessage(
-          'La recuperacion automatica aun no esta habilitada en el backend. Contacta con el administrador para restablecer la cuenta.',
+          'No se pudo contactar con el servicio de recuperación. Revisa la conexión e inténtalo de nuevo.',
         )
       } else {
-        setSuccessMessage('Si el correo existe, recibirás instrucciones para recuperar tu acceso.')
-        setEmail('')
+        setErrorMessage('No se pudo procesar la recuperación ahora mismo. Inténtalo de nuevo en unos minutos.')
       }
     } finally {
       setIsSubmitting(false)
@@ -179,16 +184,6 @@ export default function Recover() {
                 >
                   Crear cuenta
                 </Link>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted">
-                <div className="flex items-center gap-2 font-semibold text-primary">
-                  <KeyRound className="size-4" />
-                  Seguridad de la cuenta
-                </div>
-                <p className="mt-2 leading-5">
-                  Si tu email es correcto, recibirás un enlace para restablecer tu contraseña.
-                </p>
               </div>
             </form>
           </div>

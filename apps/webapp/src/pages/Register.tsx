@@ -178,15 +178,6 @@ export default function Register() {
                 </Link>
               </div>
 
-              <div className="rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted">
-                <div className="flex items-center gap-2 font-semibold text-primary">
-                  <UserPlus className="size-4" />
-                  Proceso de alta
-                </div>
-                <p className="mt-2 leading-5">
-                  Recibirás un correo confirmando la recepción de tu solicitud.
-                </p>
-              </div>
             </form>
           </div>
         </section>
