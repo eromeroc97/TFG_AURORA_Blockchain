@@ -1,0 +1,209 @@
+import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowRight, LockKeyhole, Mail } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { apiClient } from '../api/axios'
+import { useAuth } from '../context/auth-context'
+import auroraLogo from '../assets/aurora-logo.png'
+
+const logoSrc = auroraLogo
+
+const auroraMeanings = [
+  {
+    language: 'ES',
+    text: 'Investigación Unificada Avanzada sobre Análisis de Riesgos de Ciberseguridad y Sostenibilidad en Hogares Inteligentes',
+  },
+  {
+    language: 'EN',
+    text: 'Advanced and Unified Research On cybersecurity Risk Analysis and sustainability in smart homes',
+  },
+]
+
+export default function Login() {
+  const navigate = useNavigate()
+  const { setIsAuthenticated } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [logoFailed, setLogoFailed] = useState(false)
+  const [meaningIndex, setMeaningIndex] = useState(0)
+  const [isMeaningVisible, setIsMeaningVisible] = useState(true)
+
+  useEffect(() => {
+    let timeoutId: number | undefined
+
+    const intervalId = window.setInterval(() => {
+      setIsMeaningVisible(false)
+
+      timeoutId = window.setTimeout(() => {
+        setMeaningIndex((previous) => (previous + 1) % auroraMeanings.length)
+        setIsMeaningVisible(true)
+      }, 350)
+    }, 3000)
+
+    return () => {
+      window.clearInterval(intervalId)
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [])
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      await apiClient.post('/auth/login', { email, password })
+      setIsAuthenticated(true)
+      navigate('/dashboard', { replace: true })
+    } catch {
+      setErrorMessage('No se pudo iniciar sesión. Revisa tus credenciales e inténtalo de nuevo.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-background px-6 py-10 text-primary">
+      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
+        <section className="grid w-full overflow-hidden rounded-[2rem] border border-border bg-surface shadow-aurora lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="flex flex-col justify-between gap-8 bg-primary p-8 text-surface sm:p-10 lg:p-12">
+            <div className="max-w-lg space-y-6">
+              <div className="flex items-center gap-4">
+                {!logoFailed ? (
+                  <img
+                    src={logoSrc}
+                    alt="Logotipo de AURORA"
+                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
+                    onError={() => setLogoFailed(true)}
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/90 text-sm font-bold text-primary">
+                    AU
+                  </div>
+                )}
+
+                <div>
+                  <p className="font-heading text-sm font-semibold tracking-[0.32em] text-white/90">
+                    AURORA
+                  </p>
+                  <p className="text-sm text-white/70">Acceso seguro con cookies HttpOnly</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-white/80">
+                  Login · WebApp
+                </span>
+                <h1 className="font-heading text-4xl font-semibold leading-tight sm:text-5xl">
+                  AURORA
+                </h1>
+                <div
+                  className={`max-w-md space-y-3 transition-opacity duration-300 ${isMeaningVisible ? 'opacity-100' : 'opacity-0'}`}
+                  aria-live="polite"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
+                    {auroraMeanings[meaningIndex].language}
+                  </p>
+                  <p className="text-base leading-7 text-white/75 sm:text-lg">
+                    {auroraMeanings[meaningIndex].text}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                'Cookies HttpOnly',
+                'Acceso por Traefik',
+                'Tema claro exclusivo',
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white/85"
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center p-8 sm:p-10 lg:p-12">
+            <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent">
+                  Bienvenido de nuevo
+                </p>
+                <h2 className="font-heading text-3xl font-semibold text-primary">
+                  Accede al panel de AURORA
+                </h2>
+                <p className="text-sm leading-6 text-muted">
+                  Usa tus credenciales corporativas. El backend gestionará la sesión por
+                  cookies.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-primary">Email</span>
+                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-accent">
+                    <Mail className="size-4 shrink-0 text-muted" />
+                    <input
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className="w-full border-0 bg-transparent text-sm text-primary outline-none placeholder:text-muted"
+                      placeholder="tu@email.com"
+                    />
+                  </div>
+                </label>
+
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-primary">Contraseña</span>
+                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-accent">
+                    <LockKeyhole className="size-4 shrink-0 text-muted" />
+                    <input
+                      type="password"
+                      name="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className="w-full border-0 bg-transparent text-sm text-primary outline-none placeholder:text-muted"
+                      placeholder="Tu contraseña"
+                    />
+                  </div>
+                </label>
+              </div>
+
+              {errorMessage ? (
+                <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {errorMessage}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-aurora disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? 'Entrando...' : 'Entrar'}
+                <ArrowRight className="size-4" />
+              </button>
+
+              <p className="text-center text-xs leading-6 text-muted">
+                El acceso queda preparado para fluir por cookies seguras; no se usa
+                almacenamiento persistente en el navegador.
+              </p>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+  )
+}
