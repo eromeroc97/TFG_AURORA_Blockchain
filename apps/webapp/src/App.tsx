@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthProvider'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
+import Recover from './pages/Recover'
+import Register from './pages/Register'
 import MainLayout from './components/layout/MainLayout'
 import RequireAuth from './components/routes/RequireAuth'
 
@@ -12,6 +14,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/recover" element={<Recover />} />
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
