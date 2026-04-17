@@ -16,6 +16,7 @@ enum Role {
 enum UserStatus {
   PENDING
   ACTIVE
+  PASSBLOCK
   REVOKED
 }
 
@@ -35,6 +36,7 @@ model User {
   id                 String     @id @default(uuid()) @db.Uuid
   email              String     @unique
   passwordHash       String
+  passwordChangedAt  DateTime   @default(now())
   hashedRefreshToken String?
   role               Role       @default(USER)
   status             UserStatus @default(PENDING)
