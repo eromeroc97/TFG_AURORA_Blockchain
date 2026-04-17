@@ -18,6 +18,7 @@ const mockFetch = jest.fn()
 describe('Reset page', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockedApiClient.post.mockResolvedValue({ data: { valid: true } } as never)
 
     Object.defineProperty(global, 'crypto', {
       configurable: true,
@@ -56,10 +57,10 @@ describe('Reset page', () => {
     })
   }
 
-  it('renders the policy checklist and headings', () => {
+  it('renders the policy checklist and headings', async () => {
     renderReset()
 
-    expect(screen.getByRole('heading', { name: /Define tu nueva contraseña/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })).toBeInTheDocument()
     expect(screen.getByText(/Política de seguridad de contraseña/i)).toBeInTheDocument()
   })
 
@@ -67,6 +68,20 @@ describe('Reset page', () => {
     renderReset('/reset')
 
     expect(await screen.findByText('Recover Page')).toBeInTheDocument()
+    expect(mockedApiClient.post).not.toHaveBeenCalled()
+  })
+
+  it('redirects to recover when backend says token is invalid', async () => {
+    mockedApiClient.post.mockResolvedValueOnce({ data: { valid: false } } as never)
+
+    renderReset()
+
+    expect(await screen.findByText('Recover Page')).toBeInTheDocument()
+    expect(mockedApiClient.post).toHaveBeenCalledWith(
+      '/auth/reset/validate',
+      { token: validToken },
+      { skipAuthRefresh: true },
+    )
   })
 
   it('shows the HIBP safe message for a valid password', async () => {
@@ -80,6 +95,7 @@ describe('Reset page', () => {
     })
 
     renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
     fillValidPassword(password)
     fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
 
@@ -103,6 +119,7 @@ describe('Reset page', () => {
     })
 
     renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
     fillValidPassword(password)
     fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
 
@@ -127,8 +144,12 @@ describe('Reset page', () => {
       ok: true,
       text: async () => '',
     })
+    mockedApiClient.post
+      .mockResolvedValueOnce({ data: { valid: true } } as never)
+      .mockResolvedValueOnce({ data: { success: true } } as never)
 
     renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
     fillValidPassword(password)
     fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
 
@@ -139,7 +160,8 @@ describe('Reset page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Guardar contraseña/i }))
 
     await waitFor(() => {
-      expect(mockedApiClient.post).toHaveBeenCalledWith(
+      expect(mockedApiClient.post).toHaveBeenNthCalledWith(
+        2,
         '/auth/reset',
         {
           token: validToken,
@@ -150,6 +172,13 @@ describe('Reset page', () => {
         },
       )
     })
+
+    expect(mockedApiClient.post).toHaveBeenNthCalledWith(
+      1,
+      '/auth/reset/validate',
+      { token: validToken },
+      { skipAuthRefresh: true },
+    )
 
     expect(await screen.findByText(/Contraseña actualizada correctamente/i)).toBeInTheDocument()
   })

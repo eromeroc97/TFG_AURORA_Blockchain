@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldAlert, ShieldCheck, X } from 'lucide-react'
-import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
@@ -12,6 +12,7 @@ export default function Reset() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [tokenValidationState, setTokenValidationState] = useState<'checking' | 'valid' | 'invalid'>('checking')
   const [hibpState, setHibpState] = useState<'idle' | 'checking' | 'safe' | 'pwned' | 'error'>('idle')
   const [hibpCount, setHibpCount] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -20,6 +21,44 @@ export default function Reset() {
 
   const token = (searchParams.get('token') ?? '').trim()
   const hasValidTokenFormat = /^[A-Za-z0-9_-]{20,200}$/.test(token)
+
+  useEffect(() => {
+    if (!hasValidTokenFormat) {
+      setTokenValidationState('invalid')
+      return
+    }
+
+    let isMounted = true
+    setTokenValidationState('checking')
+
+    void apiClient
+      .post(
+        '/auth/reset/validate',
+        { token },
+        {
+          skipAuthRefresh: true,
+        },
+      )
+      .then((response) => {
+        if (!isMounted) {
+          return
+        }
+
+        const isValid = response.data?.valid === true
+        setTokenValidationState(isValid ? 'valid' : 'invalid')
+      })
+      .catch(() => {
+        if (!isMounted) {
+          return
+        }
+
+        setTokenValidationState('invalid')
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [hasValidTokenFormat, token])
 
   const hasLowercase = /[a-z]/.test(password)
   const hasUppercase = /[A-Z]/.test(password)
@@ -141,6 +180,11 @@ export default function Reset() {
     setErrorMessage('')
     setSuccessMessage('')
 
+    if (tokenValidationState !== 'valid') {
+      setErrorMessage('El token de recuperación no es válido. Solicita un nuevo enlace.')
+      return
+    }
+
     if (!isPolicyValid) {
       setErrorMessage('Revisa los requisitos de contraseña antes de continuar.')
       return
@@ -196,6 +240,32 @@ export default function Reset() {
         state={{
           forcedRecoverMessage:
             'El enlace de restablecimiento no es válido o está incompleto. Solicita un nuevo enlace.',
+        }}
+      />
+    )
+  }
+
+  if (tokenValidationState === 'checking') {
+    return (
+      <AuthPageShell>
+        <div className="w-full max-w-md rounded-2xl border border-border bg-background px-5 py-6 text-sm text-primary">
+          <p className="flex items-center gap-2">
+            <LoaderCircle className="size-4 animate-spin" />
+            Validando enlace de recuperación...
+          </p>
+        </div>
+      </AuthPageShell>
+    )
+  }
+
+  if (tokenValidationState === 'invalid') {
+    return (
+      <Navigate
+        to="/recover"
+        replace
+        state={{
+          forcedRecoverMessage:
+            'El enlace de restablecimiento no es válido, ha expirado o ya fue utilizado. Solicita uno nuevo.',
         }}
       />
     )
