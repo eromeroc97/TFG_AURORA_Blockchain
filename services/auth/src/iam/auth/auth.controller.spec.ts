@@ -34,6 +34,9 @@ describe('AuthController - API Endpoints', () => {
         {
           provide: AuthService,
           useValue: {
+            requestPasswordRecovery: jest.fn(),
+            resetPasswordWithOneTimeToken: jest.fn(),
+            validatePasswordResetToken: jest.fn(),
             validateUser: jest.fn(),
             login: jest.fn(),
             refreshTokens: jest.fn(),
@@ -76,6 +79,58 @@ describe('AuthController - API Endpoints', () => {
           password: 'wrongpass',
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('POST /auth/recover', () => {
+    it('should trigger password recovery flow with generic response', async () => {
+      authService.requestPasswordRecovery.mockResolvedValue(undefined);
+
+      const result = await controller.recover({ email: 'auth-test@test.test' });
+
+      expect(authService.requestPasswordRecovery).toHaveBeenCalledWith('auth-test@test.test');
+      expect(result).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: expect.stringContaining('Si la cuenta existe'),
+        }),
+      );
+    });
+  });
+
+  describe('POST /auth/reset', () => {
+    it('should reset password with one-time token', async () => {
+      authService.resetPasswordWithOneTimeToken.mockResolvedValue(undefined);
+
+      const result = await controller.reset({
+        token: 'token_1234567890_abcdefghijklmnopqrstuvwxyz',
+        password: 'StrongPass123!@#',
+      });
+
+      expect(authService.resetPasswordWithOneTimeToken).toHaveBeenCalledWith(
+        'token_1234567890_abcdefghijklmnopqrstuvwxyz',
+        'StrongPass123!@#',
+      );
+      expect(result).toEqual(
+        expect.objectContaining({
+          success: true,
+        }),
+      );
+    });
+  });
+
+  describe('POST /auth/reset/validate', () => {
+    it('should return token validation result', async () => {
+      authService.validatePasswordResetToken.mockResolvedValue({ valid: true });
+
+      const result = await controller.validateResetToken({
+        token: 'token_1234567890_abcdefghijklmnopqrstuvwxyz',
+      });
+
+      expect(authService.validatePasswordResetToken).toHaveBeenCalledWith(
+        'token_1234567890_abcdefghijklmnopqrstuvwxyz',
+      );
+      expect(result).toEqual({ valid: true });
     });
   });
 

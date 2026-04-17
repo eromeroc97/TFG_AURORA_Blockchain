@@ -6,6 +6,7 @@ import { LogoutDto } from './dto/logout.dto';
 import { RecoverPasswordDto } from './dto/recover-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
 
 const REFRESH_COOKIE_NAME = 'refreshToken';
 
@@ -145,6 +146,11 @@ export class AuthController {
 			success: true,
 			message: 'Contraseña actualizada correctamente.',
 		};
+	}
+
+	@Post('reset/validate')
+	async validateResetToken(@Body() validateResetTokenDto: ValidateResetTokenDto) {
+		return this.authService.validatePasswordResetToken(validateResetTokenDto.token);
 	}
 
 	@Post('login')
