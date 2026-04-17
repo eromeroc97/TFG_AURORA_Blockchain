@@ -63,9 +63,9 @@ export default function Reset() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10 text-primary">
+    <main className="min-h-screen px-6 py-10 text-primary">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
-        <section className="grid w-full overflow-hidden rounded-[2rem] border border-border bg-surface shadow-aurora lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="grid w-full overflow-hidden rounded-[2rem] border border-border bg-white shadow-aurora lg:grid-cols-[1.05fr_0.95fr]">
           <div className="flex flex-col justify-between gap-8 bg-primary p-8 text-surface sm:p-10 lg:p-12">
             <div className="max-w-lg space-y-6">
               <div className="flex items-center gap-4">
