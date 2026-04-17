@@ -33,6 +33,14 @@ export class AuthService {
 		private readonly redisService: RedisService,
 	) {}
 
+	async requestPasswordRecovery(email: string): Promise<void> {
+		await this.usersService.createPasswordResetToken(email);
+	}
+
+	async resetPasswordWithOneTimeToken(token: string, password: string): Promise<void> {
+		await this.usersService.consumePasswordResetToken(token, password);
+	}
+
 	async validateUser(email: string, pass: string) {
 		try {
 			const user = await this.usersService.findByEmail(email);
