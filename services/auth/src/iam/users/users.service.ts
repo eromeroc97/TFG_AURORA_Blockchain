@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -6,8 +7,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, Role, UserStatus } from '@prisma/client';
+import axios from 'axios';
 import * as argon2 from 'argon2';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -50,6 +52,69 @@ export class UsersService {
 
   private isNotFoundError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+  }
+
+  private async assertPasswordNotPwned(password: string) {
+    const isPasswordBreachCheckEnabled =
+      (process.env.HIBP_PASSWORD_CHECK_ENABLED ?? 'true').toLowerCase() === 'true';
+
+    if (!isPasswordBreachCheckEnabled) {
+      return;
+    }
+
+    const sha1 = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase();
+    const hashPrefix = sha1.slice(0, 5);
+    const hashSuffix = sha1.slice(5);
+
+    const baseUrl = (
+      process.env.HIBP_PWNED_PASSWORDS_BASE_URL ?? 'https://api.pwnedpasswords.com/range'
+    ).replace(/\/+$/, '');
+
+    const userAgent = process.env.HIBP_USER_AGENT ?? 'AURORA-Auth-Service';
+    const timeoutMs = Number(process.env.HIBP_TIMEOUT_MS ?? '5000');
+    const failClosed = (process.env.HIBP_FAIL_CLOSED ?? 'false').toLowerCase() === 'true';
+
+    const headers: Record<string, string> = {
+      'Add-Padding': 'true',
+      'User-Agent': userAgent,
+    };
+
+    if (process.env.HIBP_API_KEY) {
+      headers['hibp-api-key'] = process.env.HIBP_API_KEY;
+    }
+
+    try {
+      const response = await axios.get<string>(`${baseUrl}/${hashPrefix}`, {
+        headers,
+        timeout: Number.isFinite(timeoutMs) ? timeoutMs : 5000,
+        responseType: 'text',
+      });
+
+      const leakedMatch = response.data
+        .split('\n')
+        .map((line) => line.trim())
+        .find((line) => line.toUpperCase().startsWith(`${hashSuffix}:`));
+
+      if (leakedMatch) {
+        const leakedCount = Number(leakedMatch.split(':')[1] ?? '0');
+
+        throw new BadRequestException(
+          `La contraseña propuesta aparece en filtraciones públicas (${leakedCount} coincidencias). Elige una contraseña diferente.`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      if (failClosed) {
+        throw new InternalServerErrorException(
+          'No se pudo verificar la seguridad de la contraseña en este momento. Inténtalo de nuevo más tarde.',
+        );
+      }
+
+      console.warn('[UsersService] HIBP password check unavailable, continuing due to fail-open policy.', error);
+    }
   }
 
   async create(createUserDto: CreateUserDto) {
@@ -166,6 +231,7 @@ export class UsersService {
       const data: Prisma.UserUpdateInput = { ...rest };
 
       if (password) {
+        await this.assertPasswordNotPwned(password);
         data.passwordHash = await argon2.hash(password);
         const passwordChangedAt = new Date();
         passwordChangedAt.setHours(0, 0, 0, 0);
