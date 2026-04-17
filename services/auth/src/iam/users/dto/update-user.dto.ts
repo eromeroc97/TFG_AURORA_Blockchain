@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PartialType } from '@nestjs/mapped-types';
 import { Role, UserStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsStrongPassword } from 'class-validator';
 import { CreateUserDto } from './create-user.dto';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
@@ -12,7 +12,13 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 	})
 	@IsOptional()
 	@IsString()
-	@MinLength(8)
+	@IsStrongPassword({
+		minLength: 10,
+		minLowercase: 1,
+		minUppercase: 1,
+		minNumbers: 1,
+		minSymbols: 1,
+	})
 	password?: string;
 
 	@ApiPropertyOptional({
