@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   InternalServerErrorException,
@@ -20,6 +21,7 @@ import { UsersService } from './users.service';
 
 jest.mock('argon2', () => ({
   hash: jest.fn(),
+  verify: jest.fn(),
 }));
 
 jest.mock('axios', () => ({
@@ -45,10 +47,17 @@ describe('UsersService', () => {
       update: ReturnType<typeof jest.fn>;
       delete: ReturnType<typeof jest.fn>;
     };
+    passwordResetToken: {
+      findUnique: ReturnType<typeof jest.fn>;
+      create: ReturnType<typeof jest.fn>;
+      update: ReturnType<typeof jest.fn>;
+    };
+    $transaction: ReturnType<typeof jest.fn>;
   };
   let mailServiceMock: {
     sendWelcomeEmail: ReturnType<typeof jest.fn>;
     sendVerifyEmail: ReturnType<typeof jest.fn>;
+    sendRecoverEmail: ReturnType<typeof jest.fn>;
     sendRoleChangedEmail: ReturnType<typeof jest.fn>;
     sendAccountDeletedEmail: ReturnType<typeof jest.fn>;
   };
@@ -61,6 +70,7 @@ describe('UsersService', () => {
   };
 
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
+  const mockVerify = argon2.verify as jest.MockedFunction<typeof argon2.verify>;
   const mockAxiosGet = axios.get as jest.MockedFunction<typeof axios.get>;
   const mockRandomBytes = randomBytes as jest.MockedFunction<typeof randomBytes>;
   const generatedPasswordBuffer = Buffer.from('temporary-password-123456');
@@ -108,6 +118,12 @@ describe('UsersService', () => {
               update: jest.fn(),
               delete: jest.fn(),
             },
+            passwordResetToken: {
+              findUnique: jest.fn(),
+              create: jest.fn(),
+              update: jest.fn(),
+            },
+            $transaction: jest.fn(),
           }),
         },
         {
@@ -115,6 +131,7 @@ describe('UsersService', () => {
           useFactory: () => ({
             sendWelcomeEmail: jest.fn(),
             sendVerifyEmail: jest.fn(),
+            sendRecoverEmail: jest.fn(),
             sendRoleChangedEmail: jest.fn(),
             sendAccountDeletedEmail: jest.fn(),
           }),
@@ -625,6 +642,106 @@ describe('UsersService', () => {
       ).rejects.toThrow('firefly down');
       expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
       expect(mailServiceMock.sendVerifyEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createPasswordResetToken', () => {
+    it('should generate unique token, hash it and send recover email', async () => {
+      const rawTokenBuffer = Buffer.from('reset-token-1234567890');
+      const rawToken = rawTokenBuffer.toString('base64url');
+
+      process.env.PASSWORD_RESET_ACTION_URL = 'http://localhost:5173/reset';
+      prismaServiceMock.user.findFirst.mockResolvedValue({
+        id: createdUserRecord.id,
+        email: createdUserRecord.email,
+      });
+      mockRandomBytes.mockReturnValue(rawTokenBuffer as never);
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue(null);
+      mockHash.mockResolvedValue('hashed_reset_token' as never);
+      prismaServiceMock.passwordResetToken.create.mockResolvedValue({
+        id: 'd32f0f8f-b57f-4b3a-90e5-74f0cd37f7c4',
+      });
+      mailServiceMock.sendRecoverEmail.mockResolvedValue(undefined);
+
+      await service.createPasswordResetToken(createdUserRecord.email);
+
+      expect(prismaServiceMock.passwordResetToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: createdUserRecord.id,
+          tokenHash: 'hashed_reset_token',
+        }),
+      });
+      expect(mailServiceMock.sendRecoverEmail).toHaveBeenCalledWith(
+        createdUserRecord.email,
+        `http://localhost:5173/reset?token=${encodeURIComponent(rawToken)}`,
+      );
+    });
+
+    it('should return silently when user does not exist', async () => {
+      prismaServiceMock.user.findFirst.mockResolvedValue(null);
+
+      await service.createPasswordResetToken('missing@aurora.local');
+
+      expect(prismaServiceMock.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(mailServiceMock.sendRecoverEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('consumePasswordResetToken', () => {
+    it('should reject used tokens', async () => {
+      const now = new Date();
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'used-token-id',
+        userId: createdUserRecord.id,
+        tokenHash: 'stored_hash',
+        createdAt: now,
+        usedAt: now,
+      });
+
+      await expect(
+        service.consumePasswordResetToken('raw-token', 'NewPassword123!'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+      expect(prismaServiceMock.passwordResetToken.update).not.toHaveBeenCalled();
+    });
+
+    it('should consume valid token, update password and mark token as used', async () => {
+      const createdAt = new Date(Date.now() - 60 * 1000);
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'valid-token-id',
+        userId: createdUserRecord.id,
+        tokenHash: 'stored_hash',
+        createdAt,
+        usedAt: null,
+      });
+      mockVerify.mockResolvedValue(true as never);
+      mockHash.mockResolvedValue('new_password_hash' as never);
+      prismaServiceMock.user.update.mockResolvedValue(selectedUserRecord);
+      prismaServiceMock.passwordResetToken.update.mockResolvedValue({
+        id: 'valid-token-id',
+      });
+      prismaServiceMock.$transaction.mockResolvedValue([]);
+
+      await service.consumePasswordResetToken('raw-token', 'NewPassword123!');
+
+      expect(mockVerify).toHaveBeenCalledWith('stored_hash', 'raw-token');
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: createdUserRecord.id },
+          data: expect.objectContaining({
+            passwordHash: 'new_password_hash',
+            status: UserStatus.ACTIVE,
+            isActive: true,
+            passwordChangedAt: expect.any(Date),
+          }),
+        }),
+      );
+      expect(prismaServiceMock.passwordResetToken.update).toHaveBeenCalledWith({
+        where: { id: 'valid-token-id' },
+        data: { usedAt: expect.any(Date) },
+      });
+      expect(prismaServiceMock.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 });
