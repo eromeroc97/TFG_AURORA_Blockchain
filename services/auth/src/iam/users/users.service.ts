@@ -235,7 +235,10 @@ export class UsersService {
         data.passwordHash = await argon2.hash(password);
         const passwordChangedAt = new Date();
         passwordChangedAt.setHours(0, 0, 0, 0);
-        data.passwordChangedAt = passwordChangedAt;
+        (data as Prisma.UserUpdateInput & { passwordChangedAt?: Date }).passwordChangedAt =
+          passwordChangedAt;
+        data.status = UserStatus.ACTIVE;
+        data.isActive = true;
       }
 
       return await this.prisma.user.update({
