@@ -15,6 +15,7 @@ export default function PasswordInput({
       <input
         {...props}
         type={showPassword ? 'text' : 'password'}
+        data-password-input="true"
         className={`${className} pr-10`}
       />
       <button

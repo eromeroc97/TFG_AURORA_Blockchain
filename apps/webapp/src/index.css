@@ -52,3 +52,17 @@ button:hover {
   min-height: 100vh;
   color: #0a2540;
 }
+
+input[data-password-input='true']::-ms-reveal,
+input[data-password-input='true']::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+input[data-password-input='true']::-webkit-credentials-auto-fill-button,
+input[data-password-input='true']::-webkit-contacts-auto-fill-button,
+input[data-password-input='true']::-webkit-caps-lock-indicator {
+  visibility: hidden;
+  pointer-events: none;
+}
