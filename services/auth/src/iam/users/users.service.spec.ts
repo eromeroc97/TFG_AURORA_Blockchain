@@ -7,6 +7,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma, Role, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
+import axios from 'axios';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import { FireflyService } from '../../blockchain/firefly.service';
@@ -19,6 +20,13 @@ import { UsersService } from './users.service';
 
 jest.mock('argon2', () => ({
   hash: jest.fn(),
+}));
+
+jest.mock('axios', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn(),
+  },
 }));
 
 jest.mock('crypto', () => ({
@@ -53,6 +61,7 @@ describe('UsersService', () => {
   };
 
   const mockHash = argon2.hash as jest.MockedFunction<typeof argon2.hash>;
+  const mockAxiosGet = axios.get as jest.MockedFunction<typeof axios.get>;
   const mockRandomBytes = randomBytes as jest.MockedFunction<typeof randomBytes>;
   const generatedPasswordBuffer = Buffer.from('temporary-password-123456');
   const generatedPassword = generatedPasswordBuffer.toString('base64url');
@@ -132,6 +141,7 @@ describe('UsersService', () => {
     fireflyServiceMock = module.get(FireflyService) as unknown as typeof fireflyServiceMock;
     redisServiceMock = module.get(RedisService) as unknown as typeof redisServiceMock;
     jest.clearAllMocks();
+    mockAxiosGet.mockResolvedValue({ data: '' } as never);
   });
 
   it('should hash password and create user', async () => {
@@ -262,10 +272,13 @@ describe('UsersService', () => {
       expect(mockHash).toHaveBeenCalledWith('NewPassword123!');
       expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
         where: { id: createdUserRecord.id },
-        data: {
+        data: expect.objectContaining({
           email: 'updated@aurora.local',
           passwordHash: 'new_hashed_password',
-        },
+          status: UserStatus.ACTIVE,
+          isActive: true,
+          passwordChangedAt: expect.any(Date),
+        }),
         select: {
           id: true,
           email: true,
@@ -281,6 +294,25 @@ describe('UsersService', () => {
         ...selectedUserRecord,
         email: 'updated@aurora.local',
       });
+    });
+
+    it('should reactivate user account when password changes', async () => {
+      mockHash.mockResolvedValue('reactivated_hashed_password' as never);
+      prismaServiceMock.user.update.mockResolvedValue(selectedUserRecord);
+
+      await service.update(createdUserRecord.id, { password: 'AnotherStrongPass123!' });
+
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: createdUserRecord.id },
+          data: expect.objectContaining({
+            passwordHash: 'reactivated_hashed_password',
+            status: UserStatus.ACTIVE,
+            isActive: true,
+            passwordChangedAt: expect.any(Date),
+          }),
+        }),
+      );
     });
 
     it('should map missing user to NotFoundException', async () => {
