@@ -1,5 +1,5 @@
-import { ArrowRight, Check, LockKeyhole, X } from 'lucide-react'
-import { useMemo, useState, type FormEvent } from 'react'
+import { ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldAlert, ShieldCheck, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import PasswordInput from '../components/PasswordInput'
 import auroraLogo from '../assets/aurora-logo.png'
@@ -17,6 +17,8 @@ export default function Reset() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [hibpState, setHibpState] = useState<'idle' | 'checking' | 'safe' | 'pwned' | 'error'>('idle')
+  const [hibpCount, setHibpCount] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [, setLogoFailed] = useState(false)
 
@@ -58,6 +60,72 @@ export default function Reset() {
 
   const isPolicyValid = passwordChecks.every((check) => check.passed)
 
+  useEffect(() => {
+    let canceled = false
+
+    const checkPasswordPwned = async () => {
+      if (!password || !isPolicyValid) {
+        setHibpState('idle')
+        setHibpCount(null)
+        return
+      }
+
+      setHibpState('checking')
+      setHibpCount(null)
+
+      try {
+        const digestBuffer = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(password))
+        const hashHex = Array.from(new Uint8Array(digestBuffer))
+          .map((byte) => byte.toString(16).padStart(2, '0'))
+          .join('')
+          .toUpperCase()
+
+        const hashPrefix = hashHex.slice(0, 5)
+        const hashSuffix = hashHex.slice(5)
+
+        const response = await fetch(`https://api.pwnedpasswords.com/range/${hashPrefix}`, {
+          headers: {
+            'Add-Padding': 'true',
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error('HIBP request failed')
+        }
+
+        const body = await response.text()
+        const match = body
+          .split('\n')
+          .map((line) => line.trim())
+          .find((line) => line.toUpperCase().startsWith(`${hashSuffix}:`))
+
+        if (canceled) {
+          return
+        }
+
+        if (match) {
+          const count = Number(match.split(':')[1] ?? '0')
+          setHibpCount(Number.isFinite(count) ? count : null)
+          setHibpState('pwned')
+          return
+        }
+
+        setHibpState('safe')
+      } catch {
+        if (!canceled) {
+          setHibpState('error')
+        }
+      }
+    }
+
+    const timeout = window.setTimeout(checkPasswordPwned, 450)
+
+    return () => {
+      canceled = true
+      window.clearTimeout(timeout)
+    }
+  }, [password, isPolicyValid])
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setErrorMessage('')
@@ -70,6 +138,16 @@ export default function Reset() {
 
     if (password !== confirmPassword) {
       setErrorMessage('Las contraseñas no coinciden. Revisa ambos campos.')
+      return
+    }
+
+    if (hibpState === 'checking') {
+      setErrorMessage('Comprobando si la contraseña ha sido filtrada. Espera un instante.')
+      return
+    }
+
+    if (hibpState === 'pwned') {
+      setErrorMessage('La contraseña propuesta aparece en filtraciones públicas. Debes elegir una diferente.')
       return
     }
 
@@ -225,6 +303,37 @@ export default function Reset() {
                     </li>
                   ))}
                 </ul>
+
+                <div className="mt-3 rounded-xl border border-border/70 bg-white px-3 py-2">
+                  {hibpState === 'checking' ? (
+                    <p className="flex items-center gap-2 text-primary">
+                      <LoaderCircle className="size-4 animate-spin" />
+                      Comprobando filtraciones públicas (HIBP)...
+                    </p>
+                  ) : null}
+
+                  {hibpState === 'safe' ? (
+                    <p className="flex items-center gap-2 text-emerald-700">
+                      <ShieldCheck className="size-4" />
+                      No se encontraron coincidencias públicas para esta contraseña.
+                    </p>
+                  ) : null}
+
+                  {hibpState === 'pwned' ? (
+                    <p className="flex items-center gap-2 text-rose-700">
+                      <ShieldAlert className="size-4" />
+                      Esta contraseña aparece en filtraciones públicas
+                      {hibpCount !== null ? ` (${hibpCount} veces)` : ''}. Usa otra diferente.
+                    </p>
+                  ) : null}
+
+                  {hibpState === 'error' ? (
+                    <p className="text-amber-700">
+                      No se pudo verificar HIBP en este momento. Puedes continuar, pero se recomienda volver
+                      a comprobar antes de guardar.
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               {errorMessage ? (
@@ -241,7 +350,7 @@ export default function Reset() {
 
               <button
                 type="submit"
-                disabled={isSubmitting || !isPolicyValid || password !== confirmPassword}
+                disabled={isSubmitting || !isPolicyValid || password !== confirmPassword || hibpState === 'checking' || hibpState === 'pwned'}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary shadow-aurora disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isSubmitting ? 'Aplicando...' : 'Guardar contraseña'}

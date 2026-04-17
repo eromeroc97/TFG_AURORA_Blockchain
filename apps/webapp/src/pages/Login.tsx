@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import axios from 'axios'
 import { ArrowRight, LockKeyhole, Mail } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/axios'
@@ -32,7 +33,27 @@ export default function Login() {
       const response = await apiClient.post('/auth/login', { email, password })
       setSession(response.data.accessToken)
       navigate('/dashboard', { replace: true })
-    } catch {
+    } catch (error) {
+      const backendMessage =
+        axios.isAxiosError<{ message?: string | string[] }>(error) && error.response?.data?.message
+          ? error.response.data.message
+          : ''
+      const normalizedMessage = Array.isArray(backendMessage)
+        ? backendMessage.join(' ')
+        : backendMessage
+
+      if (normalizedMessage.includes('PASSBLOCK')) {
+        navigate('/recover', {
+          replace: true,
+          state: {
+            prefillEmail: email,
+            forcedRecoverMessage:
+              'Tu contraseña lleva demasiado tiempo sin cambiarse. Debes iniciar el proceso de recuperación para definir una nueva.',
+          },
+        })
+        return
+      }
+
       setErrorMessage('No se pudo iniciar sesión. Revisa tus credenciales e inténtalo de nuevo.')
     } finally {
       setIsSubmitting(false)
