@@ -1,10 +1,13 @@
+import axios from 'axios'
 import { ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
 import PasswordInput from '../components/PasswordInput'
 
 export default function Reset() {
+  const [searchParams] = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -14,6 +17,9 @@ export default function Reset() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const hibpCacheRef = useRef(new Map<string, { state: 'safe' | 'pwned'; count: number | null }>())
   const hibpCheckIdRef = useRef(0)
+
+  const token = (searchParams.get('token') ?? '').trim()
+  const hasValidTokenFormat = /^[A-Za-z0-9_-]{20,200}$/.test(token)
 
   const hasLowercase = /[a-z]/.test(password)
   const hasUppercase = /[A-Z]/.test(password)
@@ -160,15 +166,39 @@ export default function Reset() {
     setIsSubmitting(true)
 
     try {
-      // TODO(auth-reset): Send password + one-time token to backend reset endpoint when available.
-      setSuccessMessage('Contraseña válida. El envío al backend se activará cuando esté disponible el endpoint con token.')
+      await apiClient.post(
+        '/auth/reset',
+        { token, password },
+        {
+          skipAuthRefresh: true,
+        },
+      )
+
+      setSuccessMessage('Contraseña actualizada correctamente. Ya puedes iniciar sesión con la nueva contraseña.')
       setPassword('')
       setConfirmPassword('')
-    } catch {
-      setErrorMessage('No se pudo actualizar la contraseña. Inténtalo de nuevo en unos minutos.')
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 400) {
+        setErrorMessage('El token de recuperación es inválido o ha expirado. Solicita uno nuevo.')
+      } else {
+        setErrorMessage('No se pudo actualizar la contraseña. Inténtalo de nuevo en unos minutos.')
+      }
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (!hasValidTokenFormat) {
+    return (
+      <Navigate
+        to="/recover"
+        replace
+        state={{
+          forcedRecoverMessage:
+            'El enlace de restablecimiento no es válido o está incompleto. Solicita un nuevo enlace.',
+        }}
+      />
+    )
   }
 
   return (
@@ -182,8 +212,7 @@ export default function Reset() {
                   Define tu nueva contraseña
                 </h2>
                 <p className="text-sm leading-6 text-muted">
-                  Esta pantalla servirá para primera contraseña, cambio o recuperación cuando se habilite
-                  el token de un solo uso en backend.
+                  Introduce una nueva contraseña para completar el restablecimiento con tu token de un solo uso.
                 </p>
               </div>
 

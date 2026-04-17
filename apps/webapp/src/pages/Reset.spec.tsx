@@ -1,7 +1,16 @@
 import { createHash } from 'crypto'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { apiClient } from '../api/axios'
 import Reset from './Reset'
+
+jest.mock('../api/axios', () => ({
+  apiClient: {
+    post: jest.fn(),
+  },
+}))
+
+const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>
 
 const mockDigest = jest.fn()
 const mockFetch = jest.fn()
@@ -26,10 +35,15 @@ describe('Reset page', () => {
     jest.restoreAllMocks()
   })
 
-  const renderReset = () =>
+  const validToken = 'abcdefghijklmnopqrstuvwxyzABCDE1234567890_-'
+
+  const renderReset = (initialPath = `/reset?token=${validToken}`) =>
     render(
-      <MemoryRouter>
-        <Reset />
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route path="/reset" element={<Reset />} />
+          <Route path="/recover" element={<p>Recover Page</p>} />
+        </Routes>
       </MemoryRouter>,
     )
 
@@ -47,6 +61,12 @@ describe('Reset page', () => {
 
     expect(screen.getByRole('heading', { name: /Define tu nueva contraseña/i })).toBeInTheDocument()
     expect(screen.getByText(/Política de seguridad de contraseña/i)).toBeInTheDocument()
+  })
+
+  it('redirects to recover when token is missing', async () => {
+    renderReset('/reset')
+
+    expect(await screen.findByText('Recover Page')).toBeInTheDocument()
   })
 
   it('shows the HIBP safe message for a valid password', async () => {
@@ -118,6 +138,19 @@ describe('Reset page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Guardar contraseña/i }))
 
-    expect(await screen.findByText(/Contraseña válida/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(mockedApiClient.post).toHaveBeenCalledWith(
+        '/auth/reset',
+        {
+          token: validToken,
+          password,
+        },
+        {
+          skipAuthRefresh: true,
+        },
+      )
+    })
+
+    expect(await screen.findByText(/Contraseña actualizada correctamente/i)).toBeInTheDocument()
   })
 })
