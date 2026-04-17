@@ -44,6 +44,7 @@ describe('Reset page', () => {
         <Routes>
           <Route path="/reset" element={<Reset />} />
           <Route path="/recover" element={<p>Recover Page</p>} />
+          <Route path="/login" element={<p>Login Page</p>} />
         </Routes>
       </MemoryRouter>,
     )
@@ -180,6 +181,6 @@ describe('Reset page', () => {
       { skipAuthRefresh: true },
     )
 
-    expect(await screen.findByText(/Contraseña actualizada correctamente/i)).toBeInTheDocument()
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
   })
 })

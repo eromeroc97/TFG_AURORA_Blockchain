@@ -1,17 +1,17 @@
 import axios from 'axios'
 import { ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
 import PasswordInput from '../components/PasswordInput'
 
 export default function Reset() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const [tokenValidationState, setTokenValidationState] = useState<'checking' | 'valid' | 'invalid'>('checking')
   const [hibpState, setHibpState] = useState<'idle' | 'checking' | 'safe' | 'pwned' | 'error'>('idle')
   const [hibpCount, setHibpCount] = useState<number | null>(null)
@@ -178,7 +178,6 @@ export default function Reset() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setErrorMessage('')
-    setSuccessMessage('')
 
     if (tokenValidationState !== 'valid') {
       setErrorMessage('El token de recuperación no es válido. Solicita un nuevo enlace.')
@@ -202,11 +201,6 @@ export default function Reset() {
       return
     }
 
-    if (hibpResult === 'checking') {
-      setErrorMessage('Comprobando si la contraseña ha sido filtrada. Espera un instante.')
-      return
-    }
-
     setIsSubmitting(true)
 
     try {
@@ -218,9 +212,7 @@ export default function Reset() {
         },
       )
 
-      setSuccessMessage('Contraseña actualizada correctamente. Ya puedes iniciar sesión con la nueva contraseña.')
-      setPassword('')
-      setConfirmPassword('')
+      navigate('/login', { replace: true })
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 400) {
         setErrorMessage('El token de recuperación es inválido o ha expirado. Solicita uno nuevo.')
@@ -377,12 +369,6 @@ export default function Reset() {
               {errorMessage ? (
                 <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                   {errorMessage}
-                </p>
-              ) : null}
-
-              {successMessage ? (
-                <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  {successMessage}
                 </p>
               ) : null}
 
