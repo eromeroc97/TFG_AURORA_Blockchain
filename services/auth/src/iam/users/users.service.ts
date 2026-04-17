@@ -66,9 +66,10 @@ export class UsersService {
     const hashPrefix = sha1.slice(0, 5);
     const hashSuffix = sha1.slice(5);
 
-    const baseUrl = (
-      process.env.HIBP_PWNED_PASSWORDS_BASE_URL ?? 'https://api.pwnedpasswords.com/range'
-    ).replace(/\/+$/, '');
+    let baseUrl = process.env.HIBP_PWNED_PASSWORDS_BASE_URL ?? 'https://api.pwnedpasswords.com/range';
+    while (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
 
     const userAgent = process.env.HIBP_USER_AGENT ?? 'AURORA-Auth-Service';
     const timeoutMs = Number(process.env.HIBP_TIMEOUT_MS ?? '5000');
