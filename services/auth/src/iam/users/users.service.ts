@@ -167,6 +167,9 @@ export class UsersService {
 
       if (password) {
         data.passwordHash = await argon2.hash(password);
+        const passwordChangedAt = new Date();
+        passwordChangedAt.setHours(0, 0, 0, 0);
+        data.passwordChangedAt = passwordChangedAt;
       }
 
       return await this.prisma.user.update({

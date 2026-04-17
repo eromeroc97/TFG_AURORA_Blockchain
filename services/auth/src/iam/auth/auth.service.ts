@@ -39,6 +39,7 @@ export class AuthService {
 
 			if (
 				user.status === UserStatus.PENDING ||
+				user.status === UserStatus.PASSBLOCK ||
 				user.status === UserStatus.REVOKED ||
 				!user.isActive
 			) {
@@ -130,6 +131,7 @@ export class AuthService {
 
 		if (
 			user.status === UserStatus.PENDING ||
+			user.status === UserStatus.PASSBLOCK ||
 			user.status === UserStatus.REVOKED ||
 			!user.isActive ||
 			!user.hashedRefreshToken
