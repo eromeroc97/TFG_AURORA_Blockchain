@@ -37,9 +37,14 @@ export class AuthService {
 		try {
 			const user = await this.usersService.findByEmail(email);
 
+			if (user.status === UserStatus.PASSBLOCK) {
+				throw new UnauthorizedException(
+					'PASSBLOCK: Tu contraseña lleva demasiado tiempo sin cambiarse. Debes iniciar el proceso de recuperación.',
+				);
+			}
+
 			if (
 				user.status === UserStatus.PENDING ||
-				user.status === UserStatus.PASSBLOCK ||
 				user.status === UserStatus.REVOKED ||
 				!user.isActive
 			) {
