@@ -3,7 +3,9 @@ import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { RecoverPasswordDto } from './dto/recover-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const REFRESH_COOKIE_NAME = 'refreshToken';
 
@@ -121,6 +123,29 @@ const toPublicAuthTokens = (tokens: {
 @Controller('auth')
 export class AuthController {
 	constructor(private readonly authService: AuthService) {}
+
+	@Post('recover')
+	async recover(@Body() recoverPasswordDto: RecoverPasswordDto) {
+		await this.authService.requestPasswordRecovery(recoverPasswordDto.email);
+		return {
+			success: true,
+			message:
+				'Si la cuenta existe, recibirás un correo con instrucciones para restablecer la contraseña.',
+		};
+	}
+
+	@Post('reset')
+	async reset(@Body() resetPasswordDto: ResetPasswordDto) {
+		await this.authService.resetPasswordWithOneTimeToken(
+			resetPasswordDto.token,
+			resetPasswordDto.password,
+		);
+
+		return {
+			success: true,
+			message: 'Contraseña actualizada correctamente.',
+		};
+	}
 
 	@Post('login')
 	async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res?: Response) {

@@ -49,6 +49,20 @@ model User {
   updatedAt DateTime @updatedAt
 
   ecosystems Ecosystem[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash        String
+  tokenFingerprint String   @unique
+  createdAt        DateTime @default(now())
+  usedAt           DateTime?
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Ecosystem {

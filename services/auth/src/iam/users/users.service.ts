@@ -118,6 +118,134 @@ export class UsersService {
     }
   }
 
+  private readonly resetTokenTtlMinutes = 10;
+
+  private buildTokenFingerprint(rawToken: string): string {
+    return createHash('sha256').update(rawToken, 'utf8').digest('hex');
+  }
+
+  private createResetActionUrl(rawToken: string): string {
+    let baseUrl = process.env.PASSWORD_RESET_ACTION_URL ?? 'http://localhost:5173/reset';
+    while (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
+
+    return `${baseUrl}?token=${encodeURIComponent(rawToken)}`;
+  }
+
+  private async generateUniqueResetTokenCandidate(maxAttempts = 5): Promise<{
+    rawToken: string;
+    tokenFingerprint: string;
+  }> {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const rawToken = randomBytes(32).toString('base64url');
+      const tokenFingerprint = this.buildTokenFingerprint(rawToken);
+
+      const existingToken = await this.prisma.passwordResetToken.findUnique({
+        where: { tokenFingerprint },
+        select: { id: true },
+      });
+
+      if (!existingToken) {
+        return { rawToken, tokenFingerprint };
+      }
+    }
+
+    throw new InternalServerErrorException('No se pudo generar un token de recuperación único');
+  }
+
+  async createPasswordResetToken(email: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email,
+        status: {
+          not: UserStatus.REVOKED,
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+
+    // Evita enumeración de cuentas: la respuesta de recover no debe revelar existencia del usuario.
+    if (!user) {
+      return;
+    }
+
+    const { rawToken, tokenFingerprint } = await this.generateUniqueResetTokenCandidate();
+    const tokenHash = await argon2.hash(rawToken);
+
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        tokenFingerprint,
+      },
+    });
+
+    const actionUrl = this.createResetActionUrl(rawToken);
+    await this.mailService.sendRecoverEmail(user.email, actionUrl);
+  }
+
+  async consumePasswordResetToken(rawToken: string, newPassword: string): Promise<void> {
+    const tokenFingerprint = this.buildTokenFingerprint(rawToken);
+
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenFingerprint },
+      select: {
+        id: true,
+        userId: true,
+        tokenHash: true,
+        createdAt: true,
+        usedAt: true,
+      },
+    });
+
+    if (!resetToken) {
+      throw new BadRequestException('Token de recuperación inválido o expirado.');
+    }
+
+    if (resetToken.usedAt) {
+      throw new BadRequestException('Este token de recuperación ya fue utilizado.');
+    }
+
+    const ageMs = Date.now() - resetToken.createdAt.getTime();
+    const ttlMs = this.resetTokenTtlMinutes * 60 * 1000;
+    if (ageMs > ttlMs) {
+      throw new BadRequestException('Token de recuperación inválido o expirado.');
+    }
+
+    const tokenMatches = await argon2.verify(resetToken.tokenHash, rawToken);
+    if (!tokenMatches) {
+      throw new BadRequestException('Token de recuperación inválido o expirado.');
+    }
+
+    await this.assertPasswordNotPwned(newPassword);
+
+    const passwordHash = await argon2.hash(newPassword);
+    const passwordChangedAt = new Date();
+    passwordChangedAt.setHours(0, 0, 0, 0);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: resetToken.userId },
+        data: {
+          passwordHash,
+          passwordChangedAt,
+          status: UserStatus.ACTIVE,
+          isActive: true,
+        },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: {
+          usedAt: new Date(),
+        },
+      }),
+    ]);
+  }
+
   async create(createUserDto: CreateUserDto) {
     try {
       const existingUser = await this.prisma.user.findUnique({
