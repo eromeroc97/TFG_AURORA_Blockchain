@@ -41,6 +41,10 @@ export class AuthService {
 		await this.usersService.consumePasswordResetToken(token, password);
 	}
 
+	async validatePasswordResetToken(token: string): Promise<{ valid: boolean }> {
+		return this.usersService.validatePasswordResetToken(token);
+	}
+
 	async validateUser(email: string, pass: string) {
 		try {
 			const user = await this.usersService.findByEmail(email);

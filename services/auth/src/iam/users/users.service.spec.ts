@@ -51,6 +51,7 @@ describe('UsersService', () => {
       findUnique: ReturnType<typeof jest.fn>;
       create: ReturnType<typeof jest.fn>;
       update: ReturnType<typeof jest.fn>;
+      updateMany: ReturnType<typeof jest.fn>;
     };
     $transaction: ReturnType<typeof jest.fn>;
   };
@@ -122,6 +123,7 @@ describe('UsersService', () => {
               findUnique: jest.fn(),
               create: jest.fn(),
               update: jest.fn(),
+              updateMany: jest.fn(),
             },
             $transaction: jest.fn(),
           }),
@@ -158,6 +160,13 @@ describe('UsersService', () => {
     fireflyServiceMock = module.get(FireflyService) as unknown as typeof fireflyServiceMock;
     redisServiceMock = module.get(RedisService) as unknown as typeof redisServiceMock;
     jest.clearAllMocks();
+    prismaServiceMock.$transaction.mockImplementation(async (arg: unknown) => {
+      if (typeof arg === 'function') {
+        return (arg as (tx: typeof prismaServiceMock) => Promise<unknown>)(prismaServiceMock);
+      }
+
+      return Promise.all(arg as Array<Promise<unknown>>);
+    });
     mockAxiosGet.mockResolvedValue({ data: '' } as never);
   });
 
@@ -657,6 +666,7 @@ describe('UsersService', () => {
       });
       mockRandomBytes.mockReturnValue(rawTokenBuffer as never);
       prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue(null);
+      prismaServiceMock.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
       mockHash.mockResolvedValue('hashed_reset_token' as never);
       prismaServiceMock.passwordResetToken.create.mockResolvedValue({
         id: 'd32f0f8f-b57f-4b3a-90e5-74f0cd37f7c4',
@@ -665,10 +675,20 @@ describe('UsersService', () => {
 
       await service.createPasswordResetToken(createdUserRecord.email);
 
+      expect(prismaServiceMock.passwordResetToken.updateMany).toHaveBeenCalledWith({
+        where: {
+          userId: createdUserRecord.id,
+          usedAt: null,
+        },
+        data: {
+          usedAt: expect.any(Date),
+        },
+      });
       expect(prismaServiceMock.passwordResetToken.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           userId: createdUserRecord.id,
           tokenHash: 'hashed_reset_token',
+          createdAt: expect.any(Date),
         }),
       });
       expect(mailServiceMock.sendRecoverEmail).toHaveBeenCalledWith(
@@ -718,10 +738,9 @@ describe('UsersService', () => {
       mockVerify.mockResolvedValue(true as never);
       mockHash.mockResolvedValue('new_password_hash' as never);
       prismaServiceMock.user.update.mockResolvedValue(selectedUserRecord);
-      prismaServiceMock.passwordResetToken.update.mockResolvedValue({
-        id: 'valid-token-id',
-      });
-      prismaServiceMock.$transaction.mockResolvedValue([]);
+      prismaServiceMock.passwordResetToken.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
 
       await service.consumePasswordResetToken('raw-token', 'NewPassword123!');
 
@@ -734,14 +753,74 @@ describe('UsersService', () => {
             status: UserStatus.ACTIVE,
             isActive: true,
             passwordChangedAt: expect.any(Date),
+            hashedRefreshToken: null,
           }),
         }),
       );
-      expect(prismaServiceMock.passwordResetToken.update).toHaveBeenCalledWith({
-        where: { id: 'valid-token-id' },
+      expect(prismaServiceMock.passwordResetToken.updateMany).toHaveBeenNthCalledWith(1, {
+        where: {
+          id: 'valid-token-id',
+          usedAt: null,
+          createdAt: {
+            gte: expect.any(Date),
+          },
+        },
+        data: { usedAt: expect.any(Date) },
+      });
+      expect(prismaServiceMock.passwordResetToken.updateMany).toHaveBeenNthCalledWith(2, {
+        where: {
+          userId: createdUserRecord.id,
+          usedAt: null,
+        },
         data: { usedAt: expect.any(Date) },
       });
       expect(prismaServiceMock.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('should reject when consume cannot atomically mark token as used', async () => {
+      const createdAt = new Date(Date.now() - 60 * 1000);
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'valid-token-id',
+        userId: createdUserRecord.id,
+        tokenHash: 'stored_hash',
+        createdAt,
+        usedAt: null,
+      });
+      mockVerify.mockResolvedValue(true as never);
+      mockHash.mockResolvedValue('new_password_hash' as never);
+      prismaServiceMock.passwordResetToken.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.consumePasswordResetToken('raw-token', 'NewPassword123!'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('validatePasswordResetToken', () => {
+    it('should return valid=true for an active non-expired token', async () => {
+      const createdAt = new Date(Date.now() - 60 * 1000);
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'valid-token-id',
+        userId: createdUserRecord.id,
+        tokenHash: 'stored_hash',
+        createdAt,
+        usedAt: null,
+      });
+      mockVerify.mockResolvedValue(true as never);
+
+      const result = await service.validatePasswordResetToken('raw-token');
+
+      expect(result).toEqual({ valid: true });
+    });
+
+    it('should return valid=false for missing/invalid token', async () => {
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      const result = await service.validatePasswordResetToken('raw-token');
+
+      expect(result).toEqual({ valid: false });
     });
   });
 });
