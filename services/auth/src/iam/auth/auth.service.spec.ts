@@ -35,6 +35,9 @@ describe('AuthService - Complete Authentication Flows', () => {
         {
           provide: UsersService,
           useValue: {
+            createPasswordResetToken: jest.fn(),
+            consumePasswordResetToken: jest.fn(),
+            validatePasswordResetToken: jest.fn(),
             findByEmail: jest.fn(),
             findAuthUserById: jest.fn(),
             updateRefreshTokenHash: jest.fn(),
@@ -127,6 +130,36 @@ describe('AuthService - Complete Authentication Flows', () => {
       await expect(
         service.validateUser('nonexistent@test.test', 'password123'),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('password reset delegation', () => {
+    it('should delegate recovery request to UsersService', async () => {
+      usersService.createPasswordResetToken.mockResolvedValue(undefined);
+
+      await service.requestPasswordRecovery('auth-test@test.test');
+
+      expect(usersService.createPasswordResetToken).toHaveBeenCalledWith('auth-test@test.test');
+    });
+
+    it('should delegate reset consumption to UsersService', async () => {
+      usersService.consumePasswordResetToken.mockResolvedValue(undefined);
+
+      await service.resetPasswordWithOneTimeToken('raw-reset-token', 'StrongPass123!');
+
+      expect(usersService.consumePasswordResetToken).toHaveBeenCalledWith(
+        'raw-reset-token',
+        'StrongPass123!',
+      );
+    });
+
+    it('should delegate reset token validation to UsersService', async () => {
+      usersService.validatePasswordResetToken.mockResolvedValue({ valid: true });
+
+      const result = await service.validatePasswordResetToken('raw-reset-token');
+
+      expect(usersService.validatePasswordResetToken).toHaveBeenCalledWith('raw-reset-token');
+      expect(result).toEqual({ valid: true });
     });
   });
 

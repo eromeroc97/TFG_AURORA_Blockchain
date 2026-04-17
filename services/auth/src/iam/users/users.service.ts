@@ -120,6 +120,14 @@ export class UsersService {
 
   private readonly resetTokenTtlMinutes = 10;
 
+  private getResetTokenTtlMs(): number {
+    return this.resetTokenTtlMinutes * 60 * 1000;
+  }
+
+  private getResetTokenValidSince(referenceDate: Date): Date {
+    return new Date(referenceDate.getTime() - this.getResetTokenTtlMs());
+  }
+
   private buildTokenFingerprint(rawToken: string): string {
     return createHash('sha256').update(rawToken, 'utf8').digest('hex');
   }
@@ -154,41 +162,7 @@ export class UsersService {
     throw new InternalServerErrorException('No se pudo generar un token de recuperación único');
   }
 
-  async createPasswordResetToken(email: string): Promise<void> {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email,
-        status: {
-          not: UserStatus.REVOKED,
-        },
-      },
-      select: {
-        id: true,
-        email: true,
-      },
-    });
-
-    // Evita enumeración de cuentas: la respuesta de recover no debe revelar existencia del usuario.
-    if (!user) {
-      return;
-    }
-
-    const { rawToken, tokenFingerprint } = await this.generateUniqueResetTokenCandidate();
-    const tokenHash = await argon2.hash(rawToken);
-
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        tokenFingerprint,
-      },
-    });
-
-    const actionUrl = this.createResetActionUrl(rawToken);
-    await this.mailService.sendRecoverEmail(user.email, actionUrl);
-  }
-
-  async consumePasswordResetToken(rawToken: string, newPassword: string): Promise<void> {
+  private async resolveValidPasswordResetToken(rawToken: string, referenceDate = new Date()) {
     const tokenFingerprint = this.buildTokenFingerprint(rawToken);
 
     const resetToken = await this.prisma.passwordResetToken.findUnique({
@@ -210,9 +184,8 @@ export class UsersService {
       throw new BadRequestException('Este token de recuperación ya fue utilizado.');
     }
 
-    const ageMs = Date.now() - resetToken.createdAt.getTime();
-    const ttlMs = this.resetTokenTtlMinutes * 60 * 1000;
-    if (ageMs > ttlMs) {
+    const validSince = this.getResetTokenValidSince(referenceDate);
+    if (resetToken.createdAt < validSince) {
       throw new BadRequestException('Token de recuperación inválido o expirado.');
     }
 
@@ -221,29 +194,119 @@ export class UsersService {
       throw new BadRequestException('Token de recuperación inválido o expirado.');
     }
 
+    return resetToken;
+  }
+
+  async validatePasswordResetToken(rawToken: string): Promise<{ valid: boolean }> {
+    try {
+      await this.resolveValidPasswordResetToken(rawToken);
+      return { valid: true };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        return { valid: false };
+      }
+
+      throw error;
+    }
+  }
+
+  async createPasswordResetToken(email: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email,
+        status: {
+          not: UserStatus.REVOKED,
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+
+    // Evita enumeración de cuentas: la respuesta de recover no debe revelar existencia del usuario.
+    if (!user) {
+      return;
+    }
+
+    const { rawToken, tokenFingerprint } = await this.generateUniqueResetTokenCandidate();
+    const tokenHash = await argon2.hash(rawToken);
+    const now = new Date();
+
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+        },
+        data: {
+          usedAt: now,
+        },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          tokenFingerprint,
+          createdAt: now,
+        },
+      }),
+    ]);
+
+    const actionUrl = this.createResetActionUrl(rawToken);
+    await this.mailService.sendRecoverEmail(user.email, actionUrl);
+  }
+
+  async consumePasswordResetToken(rawToken: string, newPassword: string): Promise<void> {
+    const now = new Date();
+    const validSince = this.getResetTokenValidSince(now);
+    const resetToken = await this.resolveValidPasswordResetToken(rawToken, now);
+
     await this.assertPasswordNotPwned(newPassword);
 
     const passwordHash = await argon2.hash(newPassword);
     const passwordChangedAt = new Date();
     passwordChangedAt.setHours(0, 0, 0, 0);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    await this.prisma.$transaction(async (tx) => {
+      const consumeResult = await tx.passwordResetToken.updateMany({
+        where: {
+          id: resetToken.id,
+          usedAt: null,
+          createdAt: {
+            gte: validSince,
+          },
+        },
+        data: {
+          usedAt: now,
+        },
+      });
+
+      if (consumeResult.count !== 1) {
+        throw new BadRequestException('Token de recuperación inválido o expirado.');
+      }
+
+      await tx.user.update({
         where: { id: resetToken.userId },
         data: {
           passwordHash,
           passwordChangedAt,
           status: UserStatus.ACTIVE,
           isActive: true,
+          hashedRefreshToken: null,
         },
-      }),
-      this.prisma.passwordResetToken.update({
-        where: { id: resetToken.id },
+      });
+
+      await tx.passwordResetToken.updateMany({
+        where: {
+          userId: resetToken.userId,
+          usedAt: null,
+        },
         data: {
-          usedAt: new Date(),
+          usedAt: now,
         },
-      }),
-    ]);
+      });
+    });
   }
 
   async create(createUserDto: CreateUserDto) {
