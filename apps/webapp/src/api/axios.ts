@@ -5,7 +5,15 @@ import {
   setAuthAccessToken,
 } from '../context/auth-session'
 
-const authApiBasePath = import.meta.env.VITE_API_BASE_PATH
+declare global {
+  interface Window {
+    __WEBAPP_API_BASE_PATH__?: string
+  }
+}
+
+const authApiBasePath =
+  (globalThis as typeof globalThis & { __WEBAPP_API_BASE_PATH__?: string }).__WEBAPP_API_BASE_PATH__ ??
+  ''
 
 declare module 'axios' {
   export interface AxiosRequestConfig {

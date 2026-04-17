@@ -1,16 +1,8 @@
 import { ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldAlert, ShieldCheck, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import AuthPageShell from '../components/auth/AuthPageShell'
 import PasswordInput from '../components/PasswordInput'
-import auroraLogo from '../assets/aurora-logo.png'
-import gsyaLogo from '../assets/gsya_logo.png'
-import uclmLogo from '../assets/uclm_logo.png'
-import fundingLogos from '../assets/MostrarUE-MA-Feder-Innocam.jpg'
-
-const logoSrc = auroraLogo
-
-const auroraMeaning =
-  'Advanced and Unified Research On cybersecurity Risk Analysis and sustainability in smart homes'
 
 export default function Reset() {
   const [password, setPassword] = useState('')
@@ -20,7 +12,8 @@ export default function Reset() {
   const [hibpState, setHibpState] = useState<'idle' | 'checking' | 'safe' | 'pwned' | 'error'>('idle')
   const [hibpCount, setHibpCount] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [, setLogoFailed] = useState(false)
+  const hibpCacheRef = useRef(new Map<string, { state: 'safe' | 'pwned'; count: number | null }>())
+  const hibpCheckIdRef = useRef(0)
 
   const hasLowercase = /[a-z]/.test(password)
   const hasUppercase = /[A-Z]/.test(password)
@@ -60,21 +53,32 @@ export default function Reset() {
 
   const isPolicyValid = passwordChecks.every((check) => check.passed)
 
-  useEffect(() => {
-    let canceled = false
-
-    const checkPasswordPwned = async () => {
-      if (!password || !isPolicyValid) {
+  const checkPasswordPwned = useCallback(
+    async (candidatePassword: string) => {
+      if (!candidatePassword || !isPolicyValid) {
         setHibpState('idle')
         setHibpCount(null)
-        return
+        return 'idle' as const
       }
+
+      const cachedResult = hibpCacheRef.current.get(candidatePassword)
+      if (cachedResult) {
+        setHibpCount(cachedResult.count)
+        setHibpState(cachedResult.state)
+        return cachedResult.state
+      }
+
+      const checkId = hibpCheckIdRef.current + 1
+      hibpCheckIdRef.current = checkId
 
       setHibpState('checking')
       setHibpCount(null)
 
       try {
-        const digestBuffer = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(password))
+        const digestBuffer = await crypto.subtle.digest(
+          'SHA-1',
+          new TextEncoder().encode(candidatePassword),
+        )
         const hashHex = Array.from(new Uint8Array(digestBuffer))
           .map((byte) => byte.toString(16).padStart(2, '0'))
           .join('')
@@ -99,32 +103,32 @@ export default function Reset() {
           .map((line) => line.trim())
           .find((line) => line.toUpperCase().startsWith(`${hashSuffix}:`))
 
-        if (canceled) {
-          return
+        if (checkId !== hibpCheckIdRef.current) {
+          return 'idle' as const
         }
 
         if (match) {
           const count = Number(match.split(':')[1] ?? '0')
-          setHibpCount(Number.isFinite(count) ? count : null)
+          const leakedCount = Number.isFinite(count) ? count : null
+          hibpCacheRef.current.set(candidatePassword, { state: 'pwned', count: leakedCount })
+          setHibpCount(leakedCount)
           setHibpState('pwned')
-          return
+          return 'pwned' as const
         }
 
+        hibpCacheRef.current.set(candidatePassword, { state: 'safe', count: null })
         setHibpState('safe')
+        return 'safe' as const
       } catch {
-        if (!canceled) {
+        if (checkId === hibpCheckIdRef.current) {
           setHibpState('error')
         }
+
+        return 'error' as const
       }
-    }
-
-    const timeout = window.setTimeout(checkPasswordPwned, 450)
-
-    return () => {
-      canceled = true
-      window.clearTimeout(timeout)
-    }
-  }, [password, isPolicyValid])
+    },
+    [isPolicyValid],
+  )
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -141,13 +145,15 @@ export default function Reset() {
       return
     }
 
-    if (hibpState === 'checking') {
-      setErrorMessage('Comprobando si la contraseña ha sido filtrada. Espera un instante.')
+    const hibpResult = await checkPasswordPwned(password)
+
+    if (hibpResult === 'pwned') {
+      setErrorMessage('La contraseña propuesta aparece en filtraciones públicas. Debes elegir una diferente.')
       return
     }
 
-    if (hibpState === 'pwned') {
-      setErrorMessage('La contraseña propuesta aparece en filtraciones públicas. Debes elegir una diferente.')
+    if (hibpResult === 'checking') {
+      setErrorMessage('Comprobando si la contraseña ha sido filtrada. Espera un instante.')
       return
     }
 
@@ -166,82 +172,8 @@ export default function Reset() {
   }
 
   return (
-    <main className="min-h-screen px-6 py-10 text-primary">
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
-        <section className="grid w-full overflow-hidden rounded-[2rem] border border-border bg-white shadow-aurora lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="flex flex-col justify-between gap-8 bg-primary p-8 text-surface sm:p-10 lg:p-12">
-            <div className="max-w-lg space-y-6">
-              <div className="flex items-center gap-4">
-                <a
-                  href="https://gsya.esi.uclm.es/AURORA/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="transition-opacity hover:opacity-85"
-                >
-                  <img
-                    src={logoSrc}
-                    alt="Logotipo de AURORA"
-                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                    onError={() => setLogoFailed(true)}
-                  />
-                </a>
-
-                <a
-                  href="https://gsya.esi.uclm.es/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="transition-opacity hover:opacity-85"
-                >
-                  <img
-                    src={gsyaLogo}
-                    alt="Logotipo de GSYA"
-                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                  />
-                </a>
-
-                <a
-                  href="https://www.uclm.es/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="transition-opacity hover:opacity-85"
-                >
-                  <img
-                    src={uclmLogo}
-                    alt="Logotipo de UCLM"
-                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                  />
-                </a>
-
-              </div>
-
-              <div className="space-y-4">
-                <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-primary/80">
-                  Proyecto de Investigación <b>SBPLY/24/180225/000074</b>
-                </span>
-                <h1 className="font-heading text-2xl font-semibold leading-tight text-primary/95 sm:text-3xl">
-                  <a
-                    href="https://gsya.esi.uclm.es/AURORA/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transition-opacity hover:opacity-85"
-                  >
-                    {auroraMeaning}
-                  </a>
-                </h1>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-              <img
-                src={fundingLogos}
-                alt="Logotipos de cofinanciación: Unión Europea, Ministerio de Hacienda, Fondos Europeos e INNOCAM"
-                className="h-20 w-full rounded-xl object-contain sm:h-24"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center p-8 sm:p-10 lg:p-12">
-            <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
+    <AuthPageShell>
+      <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent">
                   Restablecer contraseña
@@ -265,7 +197,14 @@ export default function Reset() {
                       autoComplete="new-password"
                       required
                       value={password}
-                      onChange={(event) => setPassword(event.target.value)}
+                      onChange={(event) => {
+                        setPassword(event.target.value)
+                        setHibpState('idle')
+                        setHibpCount(null)
+                      }}
+                      onBlur={() => {
+                        void checkPasswordPwned(password)
+                      }}
                       className="w-full border-0 bg-transparent text-sm text-primary outline-none placeholder:text-muted"
                       placeholder="Nueva contraseña"
                     />
@@ -368,10 +307,7 @@ export default function Reset() {
                   Volver a recuperación
                 </Link>
               </div>
-            </form>
-          </div>
-        </section>
-      </div>
-    </main>
+      </form>
+    </AuthPageShell>
   )
 }
