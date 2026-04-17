@@ -24,7 +24,7 @@ const parseExpiresToMs = (expiresIn: string | undefined, fallbackMs: number): nu
 		return directNumber;
 	}
 
-	const match = trimmed.match(/^(\d+)\s*([smhd])$/i);
+	const match = /^(\d+)\s*([smhd])$/i.exec(trimmed);
 	if (!match) {
 		return fallbackMs;
 	}

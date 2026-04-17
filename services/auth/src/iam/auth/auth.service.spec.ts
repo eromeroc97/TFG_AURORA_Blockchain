@@ -27,6 +27,8 @@ describe('AuthService - Complete Authentication Flows', () => {
   };
 
   beforeEach(async () => {
+    process.env.JWT_PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----\\nmock-key\\n-----END PUBLIC KEY-----';
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -86,6 +88,15 @@ describe('AuthService - Complete Authentication Flows', () => {
     it('should reject revoked users', async () => {
       const revokedUser = { ...mockUser, status: UserStatus.REVOKED };
       usersService.findByEmail.mockResolvedValue(revokedUser);
+
+      await expect(
+        service.validateUser('auth-test@test.test', 'password123'),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should reject passblocked users', async () => {
+      const passblockedUser = { ...mockUser, status: UserStatus.PASSBLOCK };
+      usersService.findByEmail.mockResolvedValue(passblockedUser);
 
       await expect(
         service.validateUser('auth-test@test.test', 'password123'),
@@ -189,6 +200,16 @@ describe('AuthService - Complete Authentication Flows', () => {
     it('should reject refresh when user is revoked', async () => {
       const revokedUser = { ...mockUser, status: UserStatus.REVOKED };
       usersService.findAuthUserById.mockResolvedValue(revokedUser);
+      jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
+
+      await expect(service.refreshTokens(mockUser.id, 'token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should reject refresh when user is passblocked', async () => {
+      const passblockedUser = { ...mockUser, status: UserStatus.PASSBLOCK };
+      usersService.findAuthUserById.mockResolvedValue(passblockedUser);
       jwtService.verifyAsync.mockResolvedValue({ sub: mockUser.id, type: 'refresh' });
 
       await expect(service.refreshTokens(mockUser.id, 'token')).rejects.toThrow(
