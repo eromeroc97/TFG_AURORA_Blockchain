@@ -20,15 +20,40 @@ export default function Reset() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [, setLogoFailed] = useState(false)
 
+  const hasLowercase = /[a-z]/.test(password)
+  const hasUppercase = /[A-Z]/.test(password)
+  const hasNumber = /\d/.test(password)
+  const hasSymbol = /[^A-Za-z0-9]/.test(password)
+
   const passwordChecks = useMemo(
     () => [
       {
-        id: 'length-8',
-        label: 'Mínimo 8 caracteres',
-        passed: password.length >= 8,
+        id: 'length-10',
+        label: 'Mínimo 10 caracteres',
+        passed: password.length >= 10,
+      },
+      {
+        id: 'lowercase',
+        label: 'Al menos una letra minúscula',
+        passed: hasLowercase,
+      },
+      {
+        id: 'uppercase',
+        label: 'Al menos una letra mayúscula',
+        passed: hasUppercase,
+      },
+      {
+        id: 'number',
+        label: 'Al menos un número',
+        passed: hasNumber,
+      },
+      {
+        id: 'symbol',
+        label: 'Al menos un símbolo',
+        passed: hasSymbol,
       },
     ],
-    [password],
+    [password, hasLowercase, hasUppercase, hasNumber, hasSymbol],
   )
 
   const isPolicyValid = passwordChecks.every((check) => check.passed)
