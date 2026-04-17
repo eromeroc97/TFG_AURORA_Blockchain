@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ArrowRight, Info, Mail, X } from 'lucide-react'
+import { ArrowRight, Mail } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { apiClient } from '../api/axios'
@@ -16,7 +16,6 @@ export default function Recover() {
   const [email, setEmail] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [toastMessage, setToastMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [, setLogoFailed] = useState(false)
 
@@ -27,7 +26,6 @@ export default function Recover() {
       | undefined
 
     if (state?.forcedRecoverMessage) {
-      setToastMessage(state.forcedRecoverMessage)
       setErrorMessage(state.forcedRecoverMessage)
     }
 
@@ -67,23 +65,6 @@ export default function Recover() {
 
   return (
     <main className="min-h-screen px-6 py-10 text-primary">
-      {toastMessage ? (
-        <div className="fixed right-6 top-6 z-50 max-w-md rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-aurora">
-          <div className="flex items-start gap-3">
-            <Info className="mt-0.5 size-4 shrink-0" />
-            <p className="leading-5">{toastMessage}</p>
-            <button
-              type="button"
-              onClick={() => setToastMessage('')}
-              className="ml-auto rounded-lg p-1 text-amber-700 transition-colors hover:bg-amber-100"
-              aria-label="Cerrar aviso"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
         <section className="grid w-full overflow-hidden rounded-[2rem] border border-border bg-white shadow-aurora lg:grid-cols-[1.05fr_0.95fr]">
           <div className="flex flex-col justify-between gap-8 bg-primary p-8 text-surface sm:p-10 lg:p-12">

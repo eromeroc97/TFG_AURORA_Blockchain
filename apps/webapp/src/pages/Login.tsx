@@ -43,12 +43,12 @@ export default function Login() {
         : backendMessage
 
       if (normalizedMessage.includes('PASSBLOCK')) {
+        const recoveredMessage = normalizedMessage.replace(/^PASSBLOCK:\s*/i, '')
         navigate('/recover', {
           replace: true,
           state: {
             prefillEmail: email,
-            forcedRecoverMessage:
-              'Tu contraseña lleva demasiado tiempo sin cambiarse. Debes iniciar el proceso de recuperación para definir una nueva.',
+            forcedRecoverMessage: recoveredMessage,
           },
         })
         return
