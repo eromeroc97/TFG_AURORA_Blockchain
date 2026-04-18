@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { ArrowRight, Check, LockKeyhole, LoaderCircle, ShieldAlert, ShieldCheck, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
@@ -8,7 +8,8 @@ import PasswordInput from '../components/PasswordInput'
 
 export default function Reset() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [token, setToken] = useState(() => (searchParams.get('token') ?? '').trim())
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -18,11 +19,29 @@ export default function Reset() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const hibpCacheRef = useRef(new Map<string, { state: 'safe' | 'pwned'; count: number | null }>())
   const hibpCheckIdRef = useRef(0)
-
-  const token = (searchParams.get('token') ?? '').trim()
+  const hasCleanedResetUrlRef = useRef(false)
   const hasValidTokenFormat = /^[A-Za-z0-9_-]{20,200}$/.test(token)
 
+  useLayoutEffect(() => {
+    if (!token || hasCleanedResetUrlRef.current) {
+      return
+    }
+
+    hasCleanedResetUrlRef.current = true
+    setSearchParams({}, { replace: true })
+  }, [setSearchParams, token])
+
   useEffect(() => {
+    return () => {
+      setToken('')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+
     if (!hasValidTokenFormat) {
       setTokenValidationState('invalid')
       return
@@ -212,6 +231,7 @@ export default function Reset() {
         },
       )
 
+      setToken('')
       navigate('/login', { replace: true })
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 400) {
@@ -224,17 +244,12 @@ export default function Reset() {
     }
   }
 
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+
   if (!hasValidTokenFormat) {
-    return (
-      <Navigate
-        to="/recover"
-        replace
-        state={{
-          forcedRecoverMessage:
-            'El enlace de restablecimiento no es válido o está incompleto. Solicita un nuevo enlace.',
-        }}
-      />
-    )
+    return <Navigate to="/login" replace />
   }
 
   if (tokenValidationState === 'checking') {
@@ -251,16 +266,7 @@ export default function Reset() {
   }
 
   if (tokenValidationState === 'invalid') {
-    return (
-      <Navigate
-        to="/recover"
-        replace
-        state={{
-          forcedRecoverMessage:
-            'El enlace de restablecimiento no es válido, ha expirado o ya fue utilizado. Solicita uno nuevo.',
-        }}
-      />
-    )
+    return <Navigate to="/login" replace />
   }
 
   return (

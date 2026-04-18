@@ -65,19 +65,19 @@ describe('Reset page', () => {
     expect(screen.getByText(/Política de seguridad de contraseña/i)).toBeInTheDocument()
   })
 
-  it('redirects to recover when token is missing', async () => {
+  it('redirects to login when token is missing', async () => {
     renderReset('/reset')
 
-    expect(await screen.findByText('Recover Page')).toBeInTheDocument()
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
     expect(mockedApiClient.post).not.toHaveBeenCalled()
   })
 
-  it('redirects to recover when backend says token is invalid', async () => {
+  it('redirects to login when backend says token is invalid', async () => {
     mockedApiClient.post.mockResolvedValueOnce({ data: { valid: false } } as never)
 
     renderReset()
 
-    expect(await screen.findByText('Recover Page')).toBeInTheDocument()
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
     expect(mockedApiClient.post).toHaveBeenCalledWith(
       '/auth/reset/validate',
       { token: validToken },
