@@ -17,18 +17,14 @@ export default function AuthPageShell({ children }: { children: ReactNode }) {
         <section className="grid w-full overflow-hidden rounded-[2rem] border border-border bg-white shadow-aurora lg:grid-cols-[1.05fr_0.95fr]">
           <div className="flex flex-col justify-between gap-8 bg-primary p-8 text-surface sm:p-10 lg:p-12">
             <div className="max-w-lg space-y-6">
-              <div className="flex items-center gap-4">
+              <div className="inline-flex items-center gap-3 rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10">
                 <a
                   href="https://gsya.esi.uclm.es/AURORA/"
                   target="_blank"
                   rel="noreferrer"
                   className="transition-opacity hover:opacity-85"
                 >
-                  <img
-                    src={auroraLogo}
-                    alt="Logotipo de AURORA"
-                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                  />
+                  <img src={auroraLogo} alt="Logotipo de AURORA" className="h-14 w-auto object-contain" />
                 </a>
 
                 <a
@@ -37,11 +33,7 @@ export default function AuthPageShell({ children }: { children: ReactNode }) {
                   rel="noreferrer"
                   className="transition-opacity hover:opacity-85"
                 >
-                  <img
-                    src={gsyaLogo}
-                    alt="Logotipo de GSYA"
-                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                  />
+                  <img src={gsyaLogo} alt="Logotipo de GSYA" className="h-14 w-auto object-contain" />
                 </a>
 
                 <a
@@ -50,11 +42,7 @@ export default function AuthPageShell({ children }: { children: ReactNode }) {
                   rel="noreferrer"
                   className="transition-opacity hover:opacity-85"
                 >
-                  <img
-                    src={uclmLogo}
-                    alt="Logotipo de UCLM"
-                    className="h-14 w-auto rounded-2xl bg-white/90 p-2 shadow-lg shadow-black/10"
-                  />
+                  <img src={uclmLogo} alt="Logotipo de UCLM" className="h-14 w-auto object-contain" />
                 </a>
               </div>
 
@@ -62,7 +50,7 @@ export default function AuthPageShell({ children }: { children: ReactNode }) {
                 <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-primary/80">
                   Proyecto de Investigación <b>SBPLY/24/180225/000074</b>
                 </span>
-                <h1 className="font-heading text-2xl font-semibold leading-tight text-primary/95 sm:text-3xl">
+                <h1 className="text-justify font-heading text-2xl font-semibold leading-tight text-primary/95 sm:text-3xl">
                   <a
                     href="https://gsya.esi.uclm.es/AURORA/"
                     target="_blank"
