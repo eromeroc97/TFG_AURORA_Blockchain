@@ -21,11 +21,9 @@ function App() {
           <Route path="/recover" element={<Recover />} />
           <Route path="/reset" element={<Reset />} />
           <Route path="/error" element={<ErrorPage />} />
-          <Route element={<MainLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-          </Route>
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/account" element={<AccountPage />} />
             </Route>
           </Route>
