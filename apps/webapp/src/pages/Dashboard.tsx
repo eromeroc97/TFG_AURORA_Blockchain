@@ -8,7 +8,7 @@ const metrics = [
 
 export default function Dashboard() {
   return (
-    <section className="space-y-8">
+    <section className="space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent">
           Dashboard provisional
@@ -53,6 +53,40 @@ export default function Dashboard() {
           navegación entre login y dashboard.
         </p>
       </article>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section
+          id="ecosistemas"
+          className="scroll-mt-28 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted">
+            Ecosistemas
+          </p>
+          <h2 className="mt-3 font-heading text-xl font-semibold text-primary">
+            Visión de módulos y dominios
+          </h2>
+          <p className="mt-3 text-sm leading-7 text-muted">
+            Punto de entrada para los módulos funcionales del ecosistema AURORA. Aquí se agruparán las
+            vistas operativas por dominio y capacidad.
+          </p>
+        </section>
+
+        <section
+          id="auditoria"
+          className="scroll-mt-28 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted">
+            Auditoría
+          </p>
+          <h2 className="mt-3 font-heading text-xl font-semibold text-primary">
+            Trazabilidad y supervisión
+          </h2>
+          <p className="mt-3 text-sm leading-7 text-muted">
+            Sección reservada para eventos, revisiones y controles de seguridad. Encaja con el header
+            superior y deja preparada la arquitectura para futuras vistas de auditoría.
+          </p>
+        </section>
+      </div>
     </section>
   )
 }

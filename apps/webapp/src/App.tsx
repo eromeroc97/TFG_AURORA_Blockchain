@@ -7,7 +7,7 @@ import Login from './pages/Login'
 import Recover from './pages/Recover'
 import Register from './pages/Register'
 import Reset from './pages/Reset'
-import MainLayout from './components/layout/MainLayout'
+import MainLayout from './layouts/MainLayout'
 import RequireAuth from './components/routes/RequireAuth'
 
 function App() {

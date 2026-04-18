@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { apiClient } from '../../api/axios'
+import { apiClient } from '../api/axios'
 import MainLayout from './MainLayout'
 
 const navigateMock = jest.fn()
@@ -15,13 +15,17 @@ jest.mock('react-router-dom', () => {
   }
 })
 
-jest.mock('../../context/auth-context', () => ({
+jest.mock('../context/auth-context', () => ({
   useAuth: () => ({
+    authClaims: {
+      email: 'investigador@gsya.es',
+      role: 'ADMIN',
+    },
     clearSession: clearSessionMock,
   }),
 }))
 
-jest.mock('../../api/axios', () => ({
+jest.mock('../api/axios', () => ({
   apiClient: {
     post: jest.fn(),
   },
@@ -43,9 +47,10 @@ describe('MainLayout', () => {
 
     expect(screen.getByText('AURORA')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Dashboard/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Perfil/i })).toBeInTheDocument()
   })
 
-  it('logs out and navigates to login', async () => {
+  it('opens the profile menu, logs out and navigates to login', async () => {
     mockedApiClient.post.mockResolvedValueOnce({ data: {} })
 
     render(
@@ -54,7 +59,8 @@ describe('MainLayout', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Cerrar sesión/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Perfil/i }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Cerrar sesión/i }))
 
     await waitFor(() => {
       expect(mockedApiClient.post).toHaveBeenCalledWith('/auth/logout', undefined, {
