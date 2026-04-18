@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 import { apiClient } from './api/axios'
 
+jest.mock('./components/dashboard/AccessMap', () => () => <div data-testid="access-map" />)
+
 jest.mock('./api/axios', () => ({
   apiClient: {
     post: jest.fn(),

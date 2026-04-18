@@ -47,7 +47,7 @@ describe('MainLayout', () => {
 
     expect(screen.getByRole('img', { name: /AURORA/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Dashboard/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Perfil/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ADMIN/i })).toBeInTheDocument()
   })
 
   it('opens the profile menu, logs out and navigates to login', async () => {
@@ -59,7 +59,7 @@ describe('MainLayout', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Perfil/i }))
+    fireEvent.click(screen.getByRole('button', { name: /ADMIN/i }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /Cerrar sesión/i }))
 
     await waitFor(() => {

@@ -3,6 +3,7 @@ import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
 import uclmLogo from '../assets/uclm_logo.png'
 import fundingLogos from '../assets/MostrarUE-MA-Feder-Innocam.jpg'
+import AccessMap from '../components/dashboard/AccessMap'
 
 const metrics = [
   { label: 'Session transport', value: 'HttpOnly cookies', icon: Cookie },
@@ -79,10 +80,12 @@ export default function Dashboard() {
           <h2 className="font-heading text-xl font-semibold">Arquitectura de acceso</h2>
         </div>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-muted">
-          El frontend no guarda tokens en localStorage ni sessionStorage. La autenticación
-          se apoya en cookies HttpOnly y el cliente solo mantiene estado efímero para la
-          navegación entre login y dashboard.
+          Vista geoespacial de ecosistemas con control de visibilidad por rol en frontend.
+          USER y AUDITOR pueden consultar dispositivos según permisos, mientras que
+          ADMIN/GLOBAL_ADMIN visualizan el estado sin detalle sensible.
         </p>
+
+        <AccessMap />
       </article>
 
       <section className="grid gap-4 lg:grid-cols-3">

@@ -20,6 +20,8 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const roleLabel = userRole ? userRole.replace(/_/g, ' ') : 'Rol no disponible'
+  const emailLocalPart = userEmail?.split('@')[0]?.trim() || 'Sesión activa'
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -101,10 +103,10 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
             </div>
             <div className="hidden text-left sm:block">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-muted">
-                Perfil
+                {roleLabel}
               </p>
               <p className="max-w-48 truncate text-sm font-medium text-primary">
-                {userEmail ?? 'Sesión activa'}
+                {emailLocalPart}
               </p>
             </div>
             <ChevronDown
