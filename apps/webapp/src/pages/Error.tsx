@@ -19,7 +19,7 @@ export default function ErrorPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10 text-primary">
+    <main className="aurora-pattern-bg min-h-screen px-6 py-10 text-primary">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
         <section
           className="w-full max-w-2xl space-y-8 rounded-[2rem] border border-border bg-white p-8 shadow-aurora sm:p-10"

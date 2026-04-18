@@ -32,7 +32,7 @@ describe('Error page', () => {
     )
 
     expect(screen.getByRole('heading', { name: /No pudimos completar la acción/i })).toBeInTheDocument()
-    expect(screen.getByText(/Por seguridad no mostramos detalles técnicos/i)).toBeInTheDocument()
+    expect(screen.getByText(/Se produjo un problema al procesar tu solicitud/i)).toBeInTheDocument()
   })
 
   it('navigates back when history is available', () => {
