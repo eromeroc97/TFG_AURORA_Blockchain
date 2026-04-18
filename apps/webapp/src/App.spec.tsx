@@ -25,4 +25,15 @@ describe('App routing', () => {
       expect(screen.getByRole('heading', { name: /Accede al panel de AURORA/i })).toBeInTheDocument()
     })
   })
+
+  it('allows opening the dashboard without authentication', async () => {
+    mockedApiClient.post.mockRejectedValueOnce(new Error('refresh unavailable'))
+    window.history.pushState({}, '', '/dashboard')
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Panel principal de AURORA/i })).toBeInTheDocument()
+    })
+  })
 })

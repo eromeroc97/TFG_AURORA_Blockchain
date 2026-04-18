@@ -1,6 +1,7 @@
-import { ChevronDown, LogOut, Shield, Sparkles, UserCircle2 } from 'lucide-react'
+import { ChevronDown, LogOut, Shield, UserCircle2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import auroraLogo from '../../assets/aurora-logo.png'
 
 type HeaderProps = {
   onSignOut: () => Promise<void> | void
@@ -69,9 +70,11 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
     <header className="sticky top-0 z-50 border-b border-white/15 bg-white/70 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-surface shadow-aurora">
-            <Sparkles className="size-5" />
-          </div>
+          <img
+            src={auroraLogo}
+            alt="AURORA"
+            className="h-11 w-auto drop-shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
+          />
           <div className="hidden sm:block">
             <p className="font-heading text-sm font-semibold tracking-[0.24em] text-primary">
               AURORA
