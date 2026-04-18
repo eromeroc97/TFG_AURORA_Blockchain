@@ -20,8 +20,8 @@ describe('Dashboard', () => {
   it('renders the dashboard metrics and content', () => {
     render(<Dashboard />)
 
-    expect(screen.getByRole('heading', { name: /Panel principal de AURORA/i })).toBeInTheDocument()
-    expect(screen.getByText(/Ecosistemas instanciados/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: /cybersecurity/i })).toBeInTheDocument()
+    expect(screen.getByText(/^Ecosistemas instanciados$/i)).toBeInTheDocument()
     expect(screen.getByText('4')).toBeInTheDocument()
     expect(screen.getByText(/Alertas de Seguridad/i)).toBeInTheDocument()
     expect(screen.getByText(/Threat Intelligence/i)).toBeInTheDocument()

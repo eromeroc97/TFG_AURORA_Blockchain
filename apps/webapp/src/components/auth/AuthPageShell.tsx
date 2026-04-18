@@ -7,9 +7,6 @@ import mHaciendaLogo from '../../assets/MHacienda.png'
 import federLogo from '../../assets/FEDER.png'
 import clmLogo from '../../assets/CLM.png'
 
-const auroraMeaning =
-  'Advanced and Unified Research On cybersecurity Risk Analysis and sustainability in smart homes'
-
 export default function AuthPageShell({ children }: { children: ReactNode }) {
   return (
     <main className="aurora-pattern-bg min-h-screen px-6 py-10 text-primary">
@@ -57,7 +54,7 @@ export default function AuthPageShell({ children }: { children: ReactNode }) {
                     rel="noreferrer"
                     className="transition-opacity hover:opacity-85"
                   >
-                    {auroraMeaning}
+                    <b>A</b>dvanced and <b>U</b>nified <b>R</b>esearch <b>O</b>n cybersecurity <b>R</b>isk <b>A</b>nalysis and sustainability in smart homes
                   </a>
                 </h1>
               </div>
