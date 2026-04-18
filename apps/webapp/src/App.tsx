@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthProvider'
 import Dashboard from './pages/Dashboard'
+import ErrorPage from './pages/Error'
 import Login from './pages/Login'
 import Recover from './pages/Recover'
 import Register from './pages/Register'
@@ -18,6 +19,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/recover" element={<Recover />} />
           <Route path="/reset" element={<Reset />} />
+          <Route path="/error" element={<ErrorPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
