@@ -2,7 +2,10 @@ import type { ReactNode } from 'react'
 import auroraLogo from '../../assets/aurora-logo.png'
 import gsyaLogo from '../../assets/gsya_logo.png'
 import uclmLogo from '../../assets/uclm_logo.png'
-import fundingLogos from '../../assets/MostrarUE-MA-Feder-Innocam.jpg'
+import ueLogo from '../../assets/UE.png'
+import mHaciendaLogo from '../../assets/MHacienda.png'
+import federLogo from '../../assets/FEDER.png'
+import clmLogo from '../../assets/CLM.png'
 
 const auroraMeaning =
   'Advanced and Unified Research On cybersecurity Risk Analysis and sustainability in smart homes'
@@ -73,11 +76,16 @@ export default function AuthPageShell({ children }: { children: ReactNode }) {
             </div>
 
             <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-              <img
-                src={fundingLogos}
-                alt="Logotipos de cofinanciación: Unión Europea, Ministerio de Hacienda, Fondos Europeos e INNOCAM"
-                className="h-20 w-full rounded-xl object-contain sm:h-24"
-              />
+              <div className="flex items-center justify-center gap-2 rounded-xl bg-white/90 px-2 py-2">
+                <img src={ueLogo} alt="Logotipo de la UE" className="h-8 w-auto object-contain" />
+                <img
+                  src={mHaciendaLogo}
+                  alt="Logotipo de Ministerio de Hacienda"
+                  className="h-8 w-auto object-contain"
+                />
+                <img src={federLogo} alt="Logotipo de FEDER" className="h-8 w-auto object-contain" />
+                <img src={clmLogo} alt="Logotipo de CLM" className="h-8 w-auto object-contain" />
+              </div>
             </div>
           </div>
 
