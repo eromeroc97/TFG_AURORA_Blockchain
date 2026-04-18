@@ -1,6 +1,8 @@
 import L from 'leaflet'
-import { useMemo } from 'react'
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
+import { useEffect, useMemo } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { Brain, House } from 'lucide-react'
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAuth } from '../../context/auth-context'
 
@@ -16,7 +18,39 @@ type EcosystemNode = {
 
 type AccessRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
 
+export type AccessMapEcosystem = EcosystemNode
+
+type AccessMapProps = {
+  ecosystems?: AccessMapEcosystem[]
+}
+
 const CENTRAL_BRAIN_COORDS: [number, number] = [38.991, -3.921]
+
+const createHouseIcon = (isOwned: boolean) =>
+  L.divIcon({
+    className: 'ecosystem-house-marker',
+    html: renderToStaticMarkup(
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '38px',
+          height: '38px',
+          borderRadius: '999px',
+          background: isOwned ? '#0A2540' : '#14B8A6',
+          color: '#F9FAFB',
+          boxShadow: '0 10px 22px rgba(10,37,64,0.22)',
+          border: '2px solid rgba(255,255,255,0.92)',
+        }}
+      >
+        <House size={18} strokeWidth={2.4} />
+      </div>,
+    ),
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -16],
+  })
 
 const ecosystemNodesMock: EcosystemNode[] = [
   {
@@ -58,24 +92,77 @@ const ecosystemNodesMock: EcosystemNode[] = [
 ]
 
 const centralShieldIcon = L.divIcon({
-  className: 'central-brain-shield-icon',
-  html: '<div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#0a2540;color:#f9fafb;font-size:18px;box-shadow:0 8px 20px rgba(10,37,64,0.35);">🛡</div>',
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
+  className: 'central-brain-marker',
+  html: renderToStaticMarkup(
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '46px',
+        height: '46px',
+        borderRadius: '999px',
+        background: '#0A2540',
+        color: '#F9FAFB',
+        boxShadow: '0 12px 26px rgba(10,37,64,0.26)',
+        border: '2px solid rgba(20,184,166,0.9)',
+      }}
+    >
+      <Brain size={21} strokeWidth={2.2} />
+    </div>,
+  ),
+  iconSize: [46, 46],
+  iconAnchor: [23, 23],
+  popupAnchor: [0, -20],
 })
 
-export default function AccessMap() {
+function MapViewportUpdater({ points }: { points: Array<[number, number]> }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (points.length === 0) {
+      map.setView(CENTRAL_BRAIN_COORDS, 6, { animate: true })
+      return
+    }
+
+    const bounds = L.latLngBounds(points)
+
+    if (points.length === 1) {
+      map.setView(points[0], 8, { animate: true })
+      return
+    }
+
+    map.fitBounds(bounds, {
+      padding: [32, 32],
+      maxZoom: 9,
+      animate: true,
+    })
+  }, [map, points])
+
+  return null
+}
+
+export default function AccessMap({ ecosystems }: AccessMapProps) {
   const { authClaims } = useAuth()
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole
   const currentUserId = authClaims?.sub ?? 'anonymous-user'
+  const sourceNodes = ecosystems ?? ecosystemNodesMock
 
   const visibleNodes = useMemo(() => {
     if (role === 'USER') {
-      return ecosystemNodesMock.filter((node) => node.ownerId === currentUserId || node.isShared)
+      return sourceNodes.filter((node) => node.ownerId === currentUserId || node.isShared)
     }
 
-    return ecosystemNodesMock
-  }, [currentUserId, role])
+    return sourceNodes
+  }, [currentUserId, role, sourceNodes])
+
+  const mapPoints = useMemo(() => {
+    const ecosystemPoints = visibleNodes.map((node) => [node.lat, node.lng] as [number, number])
+
+    return role === 'GLOBAL_ADMIN'
+      ? [...ecosystemPoints, CENTRAL_BRAIN_COORDS]
+      : ecosystemPoints
+  }, [role, visibleNodes])
 
   const canViewDevices = (node: EcosystemNode) => {
     if (role === 'AUDITOR') {
@@ -90,29 +177,32 @@ export default function AccessMap() {
   }
 
   return (
-    <div className="mt-5 h-[520px] w-full overflow-hidden rounded-[1.25rem] border border-primary/15 bg-white/70 shadow-aurora">
+    <div className="mt-5 h-[520px] w-full overflow-hidden rounded-[1.25rem] border border-primary/10 bg-white shadow-aurora">
       <MapContainer
         center={CENTRAL_BRAIN_COORDS}
         zoom={6}
+        maxZoom={10}
         scrollWheelZoom
         className="h-full w-full"
       >
+        <MapViewportUpdater points={mapPoints} />
+
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+        />
+
+        <TileLayer
+          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+          opacity={0.95}
         />
 
         {visibleNodes.map((node) => (
-          <CircleMarker
+          <Marker
             key={node.id}
-            center={[node.lat, node.lng]}
-            radius={10}
-            pathOptions={{
-              color: node.ownerId === currentUserId ? '#0A2540' : '#14B8A6',
-              fillColor: node.ownerId === currentUserId ? '#0A2540' : '#14B8A6',
-              fillOpacity: 0.75,
-              weight: 2,
-            }}
+            position={[node.lat, node.lng]}
+            icon={createHouseIcon(node.ownerId === currentUserId)}
           >
             <Popup>
               <div className="space-y-2 text-primary">
@@ -139,7 +229,7 @@ export default function AccessMap() {
                 )}
               </div>
             </Popup>
-          </CircleMarker>
+          </Marker>
         ))}
 
         {role === 'GLOBAL_ADMIN' ? (
