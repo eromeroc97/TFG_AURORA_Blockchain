@@ -45,7 +45,7 @@ describe('MainLayout', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('AURORA')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /AURORA/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Dashboard/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Perfil/i })).toBeInTheDocument()
   })

@@ -67,7 +67,9 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/15 bg-white/70 backdrop-blur-md">
+    <header className="sticky top-0 z-50 bg-gradient-to-b from-white/95 to-slate-100/75 shadow-[0_14px_34px_rgba(2,6,23,0.12),0_3px_12px_rgba(2,6,23,0.06)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-10 -bottom-3 h-6 rounded-full bg-primary/15 blur-xl" />
+
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
           <img
@@ -75,15 +77,9 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
             alt="AURORA"
             className="h-11 w-auto drop-shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
           />
-          <div className="hidden sm:block">
-            <p className="font-heading text-sm font-semibold tracking-[0.24em] text-primary">
-              AURORA
-            </p>
-            <p className="text-xs text-muted">Navigation shell</p>
-          </div>
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-2 md:flex">
+        <nav className="hidden flex-1 items-center justify-center gap-2 rounded-full bg-white/70 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] md:flex">
           {navigationItems.map((item) => (
             <Link key={item.label} to={item.to} className={getLinkClassName(item.to)}>
               {item.label}
@@ -98,7 +94,7 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
             onClick={() => setIsProfileMenuOpen((currentValue) => !currentValue)}
             aria-haspopup="menu"
             aria-expanded={isProfileMenuOpen}
-            className="inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/70 px-3 py-2 text-left shadow-sm backdrop-blur-md transition-colors hover:border-white/30 hover:bg-white/90"
+            className="inline-flex items-center gap-3 rounded-full bg-white/85 px-3 py-2 text-left shadow-[0_10px_24px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-md transition-colors hover:bg-white"
           >
             <div className="flex size-9 items-center justify-center rounded-full bg-primary text-surface">
               <UserCircle2 className="size-5" />
@@ -122,7 +118,7 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
             <div
               role="menu"
               aria-label="Perfil"
-              className="absolute right-0 mt-3 w-72 overflow-hidden rounded-3xl border border-white/20 bg-white/95 p-2 shadow-aurora backdrop-blur-xl"
+              className="absolute right-0 mt-3 w-72 overflow-hidden rounded-3xl bg-white/95 p-2 shadow-[0_24px_50px_rgba(15,23,42,0.20),0_8px_20px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl"
             >
               <div className="rounded-2xl bg-background/70 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">
