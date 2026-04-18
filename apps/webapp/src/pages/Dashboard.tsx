@@ -1,4 +1,4 @@
-import { Activity, House, ShieldCheck, Sparkles } from 'lucide-react'
+import { Activity, BellRing, House, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { useMemo } from 'react'
 import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
@@ -6,6 +6,7 @@ import uclmLogo from '../assets/uclm_logo.png'
 import fundingLogos from '../assets/MostrarUE-MA-Feder-Innocam.jpg'
 import AccessMap from '../components/dashboard/AccessMap'
 import { ACCESS_MAP_ECOSYSTEMS_MOCK } from '../components/dashboard/access-map.data'
+import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
 import { useAuth } from '../context/auth-context'
 
 const quickHighlights = [
@@ -35,27 +36,69 @@ const moduleActivity = [
   { module: 'Blockchain', owner: 'Equipo Ledger', lastUpdate: 'Hace 1 día', state: 'Estable' },
 ]
 
+type DashboardMetric = {
+  label: string
+  value: string
+  icon: typeof House
+  emphasizeValue?: boolean
+  valueClassName?: string
+}
+
 export default function Dashboard() {
   const { authClaims } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
 
-  const instantiatedEcosystemsCount = useMemo(() => {
+  const accessibleEcosystems = useMemo(() => {
     const canViewAll = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
     if (canViewAll) {
-      return ACCESS_MAP_ECOSYSTEMS_MOCK.length
+      return ACCESS_MAP_ECOSYSTEMS_MOCK
     }
 
-    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.ownerId === authClaims?.sub).length
+    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter(
+      (ecosystem) => ecosystem.ownerId === authClaims?.sub || ecosystem.isShared,
+    )
   }, [authClaims?.sub, role])
 
-  const metrics = useMemo(
+  const instantiatedEcosystemsCount = useMemo(() => {
+    return accessibleEcosystems.length
+  }, [accessibleEcosystems])
+
+  const securityAlertsCount = useMemo(() => {
+    const canViewAll = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
+
+    if (canViewAll) {
+      return SECURITY_ALERTS_MOCK.length
+    }
+
+    const accessibleEcosystemIds = new Set(accessibleEcosystems.map((ecosystem) => ecosystem.id))
+
+    return SECURITY_ALERTS_MOCK.filter((alert) => accessibleEcosystemIds.has(alert.ecosystemId)).length
+  }, [accessibleEcosystems, role])
+
+  const metrics: DashboardMetric[] = useMemo(
     () => [
-      { label: 'Ecosistemas instanciados', value: String(instantiatedEcosystemsCount), icon: House },
-      { label: 'Router surface', value: 'Traefik /api', icon: ShieldCheck },
-      { label: 'Theme policy', value: 'Light only', icon: Sparkles },
+      {
+        label: 'Ecosistemas instanciados',
+        value: String(instantiatedEcosystemsCount),
+        icon: House,
+      },
+      {
+        label: 'Alertas de Seguridad',
+        value: String(securityAlertsCount),
+        icon: BellRing,
+        emphasizeValue: true,
+        valueClassName: 'text-rose-600',
+      },
+      {
+        label: 'Threat Intelligence',
+        value: 'OFFLINE',
+        icon: ShieldAlert,
+        emphasizeValue: true,
+        valueClassName: 'text-rose-600',
+      },
     ],
-    [instantiatedEcosystemsCount],
+    [instantiatedEcosystemsCount, securityAlertsCount],
   )
 
   return (
@@ -75,7 +118,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {metrics.map(({ label, value, icon: Icon }) => (
+        {metrics.map(({ label, value, icon: Icon, valueClassName, emphasizeValue }) => (
           <article key={label} className="rounded-[1.5rem] border border-border bg-surface p-5 shadow-aurora">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
@@ -87,8 +130,8 @@ export default function Dashboard() {
             </div>
             <p
               className={`mt-4 font-semibold text-primary ${
-                /^\d+$/.test(value) ? 'text-center text-5xl leading-none' : 'text-lg'
-              }`}
+                /^\d+$/.test(value) || emphasizeValue ? 'text-center text-5xl leading-none' : 'text-lg'
+              } ${valueClassName ?? ''}`}
             >
               {value}
             </p>
