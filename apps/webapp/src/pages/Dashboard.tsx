@@ -3,7 +3,10 @@ import { useMemo } from 'react'
 import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
 import uclmLogo from '../assets/uclm_logo.png'
-import fundingLogos from '../assets/MostrarUE-MA-Feder-Innocam.jpg'
+import ueLogo from '../assets/UE.png'
+import mHaciendaLogo from '../assets/MHacienda.png'
+import federLogo from '../assets/FEDER.png'
+import clmLogo from '../assets/CLM.png'
 import AccessMap from '../components/dashboard/AccessMap'
 import { ACCESS_MAP_ECOSYSTEMS_MOCK } from '../components/dashboard/access-map.data'
 import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
@@ -247,12 +250,10 @@ export default function Dashboard() {
           <img src={auroraLogo} alt="Logotipo de AURORA" className="h-12 w-auto object-contain" />
           <img src={gsyaLogo} alt="Logotipo de GSYA" className="h-12 w-auto object-contain" />
           <img src={uclmLogo} alt="Logotipo de UCLM" className="h-12 w-auto object-contain" />
-          {/* TODO: separar los logotipos incluidos en MostrarUE-MA-Feder-Innocam.jpg en assets individuales. */}
-          <img
-            src={fundingLogos}
-            alt="Logotipos MostrarUE"
-            className="h-14 w-auto rounded-md object-contain"
-          />
+          <img src={ueLogo} alt="Logotipo de la UE" className="h-12 w-auto object-contain" />
+          <img src={mHaciendaLogo} alt="Logotipo de Ministerio de Hacienda" className="h-12 w-auto object-contain" />
+          <img src={federLogo} alt="Logotipo de FEDER" className="h-12 w-auto object-contain" />
+          <img src={clmLogo} alt="Logotipo de CLM" className="h-12 w-auto object-contain" />
         </div>
       </footer>
     </section>
