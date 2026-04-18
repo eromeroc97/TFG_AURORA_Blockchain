@@ -5,12 +5,24 @@ jest.mock('../components/dashboard/AccessMap', () => () => (
   <div data-testid="access-map">Access Map Mock</div>
 ))
 
+jest.mock('../context/auth-context', () => ({
+  useAuth: () => ({
+    authClaims: {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'ADMIN',
+      email: 'admin@aurora.es',
+      did: null,
+    },
+  }),
+}))
+
 describe('Dashboard', () => {
   it('renders the dashboard metrics and content', () => {
     render(<Dashboard />)
 
     expect(screen.getByRole('heading', { name: /Panel principal de AURORA/i })).toBeInTheDocument()
-    expect(screen.getByText(/HttpOnly cookies/i)).toBeInTheDocument()
+    expect(screen.getByText(/Ecosistemas instanciados/i)).toBeInTheDocument()
+    expect(screen.getByText('4')).toBeInTheDocument()
     expect(screen.getByText(/Traefik \/api/i)).toBeInTheDocument()
     expect(screen.getByTestId('access-map')).toBeInTheDocument()
     expect(screen.getByAltText(/Logotipo de AURORA/i)).toBeInTheDocument()

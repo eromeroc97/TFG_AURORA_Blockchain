@@ -5,20 +5,9 @@ import { Brain, House } from 'lucide-react'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAuth } from '../../context/auth-context'
-
-type EcosystemNode = {
-  id: string
-  name: string
-  ownerId: string
-  lat: number
-  lng: number
-  isShared: boolean
-  devices: string[]
-}
+import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem } from './access-map.data'
 
 type AccessRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
-
-export type AccessMapEcosystem = EcosystemNode
 
 type AccessMapProps = {
   ecosystems?: AccessMapEcosystem[]
@@ -51,45 +40,6 @@ const createHouseIcon = (isOwned: boolean) =>
     iconAnchor: [19, 19],
     popupAnchor: [0, -16],
   })
-
-const ecosystemNodesMock: EcosystemNode[] = [
-  {
-    id: 'eco-001',
-    name: 'Hogar Inteligente - Toledo Norte',
-    ownerId: '123e4567-e89b-12d3-a456-426614174000',
-    lat: 39.876,
-    lng: -4.025,
-    isShared: false,
-    devices: ['Sensores de movimiento', 'Cámara interior', 'Medidor energético'],
-  },
-  {
-    id: 'eco-002',
-    name: 'Laboratorio Domótico - Campus UCLM',
-    ownerId: '71ac8f45-8d9f-4e03-bfdf-3f0c81a4e7f4',
-    lat: 39.862,
-    lng: -4.025,
-    isShared: true,
-    devices: ['Gateway IoT', 'Sensor de apertura', 'Control de acceso'],
-  },
-  {
-    id: 'eco-003',
-    name: 'Piloto Energético - Albacete',
-    ownerId: 'f46f4f2f-cf3d-4170-a957-6b3f257cf8a5',
-    lat: 38.994,
-    lng: -1.856,
-    isShared: false,
-    devices: ['Inversor solar', 'Medidor de consumo', 'Sensor térmico'],
-  },
-  {
-    id: 'eco-004',
-    name: 'Vivienda Segura - Ciudad Real',
-    ownerId: '123e4567-e89b-12d3-a456-426614174000',
-    lat: 38.986,
-    lng: -3.932,
-    isShared: true,
-    devices: ['Sirena perimetral', 'Detector de humo', 'Control de persianas'],
-  },
-]
 
 const centralShieldIcon = L.divIcon({
   className: 'central-brain-marker',
@@ -146,7 +96,7 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
   const { authClaims } = useAuth()
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole
   const currentUserId = authClaims?.sub ?? 'anonymous-user'
-  const sourceNodes = ecosystems ?? ecosystemNodesMock
+  const sourceNodes = ecosystems ?? ACCESS_MAP_ECOSYSTEMS_MOCK
 
   const visibleNodes = useMemo(() => {
     if (role === 'USER') {
@@ -164,7 +114,7 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
       : ecosystemPoints
   }, [role, visibleNodes])
 
-  const canViewDevices = (node: EcosystemNode) => {
+  const canViewDevices = (node: AccessMapEcosystem) => {
     if (role === 'AUDITOR') {
       return true
     }

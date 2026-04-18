@@ -1,15 +1,12 @@
-import { Activity, Cookie, ShieldCheck, Sparkles } from 'lucide-react'
+import { Activity, House, ShieldCheck, Sparkles } from 'lucide-react'
+import { useMemo } from 'react'
 import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
 import uclmLogo from '../assets/uclm_logo.png'
 import fundingLogos from '../assets/MostrarUE-MA-Feder-Innocam.jpg'
 import AccessMap from '../components/dashboard/AccessMap'
-
-const metrics = [
-  { label: 'Session transport', value: 'HttpOnly cookies', icon: Cookie },
-  { label: 'Router surface', value: 'Traefik /api', icon: ShieldCheck },
-  { label: 'Theme policy', value: 'Light only', icon: Sparkles },
-]
+import { ACCESS_MAP_ECOSYSTEMS_MOCK } from '../components/dashboard/access-map.data'
+import { useAuth } from '../context/auth-context'
 
 const quickHighlights = [
   {
@@ -39,6 +36,28 @@ const moduleActivity = [
 ]
 
 export default function Dashboard() {
+  const { authClaims } = useAuth()
+  const role = (authClaims?.role ?? 'USER').toUpperCase()
+
+  const instantiatedEcosystemsCount = useMemo(() => {
+    const canViewAll = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
+
+    if (canViewAll) {
+      return ACCESS_MAP_ECOSYSTEMS_MOCK.length
+    }
+
+    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.ownerId === authClaims?.sub).length
+  }, [authClaims?.sub, role])
+
+  const metrics = useMemo(
+    () => [
+      { label: 'Ecosistemas instanciados', value: String(instantiatedEcosystemsCount), icon: House },
+      { label: 'Router surface', value: 'Traefik /api', icon: ShieldCheck },
+      { label: 'Theme policy', value: 'Light only', icon: Sparkles },
+    ],
+    [instantiatedEcosystemsCount],
+  )
+
   return (
     <section className="space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <div className="space-y-3">
@@ -57,10 +76,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-3">
         {metrics.map(({ label, value, icon: Icon }) => (
-          <article
-            key={label}
-            className="rounded-[1.5rem] border border-border bg-surface p-5 shadow-aurora"
-          >
+          <article key={label} className="rounded-[1.5rem] border border-border bg-surface p-5 shadow-aurora">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/5 text-primary">
                 <Icon className="size-5" />
@@ -69,7 +85,13 @@ export default function Dashboard() {
                 {label}
               </p>
             </div>
-            <p className="mt-4 text-lg font-semibold text-primary">{value}</p>
+            <p
+              className={`mt-4 font-semibold text-primary ${
+                /^\d+$/.test(value) ? 'text-center text-5xl leading-none' : 'text-lg'
+              }`}
+            >
+              {value}
+            </p>
           </article>
         ))}
       </div>
@@ -85,7 +107,7 @@ export default function Dashboard() {
           ADMIN/GLOBAL_ADMIN visualizan el estado sin detalle sensible.
         </p>
 
-        <AccessMap />
+        <AccessMap ecosystems={ACCESS_MAP_ECOSYSTEMS_MOCK} />
       </article>
 
       <section className="grid gap-4 lg:grid-cols-3">
