@@ -1,9 +1,29 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { randomUUID } from 'crypto';
+import type { Request, Response, NextFunction } from 'express';
+import { AllExceptionsFilter } from './shared/errors/global-exception.filter';
+import { createAuthLogger } from './shared/logging/auth-logger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const logger = createAuthLogger();
+
+  const app = await NestFactory.create(AppModule, { logger });
+
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    const incomingRequestId = request.headers['x-request-id'];
+    const requestIdFromHeader =
+      typeof incomingRequestId === 'string'
+        ? incomingRequestId
+        : Array.isArray(incomingRequestId)
+          ? incomingRequestId[0]
+          : undefined;
+
+    request.requestId = requestIdFromHeader?.trim() || randomUUID();
+    response.setHeader('x-request-id', request.requestId);
+    next();
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -11,6 +31,8 @@ async function bootstrap() {
       whitelist: true,
     }),
   );
+
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   await app.listen(3001);
 }
