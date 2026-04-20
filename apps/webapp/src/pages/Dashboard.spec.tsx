@@ -16,6 +16,7 @@ let mockAuthClaims: MockAuthClaims = {
 
 const mockedApiClient = apiClient as {
   get: jest.Mock
+  post: jest.Mock
   patch: jest.Mock
   delete: jest.Mock
 }
@@ -73,9 +74,69 @@ const apiUsers = [
   },
 ]
 
+const apiEcosystems = [
+  {
+    id: 'eco-1',
+    name: 'Hogar Inteligente - Toledo Norte',
+    ownerId: '123e4567-e89b-12d3-a456-426614174000',
+    did: 'did:firefly:custom/eco-1',
+    certificateFingerprint: null,
+    status: 'ACTIVE',
+    latitude: 39.8628,
+    longitude: -4.0273,
+    isOnline: true,
+    lastSeen: null,
+    createdAt: '2026-04-20T00:00:00.000Z',
+    updatedAt: '2026-04-20T00:00:00.000Z',
+  },
+  {
+    id: 'eco-2',
+    name: 'Piloto Energético - Albacete',
+    ownerId: '71ac8f45-8d9f-4e03-bfdf-3f0c81a4e7f4',
+    did: 'did:firefly:custom/eco-2',
+    certificateFingerprint: null,
+    status: 'ACTIVE',
+    latitude: 38.9943,
+    longitude: -1.8585,
+    isOnline: true,
+    lastSeen: null,
+    createdAt: '2026-04-20T00:00:00.000Z',
+    updatedAt: '2026-04-20T00:00:00.000Z',
+  },
+  {
+    id: 'eco-3',
+    name: 'Vivienda Segura - Ciudad Real',
+    ownerId: 'f46f4f2f-cf3d-4170-a957-6b3f257cf8a5',
+    did: 'did:firefly:custom/eco-3',
+    certificateFingerprint: null,
+    status: 'ACTIVE',
+    latitude: 38.9861,
+    longitude: -3.9273,
+    isOnline: false,
+    lastSeen: null,
+    createdAt: '2026-04-20T00:00:00.000Z',
+    updatedAt: '2026-04-20T00:00:00.000Z',
+  },
+  {
+    id: 'eco-4',
+    name: 'Laboratorio Domótico - Campus UCLM',
+    ownerId: '123e4567-e89b-12d3-a456-426614174000',
+    did: 'did:firefly:custom/eco-4',
+    certificateFingerprint: null,
+    status: 'ACTIVE',
+    latitude: 39.9898,
+    longitude: -3.9072,
+    isOnline: true,
+    lastSeen: null,
+    createdAt: '2026-04-20T00:00:00.000Z',
+    updatedAt: '2026-04-20T00:00:00.000Z',
+  },
+]
+
 jest.mock('../api/axios', () => ({
   apiClient: {
     get: jest.fn(),
+    post: jest.fn(),
     patch: jest.fn(),
     delete: jest.fn(),
   },
@@ -93,9 +154,41 @@ jest.mock('../context/auth-context', () => ({
 
 describe('Dashboard', () => {
   beforeEach(() => {
-    mockedApiClient.get.mockResolvedValue({ data: apiUsers })
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/users') {
+        return Promise.resolve({ data: apiUsers })
+      }
+
+      if (url === '/ecosystems') {
+        return Promise.resolve({ data: apiEcosystems })
+      }
+
+      if (url === '/ecosystems/eco-1/api-key') {
+        return Promise.resolve({ data: { ecosystemId: 'eco-1', apiKey: 'AUR-EXISTING-KEY-123' } })
+      }
+
+      return Promise.reject(new Error(`Unhandled GET mock for ${url}`))
+    })
+    mockedApiClient.post.mockResolvedValue({
+      data: {
+        id: 'eco-created-1',
+        name: 'Ecosistema Test Usuario',
+        ownerId: '123e4567-e89b-12d3-a456-426614174000',
+        did: 'did:firefly:custom/eco-created-1',
+        certificateFingerprint: null,
+        status: 'ACTIVE',
+        latitude: null,
+        longitude: null,
+        isOnline: false,
+        lastSeen: null,
+        createdAt: '2026-04-20T00:00:00.000Z',
+        updatedAt: '2026-04-20T00:00:00.000Z',
+        apiKey: 'AUR-CREATED-KEY-123',
+      },
+    })
     mockedApiClient.patch.mockReset()
     mockedApiClient.delete.mockReset()
+    mockedApiClient.post.mockClear()
     clipboardWriteTextMock.mockClear()
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -208,7 +301,7 @@ describe('Dashboard', () => {
     expect(screen.queryByText(/auditor@aurora.local/i)).not.toBeInTheDocument()
   })
 
-  it('renders the user dashboard content', () => {
+  it('renders the user dashboard content', async () => {
     mockAuthClaims = {
       sub: '123e4567-e89b-12d3-a456-426614174000',
       role: 'USER',
@@ -217,12 +310,13 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
+    expect(await screen.findByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
+
     expect(screen.getByRole('heading', { level: 1, name: /cybersecurity/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: /Mis ecosistemas instanciados/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: /Compartidos conmigo/i })).toBeInTheDocument()
-    expect(screen.getByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
-    expect(screen.getByText(/Vivienda Segura - Ciudad Real/i)).toBeInTheDocument()
     expect(screen.getByText(/Laboratorio Domótico - Campus UCLM/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Vivienda Segura - Ciudad Real/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Piloto Energético - Albacete/i)).not.toBeInTheDocument()
   })
 
@@ -250,6 +344,9 @@ describe('Dashboard', () => {
 
     expect(await screen.findByText(/API key generada/i)).toBeInTheDocument()
     expect(screen.getByText(/Ecosistema Test Usuario/i)).toBeInTheDocument()
+    expect(mockedApiClient.post).toHaveBeenCalledWith('/ecosystems', {
+      name: 'Ecosistema Test Usuario',
+    })
 
     const ecosystemModal = screen.getByRole('heading', { name: /Registrar ecosistema/i }).closest('div')?.parentElement?.parentElement
     expect(ecosystemModal).not.toBeNull()
@@ -261,12 +358,100 @@ describe('Dashboard', () => {
     })
 
     const generatedApiKey = clipboardWriteTextMock.mock.calls[0][0] as string
-    expect(generatedApiKey).toMatch(/^AUR-/)
+    expect(generatedApiKey).toBe('AUR-CREATED-KEY-123')
     expect(screen.queryByText(generatedApiKey)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Compartir ecosistema Ecosistema Test Usuario/i })).toBeInTheDocument()
   })
 
-  it('renders the auditor dashboard content', () => {
+  it('recovers and copies an existing ecosystem API key on demand', async () => {
+    mockAuthClaims = {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'USER',
+      email: 'user@aurora.es',
+    }
+
+    render(<Dashboard />)
+
+    expect(await screen.findByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Recuperar API key/i })[0])
+
+    await waitFor(() => {
+      expect(mockedApiClient.get).toHaveBeenCalledWith('/ecosystems/eco-1/api-key')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Copiar/i }))
+
+    await waitFor(() => {
+      expect(clipboardWriteTextMock).toHaveBeenCalledWith('AUR-EXISTING-KEY-123')
+    })
+  })
+
+  it('shows permission error when API key retrieval is forbidden', async () => {
+    mockAuthClaims = {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'USER',
+      email: 'user@aurora.es',
+    }
+
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/ecosystems') {
+        return Promise.resolve({ data: apiEcosystems })
+      }
+
+      if (url === '/ecosystems/eco-1/api-key') {
+        return Promise.reject({ isAxiosError: true, response: { status: 403 } })
+      }
+
+      if (url === '/users') {
+        return Promise.resolve({ data: apiUsers })
+      }
+
+      return Promise.reject(new Error(`Unhandled GET mock for ${url}`))
+    })
+
+    render(<Dashboard />)
+
+    expect(await screen.findByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Recuperar API key/i })[0])
+
+    expect(await screen.findByText(/Tu cuenta no puede completar esta acción/i)).toBeInTheDocument()
+  })
+
+  it('shows not-found style error when API key is unavailable', async () => {
+    mockAuthClaims = {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'USER',
+      email: 'user@aurora.es',
+    }
+
+    mockedApiClient.get.mockImplementation((url: string) => {
+      if (url === '/ecosystems') {
+        return Promise.resolve({ data: apiEcosystems })
+      }
+
+      if (url === '/ecosystems/eco-1/api-key') {
+        return Promise.reject({ isAxiosError: true, response: { status: 404 } })
+      }
+
+      if (url === '/users') {
+        return Promise.resolve({ data: apiUsers })
+      }
+
+      return Promise.reject(new Error(`Unhandled GET mock for ${url}`))
+    })
+
+    render(<Dashboard />)
+
+    expect(await screen.findByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Recuperar API key/i })[0])
+
+    expect(await screen.findByText(/El ecosistema solicitado no está disponible/i)).toBeInTheDocument()
+  })
+
+  it('renders the auditor dashboard content', async () => {
     mockAuthClaims = {
       sub: '71ac8f45-8d9f-4e03-bfdf-3f0c81a4e7f4',
       role: 'AUDITOR',
@@ -275,8 +460,9 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
+    expect(await screen.findByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
+
     expect(screen.getByRole('heading', { level: 2, name: /Todos los ecosistemas/i })).toBeInTheDocument()
-    expect(screen.getByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
     expect(screen.getByText(/Piloto Energético - Albacete/i)).toBeInTheDocument()
     expect(screen.getByText(/Vivienda Segura - Ciudad Real/i)).toBeInTheDocument()
     expect(screen.getAllByText(/Ver detalles/i)).toHaveLength(4)

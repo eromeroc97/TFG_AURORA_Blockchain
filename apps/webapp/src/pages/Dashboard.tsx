@@ -1,4 +1,5 @@
 import { BellRing, Check, Copy, Eye, EyeOff, House, MapPin, Plus, ShieldAlert, Users, Zap } from 'lucide-react'
+import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
@@ -9,7 +10,7 @@ import federLogo from '../assets/FEDER.png'
 import clmLogo from '../assets/CLM.png'
 import { apiClient } from '../api/axios'
 import AccessMap from '../components/dashboard/AccessMap'
-import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem } from '../components/dashboard/access-map.data'
+import { type AccessMapEcosystem } from '../components/dashboard/access-map.data'
 import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
 import { USERS_MOCK } from '../components/dashboard/users.data'
 import { useAuth } from '../context/auth-context'
@@ -45,6 +46,36 @@ type ApiUser = {
   email: string
   role: UserRole
   status: UserStatus
+}
+
+type ApiEcosystem = {
+  id: string
+  name: string
+  ownerId: string
+  did: string | null
+  certificateFingerprint: string | null
+  status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED'
+  latitude: number | null
+  longitude: number | null
+  isOnline: boolean
+  lastSeen: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type CreateEcosystemRequest = {
+  name: string
+  latitude?: number
+  longitude?: number
+}
+
+type CreateEcosystemResponse = ApiEcosystem & {
+  apiKey: string
+}
+
+type EcosystemApiKeyResponse = {
+  ecosystemId: string
+  apiKey: string
 }
 
 type UserOwnedEcosystem = AccessMapEcosystem & {
@@ -94,12 +125,46 @@ const isVisibleUser = (user: Pick<DashboardUser, 'status'>) => user.status !== '
 const getAssignableRoles = (adminRole: AdminRole) =>
   adminRole === 'GLOBAL_ADMIN' ? (['USER', 'AUDITOR', 'ADMIN'] as const) : (['USER', 'AUDITOR'] as const)
 
-const buildApiKey = () => {
-  const randomSegment = () => Math.random().toString(36).slice(2, 10).toUpperCase()
-  return `AUR-${randomSegment()}-${randomSegment()}-${randomSegment()}`
-}
-
 const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 8)}••••••••${apiKey.slice(-6)}`
+
+const mapApiEcosystemToUserOwned = (ecosystem: ApiEcosystem): UserOwnedEcosystem => ({
+  id: ecosystem.id,
+  name: ecosystem.name,
+  ownerId: ecosystem.ownerId,
+  lat: ecosystem.latitude ?? 39.0,
+  lng: ecosystem.longitude ?? -3.9,
+  isShared: false,
+  devices: [],
+  apiKey: null,
+})
+
+const mapApiEcosystemToAccessMap = (ecosystem: ApiEcosystem): AccessMapEcosystem => ({
+  id: ecosystem.id,
+  name: ecosystem.name,
+  ownerId: ecosystem.ownerId,
+  lat: ecosystem.latitude ?? 39.0,
+  lng: ecosystem.longitude ?? -3.9,
+  isShared: false,
+  devices: [],
+})
+
+const getEcosystemErrorMessage = (error: unknown, fallbackMessage: string) => {
+  if (!axios.isAxiosError(error)) {
+    return fallbackMessage
+  }
+
+  const status = error.response?.status
+
+  if (status === 403) {
+    return 'Tu cuenta no puede completar esta acción. Verifica que esté activa y validada.'
+  }
+
+  if (status === 404) {
+    return 'El ecosistema solicitado no está disponible.'
+  }
+
+  return fallbackMessage
+}
 
 export default function Dashboard() {
   const { authClaims } = useAuth()
@@ -126,18 +191,23 @@ export default function Dashboard() {
   const [userSearchTerm, setUserSearchTerm] = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState<UserRoleFilter>('ALL')
   const [userStatusFilter, setUserStatusFilter] = useState<UserStatusFilter>('ALL')
+  const [allEcosystems, setAllEcosystems] = useState<AccessMapEcosystem[]>([])
   const [userOwnedEcosystems, setUserOwnedEcosystems] = useState<UserOwnedEcosystem[]>(() =>
-    ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.ownerId === authenticatedUserId).map((ecosystem) => ({
-      ...ecosystem,
-      apiKey: null,
-    })),
+    [],
   )
+  const [isUserEcosystemsLoading, setIsUserEcosystemsLoading] = useState(false)
+  const [userEcosystemsError, setUserEcosystemsError] = useState<string | null>(null)
   const [isCreateEcosystemModalOpen, setIsCreateEcosystemModalOpen] = useState(false)
   const [createEcosystemStep, setCreateEcosystemStep] = useState<CreateEcosystemStep>('form')
+  const [isCreatingEcosystem, setIsCreatingEcosystem] = useState(false)
+  const [createEcosystemError, setCreateEcosystemError] = useState<string | null>(null)
   const [newEcosystemName, setNewEcosystemName] = useState('')
   const [newEcosystemApiKey, setNewEcosystemApiKey] = useState<string | null>(null)
   const [newEcosystemId, setNewEcosystemId] = useState<string | null>(null)
   const [revealedApiKeysByEcosystemId, setRevealedApiKeysByEcosystemId] = useState<Record<string, boolean>>({})
+  const [apiKeysByEcosystemId, setApiKeysByEcosystemId] = useState<Record<string, string>>({})
+  const [apiKeyLoadingByEcosystemId, setApiKeyLoadingByEcosystemId] = useState<Record<string, boolean>>({})
+  const [apiKeyErrorByEcosystemId, setApiKeyErrorByEcosystemId] = useState<Record<string, string | null>>({})
   const [copiedKeyTag, setCopiedKeyTag] = useState<string | null>(null)
 
   const copyToClipboard = async (value: string, tag: string) => {
@@ -155,6 +225,8 @@ export default function Dashboard() {
   const closeCreateEcosystemModal = () => {
     setIsCreateEcosystemModalOpen(false)
     setCreateEcosystemStep('form')
+    setCreateEcosystemError(null)
+    setIsCreatingEcosystem(false)
     setNewEcosystemName('')
     setNewEcosystemApiKey(null)
     setNewEcosystemId(null)
@@ -162,61 +234,145 @@ export default function Dashboard() {
 
   const openCreateEcosystemModal = () => {
     setCreateEcosystemStep('form')
+    setCreateEcosystemError(null)
+    setIsCreatingEcosystem(false)
     setNewEcosystemName('')
     setNewEcosystemApiKey(null)
     setNewEcosystemId(null)
     setIsCreateEcosystemModalOpen(true)
   }
 
-  const handleRegisterEcosystem = () => {
+  const fetchEcosystemApiKey = async (ecosystemId: string) => {
+    const cachedApiKey = apiKeysByEcosystemId[ecosystemId]
+
+    if (cachedApiKey) {
+      return cachedApiKey
+    }
+
+    setApiKeyLoadingByEcosystemId((currentMap) => ({
+      ...currentMap,
+      [ecosystemId]: true,
+    }))
+    setApiKeyErrorByEcosystemId((currentMap) => ({
+      ...currentMap,
+      [ecosystemId]: null,
+    }))
+
+    try {
+      const response = await apiClient.get<EcosystemApiKeyResponse>(`/ecosystems/${ecosystemId}/api-key`)
+      const recoveredApiKey = response.data.apiKey
+
+      setApiKeysByEcosystemId((currentMap) => ({
+        ...currentMap,
+        [ecosystemId]: recoveredApiKey,
+      }))
+
+      return recoveredApiKey
+    } catch (error) {
+      const errorMessage = getEcosystemErrorMessage(
+        error,
+        'No se pudo recuperar la API key del ecosistema.',
+      )
+
+      setApiKeyErrorByEcosystemId((currentMap) => ({
+        ...currentMap,
+        [ecosystemId]: errorMessage,
+      }))
+
+      return null
+    } finally {
+      setApiKeyLoadingByEcosystemId((currentMap) => ({
+        ...currentMap,
+        [ecosystemId]: false,
+      }))
+    }
+  }
+
+  const handleRegisterEcosystem = async () => {
     const ecosystemName = newEcosystemName.trim()
 
     if (!ecosystemName || !authenticatedUserId) {
       return
     }
 
-    const apiKey = buildApiKey()
-    const ecosystemId = `eco-user-${Date.now()}`
+    setIsCreatingEcosystem(true)
+    setCreateEcosystemError(null)
 
-    setUserOwnedEcosystems((currentEcosystems) => [
-      {
-        id: ecosystemId,
+    try {
+      const payload: CreateEcosystemRequest = {
         name: ecosystemName,
-        ownerId: authenticatedUserId,
-        lat: 39.0,
-        lng: -3.9,
-        isShared: false,
-        devices: [],
-        apiKey,
-      },
-      ...currentEcosystems,
-    ])
+      }
 
-    setNewEcosystemApiKey(apiKey)
-    setNewEcosystemId(ecosystemId)
-    setCreateEcosystemStep('result')
+      const response = await apiClient.post<CreateEcosystemResponse>('/ecosystems', payload)
+      const createdEcosystem = mapApiEcosystemToUserOwned(response.data)
+      const createdMapEcosystem = mapApiEcosystemToAccessMap(response.data)
+
+      setUserOwnedEcosystems((currentEcosystems) => {
+        const withoutDuplicates = currentEcosystems.filter(
+          (ecosystem) => ecosystem.id !== createdEcosystem.id,
+        )
+
+        return [createdEcosystem, ...withoutDuplicates]
+      })
+      setAllEcosystems((currentEcosystems) => {
+        const withoutDuplicates = currentEcosystems.filter(
+          (ecosystem) => ecosystem.id !== createdMapEcosystem.id,
+        )
+
+        return [createdMapEcosystem, ...withoutDuplicates]
+      })
+      setApiKeysByEcosystemId((currentMap) => ({
+        ...currentMap,
+        [createdEcosystem.id]: response.data.apiKey,
+      }))
+      setNewEcosystemApiKey(response.data.apiKey)
+      setNewEcosystemId(createdEcosystem.id)
+      setCreateEcosystemStep('result')
+    } catch (error) {
+      setCreateEcosystemError(
+        getEcosystemErrorMessage(error, 'No se pudo registrar el ecosistema. Inténtalo de nuevo.'),
+      )
+    } finally {
+      setIsCreatingEcosystem(false)
+    }
   }
 
-  const toggleApiKeyVisibility = (ecosystemId: string) => {
+  const toggleApiKeyVisibility = async (ecosystemId: string) => {
+    const nextIsVisible = !revealedApiKeysByEcosystemId[ecosystemId]
+
     setRevealedApiKeysByEcosystemId((currentMap) => ({
       ...currentMap,
-      [ecosystemId]: !currentMap[ecosystemId],
+      [ecosystemId]: nextIsVisible,
     }))
+
+    if (nextIsVisible) {
+      await fetchEcosystemApiKey(ecosystemId)
+    }
   }
 
-  const userSharedEcosystems = useMemo(() => {
-    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.isShared && ecosystem.ownerId !== authClaims?.sub)
-  }, [authClaims?.sub])
+  const handleCopyEcosystemApiKey = async (ecosystemId: string) => {
+    const apiKey = apiKeysByEcosystemId[ecosystemId] ?? (await fetchEcosystemApiKey(ecosystemId))
+
+    if (!apiKey) {
+      return
+    }
+
+    await copyToClipboard(apiKey, `list-${ecosystemId}`)
+  }
+
+  const userSharedEcosystems = useMemo<AccessMapEcosystem[]>(() => {
+    return []
+  }, [])
 
   const accessibleEcosystems = useMemo(() => {
     const canViewAll = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
     if (canViewAll) {
-      return ACCESS_MAP_ECOSYSTEMS_MOCK
+      return allEcosystems
     }
 
     return [...userOwnedEcosystems, ...userSharedEcosystems]
-  }, [role, userOwnedEcosystems, userSharedEcosystems])
+  }, [allEcosystems, role, userOwnedEcosystems, userSharedEcosystems])
 
   const instantiatedEcosystemsCount = useMemo(() => {
     return accessibleEcosystems.length
@@ -246,7 +402,7 @@ export default function Dashboard() {
         value: String(securityAlertsCount),
         icon: BellRing,
         emphasizeValue: true,
-        valueClassName: 'text-rose-600',
+        valueClassName: securityAlertsCount === 0 ? 'text-emerald-600' : 'text-rose-600',
       },
       {
         label: 'Threat Intelligence',
@@ -258,11 +414,6 @@ export default function Dashboard() {
     ],
     [instantiatedEcosystemsCount, securityAlertsCount],
   )
-
-  // AUDITOR Dashboard: Todos los ecosistemas
-  const allEcosystems = useMemo(() => {
-    return ACCESS_MAP_ECOSYSTEMS_MOCK
-  }, [])
 
   // ADMIN Dashboard: Usuarios
   const users = useMemo(() => {
@@ -335,6 +486,53 @@ export default function Dashboard() {
 
     return []
   }, [role])
+
+  useEffect(() => {
+    if (!authenticatedUserId) {
+      return
+    }
+
+    let isMounted = true
+
+    const loadUserEcosystems = async () => {
+      setIsUserEcosystemsLoading(true)
+      setUserEcosystemsError(null)
+
+      try {
+        const response = await apiClient.get<ApiEcosystem[]>('/ecosystems')
+
+        if (!isMounted) {
+          return
+        }
+
+        const ownedEcosystems = response.data
+          .filter((ecosystem) => ecosystem.ownerId === authenticatedUserId)
+          .map(mapApiEcosystemToUserOwned)
+        const mappedEcosystems = response.data.map(mapApiEcosystemToAccessMap)
+
+        setAllEcosystems(mappedEcosystems)
+        setUserOwnedEcosystems(ownedEcosystems)
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        setAllEcosystems([])
+        setUserOwnedEcosystems([])
+        setUserEcosystemsError('No se pudieron cargar tus ecosistemas desde el backend.')
+      } finally {
+        if (isMounted) {
+          setIsUserEcosystemsLoading(false)
+        }
+      }
+    }
+
+    void loadUserEcosystems()
+
+    return () => {
+      isMounted = false
+    }
+  }, [authenticatedUserId])
 
   useEffect(() => {
     if (!canManageUsers) {
@@ -561,6 +759,8 @@ export default function Dashboard() {
           </button>
         </div>
         <p className="mt-3 text-xs text-muted">Ecosistemas que has creado y administras</p>
+        {userEcosystemsError ? <p className="mt-2 text-xs text-amber-700">{userEcosystemsError}</p> : null}
+        {isUserEcosystemsLoading ? <p className="mt-2 text-xs text-muted">Cargando ecosistemas...</p> : null}
 
         <div className="mt-6 space-y-3">
           {userOwnedEcosystems.length > 0 ? (
@@ -572,19 +772,21 @@ export default function Dashboard() {
                 <div>
                   <p className="font-medium text-primary">{ecosystem.name}</p>
                   <p className="text-xs text-muted mt-1">{ecosystem.devices.length} dispositivos</p>
-                  {ecosystem.apiKey ? (
+                  {apiKeysByEcosystemId[ecosystem.id] ? (
                     <div className="mt-2 flex items-center gap-2 text-xs">
                       <button
                         type="button"
-                        onClick={() => toggleApiKeyVisibility(ecosystem.id)}
+                        onClick={() => void toggleApiKeyVisibility(ecosystem.id)}
                         className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-muted transition-colors hover:text-primary"
                       >
                         {revealedApiKeysByEcosystemId[ecosystem.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                        {revealedApiKeysByEcosystemId[ecosystem.id] ? ecosystem.apiKey : maskApiKey(ecosystem.apiKey)}
+                        {revealedApiKeysByEcosystemId[ecosystem.id]
+                          ? apiKeysByEcosystemId[ecosystem.id]
+                          : maskApiKey(apiKeysByEcosystemId[ecosystem.id])}
                       </button>
                       <button
                         type="button"
-                        onClick={() => void copyToClipboard(ecosystem.apiKey as string, `list-${ecosystem.id}`)}
+                        onClick={() => void handleCopyEcosystemApiKey(ecosystem.id)}
                         className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-muted transition-colors hover:text-primary"
                       >
                         {copiedKeyTag === `list-${ecosystem.id}` ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -592,7 +794,19 @@ export default function Dashboard() {
                       </button>
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs text-muted">API Key: pendiente de generación</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={apiKeyLoadingByEcosystemId[ecosystem.id]}
+                        onClick={() => void fetchEcosystemApiKey(ecosystem.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-muted transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {apiKeyLoadingByEcosystemId[ecosystem.id] ? 'Recuperando API key...' : 'Recuperar API key'}
+                      </button>
+                      {apiKeyErrorByEcosystemId[ecosystem.id] ? (
+                        <p className="text-xs text-rose-600">{apiKeyErrorByEcosystemId[ecosystem.id]}</p>
+                      ) : null}
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -695,6 +909,7 @@ export default function Dashboard() {
                 <p className="mt-2 text-xs text-muted">
                   Al confirmar, se generará una API key única para este ecosistema.
                 </p>
+                {createEcosystemError ? <p className="mt-2 text-xs text-rose-600">{createEcosystemError}</p> : null}
               </div>
             ) : null}
 
@@ -749,10 +964,11 @@ export default function Dashboard() {
               {createEcosystemStep === 'confirm' ? (
                 <button
                   type="button"
-                  onClick={handleRegisterEcosystem}
-                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                  disabled={isCreatingEcosystem}
+                  onClick={() => void handleRegisterEcosystem()}
+                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Confirmar y generar API key
+                  {isCreatingEcosystem ? 'Creando ecosistema...' : 'Confirmar y generar API key'}
                 </button>
               ) : null}
             </div>
@@ -1105,7 +1321,7 @@ export default function Dashboard() {
         <p className="mt-3 text-xs text-muted">Lista general de ecosistemas (sin información de dispositivos)</p>
 
         <div className="mt-6 space-y-3">
-          {ACCESS_MAP_ECOSYSTEMS_MOCK.map((ecosystem) => (
+          {allEcosystems.map((ecosystem) => (
             <div
               key={ecosystem.id}
               className="flex items-center justify-between rounded-lg border border-border/50 bg-surface/30 p-4 hover:border-border hover:bg-surface/50 transition-colors"
@@ -1173,7 +1389,7 @@ export default function Dashboard() {
           Vista geoespacial de ecosistemas instanciados en AURORA.
         </p>
 
-        <AccessMap ecosystems={ACCESS_MAP_ECOSYSTEMS_MOCK} />
+        <AccessMap ecosystems={accessibleEcosystems} />
       </article>
 
       <article className="scroll-mt-28 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
