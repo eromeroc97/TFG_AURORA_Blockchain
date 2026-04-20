@@ -578,6 +578,11 @@ describe('UsersService', () => {
         status: UserStatus.ACTIVE,
         isActive: true,
       });
+      mockRandomBytes.mockReturnValue(Buffer.from('verify-token-123') as never);
+      mockHash.mockResolvedValue('hashed_verify_token' as never);
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue(null);
+      prismaServiceMock.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+      prismaServiceMock.passwordResetToken.create.mockResolvedValue({ id: 'verify-token-id' });
       mailServiceMock.sendVerifyEmail.mockResolvedValue(undefined);
 
       const result = await service.approveUser(
@@ -624,7 +629,7 @@ describe('UsersService', () => {
       });
       expect(mailServiceMock.sendVerifyEmail).toHaveBeenCalledWith(
         createdUserRecord.email,
-        'http://localhost/reset-password?token=mock-token',
+        expect.stringContaining('?token='),
       );
       expect(result.status).toBe(UserStatus.ACTIVE);
     });
@@ -686,6 +691,11 @@ describe('UsersService', () => {
         isActive: true,
         did: issuedDid,
       });
+      mockRandomBytes.mockReturnValue(Buffer.from('verify-token-123') as never);
+      mockHash.mockResolvedValue('hashed_verify_token' as never);
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue(null);
+      prismaServiceMock.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+      prismaServiceMock.passwordResetToken.create.mockResolvedValue({ id: 'verify-token-id' });
       mailServiceMock.sendVerifyEmail.mockRejectedValue(new Error('smtp down'));
 
       await expect(

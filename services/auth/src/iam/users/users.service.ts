@@ -295,6 +295,11 @@ export class UsersService {
       return;
     }
 
+    const actionUrl = await this.issuePasswordResetActionUrl(user.id);
+    await this.mailService.sendRecoverEmail(user.email, actionUrl);
+  }
+
+  private async issuePasswordResetActionUrl(userId: string): Promise<string> {
     const { rawToken, tokenFingerprint } = await this.generateUniqueResetTokenCandidate();
     const tokenHash = await argon2.hash(rawToken);
     const now = new Date();
@@ -302,7 +307,7 @@ export class UsersService {
     await this.prisma.$transaction([
       this.prisma.passwordResetToken.updateMany({
         where: {
-          userId: user.id,
+          userId,
           usedAt: null,
         },
         data: {
@@ -311,7 +316,7 @@ export class UsersService {
       }),
       this.prisma.passwordResetToken.create({
         data: {
-          userId: user.id,
+          userId,
           tokenHash,
           tokenFingerprint,
           createdAt: now,
@@ -319,8 +324,7 @@ export class UsersService {
       }),
     ]);
 
-    const actionUrl = this.createResetActionUrl(rawToken);
-    await this.mailService.sendRecoverEmail(user.email, actionUrl);
+    return this.createResetActionUrl(rawToken);
   }
 
   async consumePasswordResetToken(rawToken: string, newPassword: string): Promise<void> {
@@ -708,10 +712,8 @@ export class UsersService {
       select: this.userSelect,
     });
 
-    await this.mailService.sendVerifyEmail(
-      user.email,
-      'http://localhost/reset-password?token=mock-token',
-    );
+    const actionUrl = await this.issuePasswordResetActionUrl(user.id);
+    await this.mailService.sendVerifyEmail(user.email, actionUrl);
 
     return approvedUser;
   }
