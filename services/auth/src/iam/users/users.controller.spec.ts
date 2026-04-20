@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Role } from '@prisma/client';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
-import { ApproveUserDto } from './dto/approve-user.dto';
 import { ChangeRoleDto } from './dto/change-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -18,6 +17,13 @@ describe('UsersController', () => {
     changeRole: ReturnType<typeof jest.fn>;
     approveUser: ReturnType<typeof jest.fn>;
     remove: ReturnType<typeof jest.fn>;
+  };
+
+  const adminRequest = {
+    user: {
+      sub: 'admin-user-id',
+      role: Role.ADMIN,
+    },
   };
 
   const usersServiceMock = {
@@ -74,17 +80,21 @@ describe('UsersController', () => {
 
   describe('findAll', () => {
     it('should call UsersService.findAll', () => {
-      controller.findAll();
+      controller.findAll(adminRequest);
 
-      expect(usersService.findAll).toHaveBeenCalled();
+      expect(usersService.findAll).toHaveBeenCalledWith(adminRequest.user.role, adminRequest.user.sub);
     });
   });
 
   describe('findOne', () => {
     it('should call UsersService.findOne', () => {
-      controller.findOne('11111111-1111-1111-1111-111111111111');
+      controller.findOne('11111111-1111-1111-1111-111111111111', adminRequest);
 
-      expect(usersService.findOne).toHaveBeenCalled();
+      expect(usersService.findOne).toHaveBeenCalledWith(
+        '11111111-1111-1111-1111-111111111111',
+        adminRequest.user.role,
+        adminRequest.user.sub,
+      );
     });
   });
 
@@ -100,12 +110,12 @@ describe('UsersController', () => {
 
   describe('remove', () => {
     it('should call UsersService.remove with self requester by default', () => {
-      controller.remove('11111111-1111-1111-1111-111111111111');
+      controller.remove('11111111-1111-1111-1111-111111111111', adminRequest);
 
       expect(usersService.remove).toHaveBeenCalledWith(
         '11111111-1111-1111-1111-111111111111',
-        '11111111-1111-1111-1111-111111111111',
-        undefined,
+        adminRequest.user.sub,
+        adminRequest.user.role,
       );
     });
   });
@@ -114,24 +124,25 @@ describe('UsersController', () => {
     it('should call UsersService.changeRole', () => {
       const dto: ChangeRoleDto = { newRole: Role.ADMIN };
 
-      controller.changeRole('11111111-1111-1111-1111-111111111111', dto);
+      controller.changeRole('11111111-1111-1111-1111-111111111111', dto, adminRequest);
 
       expect(usersService.changeRole).toHaveBeenCalledWith(
         '11111111-1111-1111-1111-111111111111',
         Role.ADMIN,
+        adminRequest.user.sub,
+        adminRequest.user.role,
       );
     });
   });
 
   describe('approveUser', () => {
     it('should call UsersService.approveUser', () => {
-      const dto: ApproveUserDto = { adminDid: 'did:firefly:custom/admin@aurora.local' };
-
-      controller.approveUser('11111111-1111-1111-1111-111111111111', dto);
+      controller.approveUser('11111111-1111-1111-1111-111111111111', adminRequest);
 
       expect(usersService.approveUser).toHaveBeenCalledWith(
         '11111111-1111-1111-1111-111111111111',
-        'did:firefly:custom/admin@aurora.local',
+        adminRequest.user.sub,
+        adminRequest.user.role,
       );
     });
   });
@@ -149,7 +160,7 @@ describe('UsersController', () => {
        * Solo usuarios con Role.ADMIN o Role.GLOBAL_ADMIN pueden acceder.
        */
       const dto: ChangeRoleDto = { newRole: Role.ADMIN };
-      controller.changeRole('user-id-123', dto);
+      controller.changeRole('user-id-123', dto, adminRequest);
 
       expect(usersService.changeRole).toHaveBeenCalled();
     });
@@ -159,8 +170,7 @@ describe('UsersController', () => {
        * El decorador @UseGuards(JwtAuthGuard, RolesGuard) protege este endpoint.
        * Solo usuarios con Role.GLOBAL_ADMIN o Role.ADMIN pueden acceder.
        */
-      const dto: ApproveUserDto = { adminDid: 'did:firefly:custom/admin@aurora.local' };
-      controller.approveUser('pending-user-id', dto);
+      controller.approveUser('pending-user-id', adminRequest);
 
       expect(usersService.approveUser).toHaveBeenCalled();
     });
@@ -171,9 +181,7 @@ describe('UsersController', () => {
        * Requiere JWT válido pero cualquier usuario autenticado puede intentar borrar su cuenta.
        * La lógica de autorización (self/admin) está en UsersService.
        */
-      controller.remove('user-id-123', {
-        requesterId: 'user-id-123',
-      });
+      controller.remove('user-id-123', adminRequest);
 
       expect(usersService.remove).toHaveBeenCalled();
     });

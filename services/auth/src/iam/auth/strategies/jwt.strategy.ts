@@ -26,7 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string; role: string; did: string | null }) {
+  async validate(payload: { sub: string; email: string; role: string }) {
     const isBlacklisted = await this.redisService.isBlacklisted(payload.sub);
     if (isBlacklisted) {
       throw new UnauthorizedException('La sesión ha sido revocada o finalizada.');

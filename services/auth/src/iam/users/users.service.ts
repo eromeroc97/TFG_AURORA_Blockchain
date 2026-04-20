@@ -32,7 +32,6 @@ export class UsersService {
     role: true,
     status: true,
     isActive: true,
-    did: true,
     createdAt: true,
     updatedAt: true,
   } as const;
@@ -52,6 +51,73 @@ export class UsersService {
 
   private isNotFoundError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+  }
+
+  private isAdminRole(role?: Role): boolean {
+    return role === Role.ADMIN || role === Role.GLOBAL_ADMIN;
+  }
+
+  private assertPrivilegedRole(role?: Role) {
+    if (!this.isAdminRole(role)) {
+      throw new ForbiddenException('No tienes permisos para gestionar usuarios');
+    }
+  }
+
+  private assertCanViewTarget(actorRole: Role | undefined, actorId: string | undefined, target: { id: string; role: Role }) {
+    this.assertPrivilegedRole(actorRole);
+
+    if (target.id === actorId) {
+      throw new ForbiddenException('No puedes gestionar tu propio usuario desde esta vista');
+    }
+
+    if (actorRole === Role.ADMIN && target.role === Role.GLOBAL_ADMIN) {
+      throw new ForbiddenException('No tienes permisos para gestionar este usuario');
+    }
+  }
+
+  private assertCanManageRoleChange(actorRole: Role | undefined, targetRole: Role, newRole: Role) {
+    this.assertPrivilegedRole(actorRole);
+
+    if (newRole === Role.GLOBAL_ADMIN) {
+      throw new ForbiddenException(
+        'No se puede asignar el rol GLOBAL_ADMIN a través de la API.',
+      );
+    }
+
+    if (actorRole === Role.ADMIN) {
+      if (targetRole === Role.ADMIN || targetRole === Role.GLOBAL_ADMIN) {
+        throw new ForbiddenException('No puedes modificar el rol de usuarios administradores');
+      }
+
+      if (newRole === Role.ADMIN) {
+        throw new ForbiddenException('No tienes permisos para asignar el rol ADMIN');
+      }
+    }
+  }
+
+  private assertCanRevoke(actorRole: Role | undefined, targetRole: Role) {
+    if (actorRole === Role.ADMIN && (targetRole === Role.ADMIN || targetRole === Role.GLOBAL_ADMIN)) {
+      throw new ForbiddenException('No puedes revocar cuentas de administradores');
+    }
+  }
+
+  private async resolveActorDid(actorId: string): Promise<string> {
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorId },
+      select: {
+        did: true,
+      },
+    });
+
+    if (!actor) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!actor.did?.trim()) {
+      throw new BadRequestException('El usuario administrador debe tener DID para aprobar altas');
+    }
+
+    return actor.did.trim();
   }
 
   private async assertPasswordNotPwned(password: string) {
@@ -229,6 +295,11 @@ export class UsersService {
       return;
     }
 
+    const actionUrl = await this.issuePasswordResetActionUrl(user.id);
+    await this.mailService.sendRecoverEmail(user.email, actionUrl);
+  }
+
+  private async issuePasswordResetActionUrl(userId: string): Promise<string> {
     const { rawToken, tokenFingerprint } = await this.generateUniqueResetTokenCandidate();
     const tokenHash = await argon2.hash(rawToken);
     const now = new Date();
@@ -236,7 +307,7 @@ export class UsersService {
     await this.prisma.$transaction([
       this.prisma.passwordResetToken.updateMany({
         where: {
-          userId: user.id,
+          userId,
           usedAt: null,
         },
         data: {
@@ -245,7 +316,7 @@ export class UsersService {
       }),
       this.prisma.passwordResetToken.create({
         data: {
-          userId: user.id,
+          userId,
           tokenHash,
           tokenFingerprint,
           createdAt: now,
@@ -253,8 +324,7 @@ export class UsersService {
       }),
     ]);
 
-    const actionUrl = this.createResetActionUrl(rawToken);
-    await this.mailService.sendRecoverEmail(user.email, actionUrl);
+    return this.createResetActionUrl(rawToken);
   }
 
   async consumePasswordResetToken(rawToken: string, newPassword: string): Promise<void> {
@@ -351,14 +421,36 @@ export class UsersService {
     }
   }
 
-  findAll() {
+  findAll(actorRole?: Role, actorId?: string) {
+    this.assertPrivilegedRole(actorRole);
+
+    const where: Prisma.UserWhereInput = {
+      status: {
+        not: UserStatus.REVOKED,
+      },
+      id: actorId
+        ? {
+            not: actorId,
+          }
+        : undefined,
+      role:
+        actorRole === Role.ADMIN
+          ? {
+              not: Role.GLOBAL_ADMIN,
+            }
+          : undefined,
+    };
+
     return this.prisma.user.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       select: this.userSelect,
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actorRole?: Role, actorId?: string) {
+    this.assertPrivilegedRole(actorRole);
+
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: this.userSelect,
@@ -367,6 +459,15 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    if (user.status === UserStatus.REVOKED) {
+      throw new NotFoundException('User not found');
+    }
+
+    this.assertCanViewTarget(actorRole, actorId, {
+      id: user.id,
+      role: user.role,
+    });
 
     return user;
   }
@@ -452,6 +553,10 @@ export class UsersService {
       requesterRole === Role.ADMIN || requesterRole === Role.GLOBAL_ADMIN;
     const isSelfRequester = requesterId === id;
 
+    if (isAdminRequester && isSelfRequester) {
+      throw new ForbiddenException('No puedes revocar tu propia cuenta desde este endpoint');
+    }
+
     if (!isAdminRequester && !isSelfRequester) {
       throw new ForbiddenException('No tienes permisos para revocar esta cuenta');
     }
@@ -463,6 +568,7 @@ export class UsersService {
         email: true,
         status: true,
         did: true,
+        role: true,
       },
     });
 
@@ -472,6 +578,10 @@ export class UsersService {
 
     if (user.status === UserStatus.REVOKED) {
       throw new ConflictException('El usuario ya ha sido revocado');
+    }
+
+    if (isAdminRequester) {
+      this.assertCanRevoke(requesterRole, user.role);
     }
 
     try {
@@ -498,11 +608,15 @@ export class UsersService {
     }
   }
 
-  async changeRole(targetUserId: string, newRole: Role) {
-    if (newRole === Role.GLOBAL_ADMIN) {
-      throw new ForbiddenException(
-        'No se puede asignar el rol GLOBAL_ADMIN a través de la API.',
-      );
+  async changeRole(targetUserId: string, newRole: Role, actorId?: string, actorRole?: Role) {
+    this.assertPrivilegedRole(actorRole);
+
+    if (!actorId) {
+      throw new ForbiddenException('No se pudo identificar al usuario autenticado');
+    }
+
+    if (targetUserId === actorId) {
+      throw new ForbiddenException('No puedes modificar tu propio rol');
     }
 
     const currentUser = await this.prisma.user.findUnique({
@@ -511,12 +625,19 @@ export class UsersService {
         id: true,
         email: true,
         role: true,
+        status: true,
       },
     });
 
     if (!currentUser) {
       throw new NotFoundException('User not found');
     }
+
+    if (currentUser.status === UserStatus.REVOKED) {
+      throw new ConflictException('No se puede modificar el rol de un usuario revocado');
+    }
+
+    this.assertCanManageRoleChange(actorRole, currentUser.role, newRole);
 
     try {
       const updatedUser = await this.prisma.user.update({
@@ -541,13 +662,26 @@ export class UsersService {
     }
   }
 
-  async approveUser(id: string, adminDid: string) {
+  async approveUser(id: string, actorId?: string, actorRole?: Role) {
+    this.assertPrivilegedRole(actorRole);
+
+    if (!actorId) {
+      throw new ForbiddenException('No se pudo identificar al usuario autenticado');
+    }
+
+    if (id === actorId) {
+      throw new ForbiddenException('No puedes aprobar tu propia cuenta');
+    }
+
+    const adminDid = await this.resolveActorDid(actorId);
+
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
         id: true,
         email: true,
         status: true,
+        role: true,
       },
     });
 
@@ -557,6 +691,10 @@ export class UsersService {
 
     if (user.status !== UserStatus.PENDING) {
       throw new ConflictException('El usuario no está en PENDING');
+    }
+
+    if (actorRole === Role.ADMIN && (user.role === Role.ADMIN || user.role === Role.GLOBAL_ADMIN)) {
+      throw new ForbiddenException('No puedes aprobar cuentas de administradores');
     }
 
     const userDid = await this.blockchainService.createIdentity({
@@ -574,10 +712,8 @@ export class UsersService {
       select: this.userSelect,
     });
 
-    await this.mailService.sendVerifyEmail(
-      user.email,
-      'http://localhost/reset-password?token=mock-token',
-    );
+    const actionUrl = await this.issuePasswordResetActionUrl(user.id);
+    await this.mailService.sendVerifyEmail(user.email, actionUrl);
 
     return approvedUser;
   }

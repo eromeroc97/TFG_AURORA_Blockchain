@@ -10,7 +10,6 @@ interface AuthPayload {
 	sub: string;
 	email: string;
 	role: string;
-	did: string | null;
 }
 
 const decodePublicKey = (rawValue: string | undefined): string => {
@@ -78,12 +77,11 @@ export class AuthService {
 		}
 	}
 
-	async generateTokens(user: { id: string; email: string; role: string; did: string | null }) {
+	async generateTokens(user: { id: string; email: string; role: string }) {
 		const payload: AuthPayload = {
 			sub: user.id,
 			email: user.email,
 			role: user.role,
-			did: user.did,
 		};
 		const refreshTokenExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as StringValue;
 
@@ -132,7 +130,7 @@ export class AuthService {
 		await this.usersService.updateRefreshTokenHash(userId, hashedRefreshToken);
 	}
 
-	async login(user: { id: string; email: string; role: string; did: string | null }) {
+	async login(user: { id: string; email: string; role: string }) {
 		const tokens = await this.generateTokens(user);
 		await this.updateRefreshToken(user.id, tokens.refreshToken);
 		return tokens;
