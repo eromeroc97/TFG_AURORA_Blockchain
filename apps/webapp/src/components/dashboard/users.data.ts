@@ -3,7 +3,7 @@ export type User = {
   email: string
   name: string
   role: 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
-  status: 'active' | 'inactive' | 'revoked'
+  status: 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED'
   createdAt: string
 }
 
@@ -13,7 +13,7 @@ export const USERS_MOCK: User[] = [
     email: 'user1@aurora.local',
     name: 'Juan García',
     role: 'USER',
-    status: 'active',
+    status: 'ACTIVE',
     createdAt: '2024-01-15',
   },
   {
@@ -21,7 +21,7 @@ export const USERS_MOCK: User[] = [
     email: 'auditor@aurora.local',
     name: 'María López',
     role: 'AUDITOR',
-    status: 'active',
+    status: 'ACTIVE',
     createdAt: '2024-01-10',
   },
   {
@@ -29,7 +29,7 @@ export const USERS_MOCK: User[] = [
     email: 'admin@aurora.local',
     name: 'Carlos Rodríguez',
     role: 'ADMIN',
-    status: 'active',
+    status: 'ACTIVE',
     createdAt: '2023-12-01',
   },
   {
@@ -37,7 +37,7 @@ export const USERS_MOCK: User[] = [
     email: 'user2@aurora.local',
     name: 'Ana Martínez',
     role: 'USER',
-    status: 'inactive',
+    status: 'PENDING',
     createdAt: '2024-02-05',
   },
   {
@@ -45,7 +45,7 @@ export const USERS_MOCK: User[] = [
     email: 'user3@aurora.local',
     name: 'Pedro Sánchez',
     role: 'USER',
-    status: 'revoked',
+    status: 'REVOKED',
     createdAt: '2024-01-20',
   },
   {
@@ -53,7 +53,7 @@ export const USERS_MOCK: User[] = [
     email: 'auditor2@aurora.local',
     name: 'Isabel Fernández',
     role: 'AUDITOR',
-    status: 'active',
+    status: 'ACTIVE',
     createdAt: '2024-01-22',
   },
 ]

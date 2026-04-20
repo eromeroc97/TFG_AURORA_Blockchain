@@ -56,7 +56,7 @@ describe('Account page', () => {
     })
 
     expect(screen.getByDisplayValue('investigador@gsya.es')).toBeInTheDocument()
-    expect(screen.getByText('123e4567-e89b-12d3-a456-426614174000')).toBeInTheDocument()
+    expect(screen.queryByText('123e4567-e89b-12d3-a456-426614174000')).not.toBeInTheDocument()
     expect(screen.getByText(/Se ha detectado un identificador de cuenta en la URL/i)).toBeInTheDocument()
   })
 

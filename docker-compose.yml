@@ -205,6 +205,7 @@ services:
       - ./services/auth/.env
     environment:
       ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
     ports:
       - "5341:5341"
       - "8081:80"

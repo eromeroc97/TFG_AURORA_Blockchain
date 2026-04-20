@@ -1,8 +1,8 @@
 import L from 'leaflet'
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Brain, House } from 'lucide-react'
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAuth } from '../../context/auth-context'
 import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem } from './access-map.data'
@@ -13,7 +13,7 @@ type AccessMapProps = {
   ecosystems?: AccessMapEcosystem[]
 }
 
-const CENTRAL_BRAIN_COORDS: [number, number] = [38.991, -3.921]
+const CENTRAL_BRAIN_COORDS: [number, number] = [38.99009855762482, -3.920457433978659]
 
 const createHouseIcon = (isOwned: boolean) =>
   L.divIcon({
@@ -66,32 +66,6 @@ const centralShieldIcon = L.divIcon({
   popupAnchor: [0, -20],
 })
 
-function MapViewportUpdater({ points }: { points: Array<[number, number]> }) {
-  const map = useMap()
-
-  useEffect(() => {
-    if (points.length === 0) {
-      map.setView(CENTRAL_BRAIN_COORDS, 6, { animate: true })
-      return
-    }
-
-    const bounds = L.latLngBounds(points)
-
-    if (points.length === 1) {
-      map.setView(points[0], 8, { animate: true })
-      return
-    }
-
-    map.fitBounds(bounds, {
-      padding: [32, 32],
-      maxZoom: 9,
-      animate: true,
-    })
-  }, [map, points])
-
-  return null
-}
-
 export default function AccessMap({ ecosystems }: AccessMapProps) {
   const { authClaims } = useAuth()
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole
@@ -105,14 +79,6 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
 
     return sourceNodes
   }, [currentUserId, role, sourceNodes])
-
-  const mapPoints = useMemo(() => {
-    const ecosystemPoints = visibleNodes.map((node) => [node.lat, node.lng] as [number, number])
-
-    return role === 'GLOBAL_ADMIN'
-      ? [...ecosystemPoints, CENTRAL_BRAIN_COORDS]
-      : ecosystemPoints
-  }, [role, visibleNodes])
 
   const canViewDevices = (node: AccessMapEcosystem) => {
     if (role === 'AUDITOR') {
@@ -131,12 +97,9 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
       <MapContainer
         center={CENTRAL_BRAIN_COORDS}
         zoom={6}
-        maxZoom={10}
         scrollWheelZoom
         className="h-full w-full"
       >
-        <MapViewportUpdater points={mapPoints} />
-
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"

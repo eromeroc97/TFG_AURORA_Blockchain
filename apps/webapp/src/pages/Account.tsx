@@ -6,7 +6,6 @@ import { useAuth } from '../context/auth-context'
 type UserAccount = {
   email: string
   role: string
-  uuid: string
 }
 
 export default function AccountPage() {
@@ -26,7 +25,6 @@ export default function AccountPage() {
       setUser({
         email: authClaims.email,
         role: authClaims.role,
-        uuid: authClaims.sub,
       })
     }
   }, [authClaims])
@@ -155,11 +153,6 @@ export default function AccountPage() {
               />
             </div>
           </label>
-
-          <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3 text-xs text-slate-500 shadow-sm">
-            <p className="font-semibold text-slate-900">UUID interno</p>
-            <p className="mt-1 break-all font-mono text-[0.78rem] text-slate-600">{user.uuid}</p>
-          </div>
         </div>
       </section>
 
