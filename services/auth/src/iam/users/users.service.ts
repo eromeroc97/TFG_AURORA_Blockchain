@@ -296,16 +296,23 @@ export class UsersService {
       return;
     }
 
-    const actionUrl = await this.issuePasswordResetActionUrl(user.id);
+    const actionUrl = await this.issuePasswordResetActionUrl(user.id, {
+      blockLoginUntilPasswordReset: true,
+    });
     await this.mailService.sendRecoverEmail(user.email, actionUrl);
   }
 
-  private async issuePasswordResetActionUrl(userId: string): Promise<string> {
+  private async issuePasswordResetActionUrl(
+    userId: string,
+    options?: {
+      blockLoginUntilPasswordReset?: boolean;
+    },
+  ): Promise<string> {
     const { rawToken, tokenFingerprint } = await this.generateUniqueResetTokenCandidate();
     const tokenHash = await argon2.hash(rawToken);
     const now = new Date();
 
-    await this.prisma.$transaction([
+    const operations: Prisma.PrismaPromise<unknown>[] = [
       this.prisma.passwordResetToken.updateMany({
         where: {
           userId,
@@ -323,7 +330,20 @@ export class UsersService {
           createdAt: now,
         },
       }),
-    ]);
+    ];
+
+    if (options?.blockLoginUntilPasswordReset) {
+      operations.push(
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            status: UserStatus.PASSBLOCK,
+          },
+        }),
+      );
+    }
+
+    await this.prisma.$transaction(operations);
 
     return this.createResetActionUrl(rawToken);
   }
