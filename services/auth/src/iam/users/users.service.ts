@@ -280,6 +280,7 @@ export class UsersService {
     const user = await this.prisma.user.findFirst({
       where: {
         email,
+        isActive: true,
         status: {
           not: UserStatus.REVOKED,
         },
@@ -331,6 +332,18 @@ export class UsersService {
     const now = new Date();
     const validSince = this.getResetTokenValidSince(now);
     const resetToken = await this.resolveValidPasswordResetToken(rawToken, now);
+
+    const tokenOwner = await this.prisma.user.findUnique({
+      where: { id: resetToken.userId },
+      select: {
+        id: true,
+        isActive: true,
+      },
+    });
+
+    if (!tokenOwner || !tokenOwner.isActive) {
+      throw new ForbiddenException('La cuenta no está activa para actualizar contraseña');
+    }
 
     await this.assertPasswordNotPwned(newPassword);
 

@@ -752,6 +752,20 @@ describe('UsersService', () => {
 
       await service.createPasswordResetToken(createdUserRecord.email);
 
+      expect(prismaServiceMock.user.findFirst).toHaveBeenCalledWith({
+        where: {
+          email: createdUserRecord.email,
+          isActive: true,
+          status: {
+            not: UserStatus.REVOKED,
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+        },
+      });
+
       expect(prismaServiceMock.passwordResetToken.updateMany).toHaveBeenCalledWith({
         where: {
           userId: createdUserRecord.id,
@@ -778,6 +792,15 @@ describe('UsersService', () => {
       prismaServiceMock.user.findFirst.mockResolvedValue(null);
 
       await service.createPasswordResetToken('missing@aurora.local');
+
+      expect(prismaServiceMock.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(mailServiceMock.sendRecoverEmail).not.toHaveBeenCalled();
+    });
+
+    it('should return silently when user is not active', async () => {
+      prismaServiceMock.user.findFirst.mockResolvedValue(null);
+
+      await service.createPasswordResetToken(createdUserRecord.email);
 
       expect(prismaServiceMock.passwordResetToken.create).not.toHaveBeenCalled();
       expect(mailServiceMock.sendRecoverEmail).not.toHaveBeenCalled();
@@ -811,6 +834,10 @@ describe('UsersService', () => {
         tokenHash: 'stored_hash',
         createdAt,
         usedAt: null,
+      });
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        isActive: true,
       });
       mockVerify.mockResolvedValue(true as never);
       mockHash.mockResolvedValue('new_password_hash' as never);
@@ -854,6 +881,29 @@ describe('UsersService', () => {
       expect(prismaServiceMock.$transaction).toHaveBeenCalledTimes(1);
     });
 
+    it('should reject reset when token owner is not active', async () => {
+      const createdAt = new Date(Date.now() - 60 * 1000);
+      prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'valid-token-id',
+        userId: createdUserRecord.id,
+        tokenHash: 'stored_hash',
+        createdAt,
+        usedAt: null,
+      });
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        isActive: false,
+      });
+      mockVerify.mockResolvedValue(true as never);
+
+      await expect(
+        service.consumePasswordResetToken('raw-token', 'NewPassword123!'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+      expect(prismaServiceMock.passwordResetToken.updateMany).not.toHaveBeenCalled();
+    });
+
     it('should reject when consume cannot atomically mark token as used', async () => {
       const createdAt = new Date(Date.now() - 60 * 1000);
       prismaServiceMock.passwordResetToken.findUnique.mockResolvedValue({
@@ -862,6 +912,10 @@ describe('UsersService', () => {
         tokenHash: 'stored_hash',
         createdAt,
         usedAt: null,
+      });
+      prismaServiceMock.user.findUnique.mockResolvedValue({
+        id: createdUserRecord.id,
+        isActive: true,
       });
       mockVerify.mockResolvedValue(true as never);
       mockHash.mockResolvedValue('new_password_hash' as never);
