@@ -2,8 +2,8 @@ export type AccessMapEcosystem = {
   id: string
   name: string
   ownerId: string
-  lat: number
-  lng: number
+  lat: number | null
+  lng: number | null
   isShared: boolean
   devices: string[]
 }

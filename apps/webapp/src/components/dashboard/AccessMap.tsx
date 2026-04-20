@@ -71,14 +71,18 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole
   const currentUserId = authClaims?.sub ?? 'anonymous-user'
   const sourceNodes = ecosystems ?? ACCESS_MAP_ECOSYSTEMS_MOCK
+  const mapNodes = sourceNodes.filter(
+    (node): node is AccessMapEcosystem & { lat: number; lng: number } =>
+      node.lat !== null && node.lng !== null,
+  )
 
   const visibleNodes = useMemo(() => {
     if (role === 'USER') {
-      return sourceNodes.filter((node) => node.ownerId === currentUserId || node.isShared)
+      return mapNodes.filter((node) => node.ownerId === currentUserId || node.isShared)
     }
 
-    return sourceNodes
-  }, [currentUserId, role, sourceNodes])
+    return mapNodes
+  }, [currentUserId, mapNodes, role])
 
   const canViewDevices = (node: AccessMapEcosystem) => {
     if (role === 'AUDITOR') {
