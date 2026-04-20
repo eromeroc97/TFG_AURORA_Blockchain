@@ -1,4 +1,4 @@
-import { BellRing, House, MapPin, Plus, ShieldAlert, Users, Zap } from 'lucide-react'
+import { BellRing, Check, Copy, Eye, EyeOff, House, MapPin, Plus, ShieldAlert, Users, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
@@ -9,7 +9,7 @@ import federLogo from '../assets/FEDER.png'
 import clmLogo from '../assets/CLM.png'
 import { apiClient } from '../api/axios'
 import AccessMap from '../components/dashboard/AccessMap'
-import { ACCESS_MAP_ECOSYSTEMS_MOCK } from '../components/dashboard/access-map.data'
+import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem } from '../components/dashboard/access-map.data'
 import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
 import { USERS_MOCK } from '../components/dashboard/users.data'
 import { useAuth } from '../context/auth-context'
@@ -31,6 +31,7 @@ type UserAction = 'approve' | 'revoke'
 type AdminRole = 'ADMIN' | 'GLOBAL_ADMIN'
 type UserRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
 type UserStatus = 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED'
+type CreateEcosystemStep = 'form' | 'confirm' | 'result'
 
 type DashboardUser = {
   id: string
@@ -44,6 +45,10 @@ type ApiUser = {
   email: string
   role: UserRole
   status: UserStatus
+}
+
+type UserOwnedEcosystem = AccessMapEcosystem & {
+  apiKey: string | null
 }
 
 type UserRoleFilter = 'ALL' | 'USER' | 'AUDITOR' | 'ADMIN'
@@ -89,6 +94,13 @@ const isVisibleUser = (user: Pick<DashboardUser, 'status'>) => user.status !== '
 const getAssignableRoles = (adminRole: AdminRole) =>
   adminRole === 'GLOBAL_ADMIN' ? (['USER', 'AUDITOR', 'ADMIN'] as const) : (['USER', 'AUDITOR'] as const)
 
+const buildApiKey = () => {
+  const randomSegment = () => Math.random().toString(36).slice(2, 10).toUpperCase()
+  return `AUR-${randomSegment()}-${randomSegment()}-${randomSegment()}`
+}
+
+const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 8)}••••••••${apiKey.slice(-6)}`
+
 export default function Dashboard() {
   const { authClaims } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
@@ -114,6 +126,87 @@ export default function Dashboard() {
   const [userSearchTerm, setUserSearchTerm] = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState<UserRoleFilter>('ALL')
   const [userStatusFilter, setUserStatusFilter] = useState<UserStatusFilter>('ALL')
+  const [userOwnedEcosystems, setUserOwnedEcosystems] = useState<UserOwnedEcosystem[]>(() =>
+    ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.ownerId === authenticatedUserId).map((ecosystem) => ({
+      ...ecosystem,
+      apiKey: null,
+    })),
+  )
+  const [isCreateEcosystemModalOpen, setIsCreateEcosystemModalOpen] = useState(false)
+  const [createEcosystemStep, setCreateEcosystemStep] = useState<CreateEcosystemStep>('form')
+  const [newEcosystemName, setNewEcosystemName] = useState('')
+  const [newEcosystemApiKey, setNewEcosystemApiKey] = useState<string | null>(null)
+  const [newEcosystemId, setNewEcosystemId] = useState<string | null>(null)
+  const [revealedApiKeysByEcosystemId, setRevealedApiKeysByEcosystemId] = useState<Record<string, boolean>>({})
+  const [copiedKeyTag, setCopiedKeyTag] = useState<string | null>(null)
+
+  const copyToClipboard = async (value: string, tag: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedKeyTag(tag)
+      window.setTimeout(() => {
+        setCopiedKeyTag((currentTag) => (currentTag === tag ? null : currentTag))
+      }, 1500)
+    } catch {
+      setCopiedKeyTag(null)
+    }
+  }
+
+  const closeCreateEcosystemModal = () => {
+    setIsCreateEcosystemModalOpen(false)
+    setCreateEcosystemStep('form')
+    setNewEcosystemName('')
+    setNewEcosystemApiKey(null)
+    setNewEcosystemId(null)
+  }
+
+  const openCreateEcosystemModal = () => {
+    setCreateEcosystemStep('form')
+    setNewEcosystemName('')
+    setNewEcosystemApiKey(null)
+    setNewEcosystemId(null)
+    setIsCreateEcosystemModalOpen(true)
+  }
+
+  const handleRegisterEcosystem = () => {
+    const ecosystemName = newEcosystemName.trim()
+
+    if (!ecosystemName || !authenticatedUserId) {
+      return
+    }
+
+    const apiKey = buildApiKey()
+    const ecosystemId = `eco-user-${Date.now()}`
+
+    setUserOwnedEcosystems((currentEcosystems) => [
+      {
+        id: ecosystemId,
+        name: ecosystemName,
+        ownerId: authenticatedUserId,
+        lat: 39.0,
+        lng: -3.9,
+        isShared: false,
+        devices: [],
+        apiKey,
+      },
+      ...currentEcosystems,
+    ])
+
+    setNewEcosystemApiKey(apiKey)
+    setNewEcosystemId(ecosystemId)
+    setCreateEcosystemStep('result')
+  }
+
+  const toggleApiKeyVisibility = (ecosystemId: string) => {
+    setRevealedApiKeysByEcosystemId((currentMap) => ({
+      ...currentMap,
+      [ecosystemId]: !currentMap[ecosystemId],
+    }))
+  }
+
+  const userSharedEcosystems = useMemo(() => {
+    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.isShared && ecosystem.ownerId !== authClaims?.sub)
+  }, [authClaims?.sub])
 
   const accessibleEcosystems = useMemo(() => {
     const canViewAll = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
@@ -122,10 +215,8 @@ export default function Dashboard() {
       return ACCESS_MAP_ECOSYSTEMS_MOCK
     }
 
-    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter(
-      (ecosystem) => ecosystem.ownerId === authClaims?.sub || ecosystem.isShared,
-    )
-  }, [authClaims?.sub, role])
+    return [...userOwnedEcosystems, ...userSharedEcosystems]
+  }, [role, userOwnedEcosystems, userSharedEcosystems])
 
   const instantiatedEcosystemsCount = useMemo(() => {
     return accessibleEcosystems.length
@@ -167,15 +258,6 @@ export default function Dashboard() {
     ],
     [instantiatedEcosystemsCount, securityAlertsCount],
   )
-
-  // USER Dashboard: Mis ecosistemas + Compartidos conmigo
-  const userOwnedEcosystems = useMemo(() => {
-    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.ownerId === authClaims?.sub)
-  }, [authClaims?.sub])
-
-  const userSharedEcosystems = useMemo(() => {
-    return ACCESS_MAP_ECOSYSTEMS_MOCK.filter((ecosystem) => ecosystem.isShared && ecosystem.ownerId !== authClaims?.sub)
-  }, [authClaims?.sub])
 
   // AUDITOR Dashboard: Todos los ecosistemas
   const allEcosystems = useMemo(() => {
@@ -469,7 +551,12 @@ export default function Dashboard() {
             <House className="size-5 text-accent" />
             <h2 className="font-heading text-xl font-semibold">Mis ecosistemas instanciados</h2>
           </div>
-          <button className="flex size-10 items-center justify-center rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors">
+          <button
+            type="button"
+            onClick={openCreateEcosystemModal}
+            aria-label="Registrar ecosistema"
+            className="flex size-10 items-center justify-center rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+          >
             <Plus className="size-5" />
           </button>
         </div>
@@ -485,11 +572,40 @@ export default function Dashboard() {
                 <div>
                   <p className="font-medium text-primary">{ecosystem.name}</p>
                   <p className="text-xs text-muted mt-1">{ecosystem.devices.length} dispositivos</p>
+                  {ecosystem.apiKey ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => toggleApiKeyVisibility(ecosystem.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-muted transition-colors hover:text-primary"
+                      >
+                        {revealedApiKeysByEcosystemId[ecosystem.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                        {revealedApiKeysByEcosystemId[ecosystem.id] ? ecosystem.apiKey : maskApiKey(ecosystem.apiKey)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void copyToClipboard(ecosystem.apiKey as string, `list-${ecosystem.id}`)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-muted transition-colors hover:text-primary"
+                      >
+                        {copiedKeyTag === `list-${ecosystem.id}` ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                        {copiedKeyTag === `list-${ecosystem.id}` ? 'Copiada' : 'Copiar'}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted">API Key: pendiente de generación</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
                     {ecosystem.isShared ? 'Compartido' : 'Privado'}
                   </span>
+                  <button
+                    type="button"
+                    aria-label={`Compartir ecosistema ${ecosystem.name}`}
+                    className="text-xs font-medium px-2 py-1 rounded-full border border-border bg-white text-primary/80 transition-colors hover:bg-surface/60"
+                  >
+                    Compartir ecosistema
+                  </button>
                 </div>
               </div>
             ))
@@ -536,6 +652,113 @@ export default function Dashboard() {
           )}
         </div>
       </article>
+
+      {isCreateEcosystemModalOpen ? (
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+                <House className="size-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-primary">Registrar ecosistema</h3>
+                <p className="text-sm leading-6 text-muted">
+                  {createEcosystemStep === 'form'
+                    ? 'Introduce el nombre del nuevo ecosistema.'
+                    : createEcosystemStep === 'confirm'
+                      ? 'Confirma la creación para generar la API key.'
+                      : 'Ecosistema registrado correctamente.'}
+                </p>
+              </div>
+            </div>
+
+            {createEcosystemStep === 'form' ? (
+              <div className="mt-6 space-y-2">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-primary">Nombre del ecosistema</span>
+                  <input
+                    type="text"
+                    value={newEcosystemName}
+                    onChange={(event) => setNewEcosystemName(event.target.value)}
+                    placeholder="Ej. Mi hogar inteligente"
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </label>
+              </div>
+            ) : null}
+
+            {createEcosystemStep === 'confirm' ? (
+              <div className="mt-6 rounded-2xl border border-border bg-surface/40 p-4 text-sm text-primary">
+                <p>
+                  <span className="font-semibold">Nombre:</span> {newEcosystemName.trim()}
+                </p>
+                <p className="mt-2 text-xs text-muted">
+                  Al confirmar, se generará una API key única para este ecosistema.
+                </p>
+              </div>
+            ) : null}
+
+            {createEcosystemStep === 'result' ? (
+              <div className="mt-6 space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                <p className="text-sm font-semibold text-emerald-800">API key generada</p>
+                {newEcosystemApiKey ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => newEcosystemId && toggleApiKeyVisibility(newEcosystemId)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-800"
+                    >
+                      {newEcosystemId && revealedApiKeysByEcosystemId[newEcosystemId] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                      {newEcosystemId && revealedApiKeysByEcosystemId[newEcosystemId]
+                        ? newEcosystemApiKey
+                        : maskApiKey(newEcosystemApiKey)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void copyToClipboard(newEcosystemApiKey, 'modal-api-key')}
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-800"
+                    >
+                      {copiedKeyTag === 'modal-api-key' ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                      {copiedKeyTag === 'modal-api-key' ? 'Copiada' : 'Copiar'}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeCreateEcosystemModal}
+                className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+              >
+                {createEcosystemStep === 'result' ? 'Cerrar' : 'Cancelar'}
+              </button>
+
+              {createEcosystemStep === 'form' ? (
+                <button
+                  type="button"
+                  disabled={newEcosystemName.trim().length < 3}
+                  onClick={() => setCreateEcosystemStep('confirm')}
+                  className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Continuar
+                </button>
+              ) : null}
+
+              {createEcosystemStep === 'confirm' ? (
+                <button
+                  type="button"
+                  onClick={handleRegisterEcosystem}
+                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                >
+                  Confirmar y generar API key
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 

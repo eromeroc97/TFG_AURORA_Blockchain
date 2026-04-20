@@ -20,6 +20,8 @@ const mockedApiClient = apiClient as {
   delete: jest.Mock
 }
 
+const clipboardWriteTextMock = jest.fn().mockResolvedValue(undefined)
+
 const apiUsers = [
   {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -94,6 +96,13 @@ describe('Dashboard', () => {
     mockedApiClient.get.mockResolvedValue({ data: apiUsers })
     mockedApiClient.patch.mockReset()
     mockedApiClient.delete.mockReset()
+    clipboardWriteTextMock.mockClear()
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: clipboardWriteTextMock,
+      },
+    })
     mockAuthClaims = {
       sub: 'f46f4f2f-cf3d-4170-a957-6b3f257cf8a5',
       role: 'ADMIN',
@@ -215,6 +224,46 @@ describe('Dashboard', () => {
     expect(screen.getByText(/Vivienda Segura - Ciudad Real/i)).toBeInTheDocument()
     expect(screen.getByText(/Laboratorio Domótico - Campus UCLM/i)).toBeInTheDocument()
     expect(screen.queryByText(/Piloto Energético - Albacete/i)).not.toBeInTheDocument()
+  })
+
+  it('registers an ecosystem from modal and allows copying the generated API key', async () => {
+    mockAuthClaims = {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'USER',
+      email: 'user@aurora.es',
+    }
+
+    render(<Dashboard />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Registrar ecosistema/i }))
+
+    expect(screen.getByRole('heading', { name: /Registrar ecosistema/i })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText(/Mi hogar inteligente/i), {
+      target: { value: 'Ecosistema Test Usuario' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }))
+    expect(screen.getByText(/se generará una API key única/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar y generar API key/i }))
+
+    expect(await screen.findByText(/API key generada/i)).toBeInTheDocument()
+    expect(screen.getByText(/Ecosistema Test Usuario/i)).toBeInTheDocument()
+
+    const ecosystemModal = screen.getByRole('heading', { name: /Registrar ecosistema/i }).closest('div')?.parentElement?.parentElement
+    expect(ecosystemModal).not.toBeNull()
+
+    fireEvent.click(within(ecosystemModal as HTMLElement).getByRole('button', { name: /Copiar/i }))
+
+    await waitFor(() => {
+      expect(clipboardWriteTextMock).toHaveBeenCalledTimes(1)
+    })
+
+    const generatedApiKey = clipboardWriteTextMock.mock.calls[0][0] as string
+    expect(generatedApiKey).toMatch(/^AUR-/)
+    expect(screen.queryByText(generatedApiKey)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Compartir ecosistema Ecosistema Test Usuario/i })).toBeInTheDocument()
   })
 
   it('renders the auditor dashboard content', () => {
