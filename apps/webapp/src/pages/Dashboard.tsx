@@ -461,7 +461,7 @@ export default function Dashboard() {
   const resolveManagedUser = (userId: string) => users.find((user) => user.id === userId) ?? null
 
   const canChangeRoles = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
-  const assignableRoles = canChangeRoles ? getAssignableRoles(role as AdminRole) : []
+  const assignableRoles: readonly UserRole[] = canChangeRoles ? getAssignableRoles(role as AdminRole) : []
   const canManageUsers = canChangeRoles
   const userTableMaxHeight = USER_TABLE_HEADER_HEIGHT_PX + MAX_VISIBLE_USER_ROWS * USER_TABLE_ROW_HEIGHT_PX
 
