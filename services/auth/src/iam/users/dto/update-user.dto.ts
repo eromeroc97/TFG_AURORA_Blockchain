@@ -45,12 +45,4 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 	@IsBoolean()
 	@Transform(({ value }) => (typeof value === 'string' ? value === 'true' : value))
 	isActive?: boolean;
-
-	@ApiPropertyOptional({
-		description: 'DID del usuario para la blockchain.',
-		example: 'did:aurora:user:123456',
-	})
-	@IsOptional()
-	@IsString()
-	did?: string | null;
 }

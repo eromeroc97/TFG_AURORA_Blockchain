@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -8,11 +8,17 @@ import {
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { UsersService } from './users.service';
-import { ApproveUserDto } from './dto/approve-user.dto';
 import { ChangeRoleDto } from './dto/change-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles, JwtAuthGuard, RolesGuard } from '../auth';
+
+type AuthenticatedRequest = {
+  user?: {
+    sub?: string;
+    role?: Role;
+  };
+};
 
 @ApiTags('Users (IAM)')
 @Controller('users')
@@ -33,13 +39,17 @@ export class UsersController {
   }
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.usersService.findAll(request.user?.role, request.user?.sub);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.usersService.findOne(id, request.user?.role, request.user?.sub);
   }
 
   @Patch(':id')
@@ -50,27 +60,33 @@ export class UsersController {
   @Patch(':id/role')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
-  changeRole(@Param('id') id: string, @Body() changeRoleDto: ChangeRoleDto) {
-    return this.usersService.changeRole(id, changeRoleDto.newRole);
+  changeRole(
+    @Param('id') id: string,
+    @Body() changeRoleDto: ChangeRoleDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.usersService.changeRole(
+      id,
+      changeRoleDto.newRole,
+      request.user?.sub,
+      request.user?.role,
+    );
   }
 
   @Patch(':id/approve')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.GLOBAL_ADMIN, Role.ADMIN)
-  approveUser(@Param('id') id: string, @Body() approveUserDto: ApproveUserDto) {
-    return this.usersService.approveUser(id, approveUserDto.adminDid);
+  approveUser(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.usersService.approveUser(
+      id,
+      request.user?.sub,
+      request.user?.role,
+    );
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  remove(
-    @Param('id') id: string,
-    @Body()
-    actor?: {
-      requesterId?: string;
-      requesterRole?: Role;
-    },
-  ) {
-    return this.usersService.remove(id, actor?.requesterId ?? id, actor?.requesterRole);
+  remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.usersService.remove(id, request.user?.sub ?? id, request.user?.role);
   }
 }
