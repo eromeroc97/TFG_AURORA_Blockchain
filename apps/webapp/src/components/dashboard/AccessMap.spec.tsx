@@ -7,7 +7,6 @@ let mockAuthClaims = {
   sub: '123e4567-e89b-12d3-a456-426614174000',
   role: 'USER',
   email: 'user@aurora.es',
-  did: null,
 }
 
 jest.mock('../../context/auth-context', () => ({
@@ -66,7 +65,6 @@ describe('AccessMap', () => {
       sub: '123e4567-e89b-12d3-a456-426614174000',
       role: 'USER',
       email: 'user@aurora.es',
-      did: null,
     }
   })
 
@@ -92,7 +90,6 @@ describe('AccessMap', () => {
       sub: 'auditor-1',
       role: 'AUDITOR',
       email: 'auditor@aurora.es',
-      did: null,
     }
 
     render(<AccessMap ecosystems={ecosystems} />)
@@ -107,7 +104,6 @@ describe('AccessMap', () => {
       sub: 'global-admin-1',
       role: 'GLOBAL_ADMIN',
       email: 'global-admin@aurora.es',
-      did: null,
     }
 
     render(<AccessMap ecosystems={[ecosystems[0]]} />)
@@ -121,7 +117,6 @@ describe('AccessMap', () => {
       sub: 'admin-1',
       role: 'ADMIN',
       email: 'admin@aurora.es',
-      did: null,
     }
 
     render(<AccessMap ecosystems={[ecosystems[0]]} />)

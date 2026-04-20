@@ -6,14 +6,12 @@ type MockAuthClaims = {
   sub: string
   role: string
   email: string
-  did: string | null
 }
 
 let mockAuthClaims: MockAuthClaims = {
   sub: 'f46f4f2f-cf3d-4170-a957-6b3f257cf8a5',
   role: 'ADMIN',
   email: 'admin@aurora.es',
-  did: null,
 }
 
 const mockedApiClient = apiClient as {
@@ -28,56 +26,48 @@ const apiUsers = [
     email: 'user1@aurora.local',
     role: 'USER',
     status: 'ACTIVE',
-    did: 'did:aurora:user1',
   },
   {
     id: '71ac8f45-8d9f-4e03-bfdf-3f0c81a4e7f4',
     email: 'auditor@aurora.local',
     role: 'AUDITOR',
     status: 'ACTIVE',
-    did: 'did:aurora:auditor',
   },
   {
     id: 'f46f4f2f-cf3d-4170-a957-6b3f257cf8a5',
     email: 'admin@aurora.local',
     role: 'ADMIN',
     status: 'ACTIVE',
-    did: 'did:aurora:admin',
   },
   {
     id: 'c1e0c2f1-8f4b-4f2a-9e11-1d2d3c4b5a6f',
     email: 'auditor2@aurora.local',
     role: 'AUDITOR',
     status: 'ACTIVE',
-    did: 'did:aurora:auditor2',
   },
   {
     id: '8f0f0a2e-1111-4d8f-b1c2-123443211234',
     email: 'admin2@aurora.local',
     role: 'ADMIN',
     status: 'ACTIVE',
-    did: 'did:aurora:admin2',
   },
   {
     id: '8d7f4f2c-3f1a-4e4e-8a2e-123456789abc',
     email: 'user2@aurora.local',
     role: 'USER',
     status: 'PENDING',
-    did: null,
   },
   {
     id: '9d7a4e5f-1b2c-4d5e-8f90-abcdef123456',
     email: 'user3@aurora.local',
     role: 'USER',
     status: 'REVOKED',
-    did: null,
   },
   {
     id: '4e4d7c8b-22aa-4a7c-bf1f-111122223333',
     email: 'global-admin@aurora.local',
     role: 'GLOBAL_ADMIN',
     status: 'ACTIVE',
-    did: 'did:aurora:global-admin',
   },
 ]
 
@@ -108,7 +98,6 @@ describe('Dashboard', () => {
       sub: 'f46f4f2f-cf3d-4170-a957-6b3f257cf8a5',
       role: 'ADMIN',
       email: 'admin@aurora.es',
-      did: null,
     }
   })
 
@@ -128,6 +117,8 @@ describe('Dashboard', () => {
     expect(screen.getByText(/Usuarios bloqueados/i)).toBeInTheDocument()
     expect(screen.queryByText(/admin@aurora.local/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/global-admin@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/DID:/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('123e4567-e89b-12d3-a456-426614174000')).not.toBeInTheDocument()
     expect(mockedApiClient.get).toHaveBeenCalledWith('/users')
     expect(screen.getByTestId('access-map')).toBeInTheDocument()
   })
@@ -155,7 +146,6 @@ describe('Dashboard', () => {
       sub: '550e8400-e29b-41d4-a716-446655440000',
       role: 'GLOBAL_ADMIN',
       email: 'global-admin@aurora.es',
-      did: null,
     }
 
     render(<Dashboard />)
@@ -184,7 +174,7 @@ describe('Dashboard', () => {
 
     await screen.findByText(/user1@aurora.local/i)
 
-    fireEvent.change(screen.getByPlaceholderText(/Email, ID o DID/i), {
+    fireEvent.change(screen.getByPlaceholderText(/Email/i), {
       target: { value: 'user2@aurora.local' },
     })
 
@@ -214,7 +204,6 @@ describe('Dashboard', () => {
       sub: '123e4567-e89b-12d3-a456-426614174000',
       role: 'USER',
       email: 'user@aurora.es',
-      did: null,
     }
 
     render(<Dashboard />)
@@ -233,7 +222,6 @@ describe('Dashboard', () => {
       sub: '71ac8f45-8d9f-4e03-bfdf-3f0c81a4e7f4',
       role: 'AUDITOR',
       email: 'auditor@aurora.es',
-      did: null,
     }
 
     render(<Dashboard />)
@@ -250,7 +238,6 @@ describe('Dashboard', () => {
       sub: '550e8400-e29b-41d4-a716-446655440000',
       role: 'GLOBAL_ADMIN',
       email: 'global-admin@aurora.es',
-      did: null,
     }
 
     render(<Dashboard />)
@@ -300,7 +287,7 @@ describe('Dashboard', () => {
     expect(within(modalBody as HTMLElement).getByText(/user2@aurora.local/i)).toBeInTheDocument()
     expect(within(modalBody as HTMLElement).getByText(/Estado:/i)).toBeInTheDocument()
     expect(within(modalBody as HTMLElement).getByText(/Pendiente/i)).toBeInTheDocument()
-    expect(within(modalBody as HTMLElement).getByText(/No disponible/i)).toBeInTheDocument()
+    expect(within(modalBody as HTMLElement).queryByText(/DID:/i)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Cerrar/i }))
 
@@ -337,13 +324,6 @@ describe('Dashboard', () => {
   })
 
   it('opens a confirmation modal before approving a pending user', async () => {
-    mockAuthClaims = {
-      sub: 'f46f4f2f-cf3d-4170-a957-6b3f257cf8a5',
-      role: 'ADMIN',
-      email: 'admin@aurora.es',
-      did: 'did:aurora:admin',
-    }
-
     mockedApiClient.patch.mockResolvedValue({
       data: {
         ...apiUsers.find((user) => user.email === 'user2@aurora.local'),
@@ -363,9 +343,7 @@ describe('Dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirmar aprobación/i }))
 
     await waitFor(() => {
-      expect(mockedApiClient.patch).toHaveBeenCalledWith('/users/8d7f4f2c-3f1a-4e4e-8a2e-123456789abc/approve', {
-        adminDid: 'did:aurora:admin',
-      })
+      expect(mockedApiClient.patch).toHaveBeenCalledWith('/users/8d7f4f2c-3f1a-4e4e-8a2e-123456789abc/approve')
     })
 
     const row = screen.getByText(/user2@aurora.local/i).closest('tr')
@@ -417,7 +395,6 @@ describe('Dashboard', () => {
       sub: '550e8400-e29b-41d4-a716-446655440000',
       role: 'GLOBAL_ADMIN',
       email: 'global-admin@aurora.es',
-      did: null,
     }
 
     render(<Dashboard />)

@@ -23,14 +23,12 @@ describe('auth-session', () => {
       sub: 'user-1',
       email: 'user@aurora.local',
       role: 'USER',
-      did: 'did:firefly:1',
     })
 
     expect(decodeAccessTokenClaims(token)).toEqual({
       sub: 'user-1',
       email: 'user@aurora.local',
       role: 'USER',
-      did: 'did:firefly:1',
     })
   })
 

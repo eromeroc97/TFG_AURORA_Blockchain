@@ -37,7 +37,6 @@ type DashboardUser = {
   email: string
   role: UserRole
   status: UserStatus
-  did?: string | null
 }
 
 type ApiUser = {
@@ -45,7 +44,6 @@ type ApiUser = {
   email: string
   role: UserRole
   status: UserStatus
-  did?: string | null
 }
 
 type UserRoleFilter = 'ALL' | 'USER' | 'AUDITOR' | 'ADMIN'
@@ -84,7 +82,6 @@ const normalizeApiUser = (user: ApiUser): DashboardUser => ({
   email: user.email,
   role: user.role,
   status: user.status,
-  did: user.did,
 })
 
 const isVisibleUser = (user: Pick<DashboardUser, 'status'>) => user.status !== 'REVOKED'
@@ -205,9 +202,7 @@ export default function Dashboard() {
     return users.filter((user) => {
       const matchesSearch =
         normalizedSearchTerm.length === 0 ||
-        user.email.toLowerCase().includes(normalizedSearchTerm) ||
-        user.id.toLowerCase().includes(normalizedSearchTerm) ||
-        (user.did ?? '').toLowerCase().includes(normalizedSearchTerm)
+        user.email.toLowerCase().includes(normalizedSearchTerm)
 
       const matchesRole = normalizedRoleFilter === 'ALL' || user.role === normalizedRoleFilter
       const matchesStatus = normalizedStatusFilter === 'ALL' || user.status === normalizedStatusFilter
@@ -407,9 +402,7 @@ export default function Dashboard() {
 
       const updatedUser =
         pendingUserAction.action === 'approve'
-          ? await apiClient.patch<ApiUser>(`/users/${pendingUserAction.userId}/approve`, {
-              adminDid: authClaims?.did,
-            })
+          ? await apiClient.patch<ApiUser>(`/users/${pendingUserAction.userId}/approve`)
           : await apiClient.delete<ApiUser>(`/users/${pendingUserAction.userId}`)
 
       setDashboardUsers((currentUsers) =>
@@ -608,7 +601,7 @@ export default function Dashboard() {
                 type="text"
                 value={userSearchTerm}
                 onChange={(event) => setUserSearchTerm(event.target.value.slice(0, MAX_SEARCH_TERM_LENGTH))}
-                placeholder="Email, ID o DID"
+                placeholder="Email"
                 className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
               />
             </label>
@@ -804,9 +797,6 @@ export default function Dashboard() {
               </p>
               <p>
                 <span className="font-semibold">Estado:</span> {USER_STATUS_LABELS[pendingUserInfo.status]}
-              </p>
-              <p>
-                <span className="font-semibold">DID:</span> {pendingUserInfo.did?.trim() ? pendingUserInfo.did : 'No disponible'}
               </p>
             </div>
 

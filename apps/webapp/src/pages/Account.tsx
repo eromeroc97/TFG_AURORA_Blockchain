@@ -13,7 +13,6 @@ export default function AccountPage() {
   const [searchParams] = useSearchParams()
   const { authClaims, isHydrating } = useAuth()
   const [user, setUser] = useState<UserAccount | null>(null)
-  const [uuidFromUrl, setUuidFromUrl] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedbackMessage, setFeedbackMessage] = useState('')
@@ -33,14 +32,9 @@ export default function AccountPage() {
     const uuid = (searchParams.get('uuid') ?? searchParams.get('id') ?? '').trim()
 
     if (uuid && !hasCapturedUuidRef.current) {
-      setUuidFromUrl(uuid)
       hasCapturedUuidRef.current = true
       navigate('/account', { replace: true })
       return
-    }
-
-    if (!uuid && !hasCapturedUuidRef.current) {
-      setUuidFromUrl('')
     }
   }, [navigate, searchParams])
 
@@ -101,13 +95,6 @@ export default function AccountPage() {
       </div>
 
       {/* TODO: implementar dashboards específicos por rol (Investigador/Admin). */}
-
-      {uuidFromUrl ? (
-        <div className="flex items-center gap-2 rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-800 shadow-sm">
-          <CheckCircle2 className="size-4 shrink-0" />
-          Se ha detectado un identificador de cuenta en la URL y se ha limpiado automáticamente.
-        </div>
-      ) : null}
 
       {feedbackMessage ? (
         <div className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">

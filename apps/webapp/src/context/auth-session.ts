@@ -2,7 +2,6 @@ export type AuthClaims = {
   sub: string
   email: string
   role: string
-  did: string | null
 }
 
 export type AuthSessionSnapshot = {
@@ -38,7 +37,6 @@ export const decodeAccessTokenClaims = (token: string): AuthClaims | null => {
       sub: parsed.sub,
       email: parsed.email,
       role: parsed.role,
-      did: parsed.did ?? null,
     }
   } catch {
     return null

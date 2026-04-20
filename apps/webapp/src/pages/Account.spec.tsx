@@ -27,7 +27,6 @@ describe('Account page', () => {
         sub: '123e4567-e89b-12d3-a456-426614174000',
         email: 'investigador@gsya.es',
         role: 'ADMIN',
-        did: null,
       },
       isHydrating: false,
     })
@@ -57,7 +56,6 @@ describe('Account page', () => {
 
     expect(screen.getByDisplayValue('investigador@gsya.es')).toBeInTheDocument()
     expect(screen.queryByText('123e4567-e89b-12d3-a456-426614174000')).not.toBeInTheDocument()
-    expect(screen.getByText(/Se ha detectado un identificador de cuenta en la URL/i)).toBeInTheDocument()
   })
 
   it('opens the modal when requesting a password change', () => {
