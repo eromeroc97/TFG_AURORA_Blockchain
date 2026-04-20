@@ -381,7 +381,7 @@ describe('Dashboard', () => {
 
     await waitFor(() => {
       expect(mockedApiClient.patch).toHaveBeenCalledWith('/users/123e4567-e89b-12d3-a456-426614174000/role', {
-        role: 'AUDITOR',
+        newRole: 'AUDITOR',
       })
     })
 

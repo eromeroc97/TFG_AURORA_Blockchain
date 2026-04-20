@@ -449,7 +449,7 @@ export default function Dashboard() {
       setAdminError(null)
 
       const updatedUser = await apiClient.patch<ApiUser>(`/users/${pendingRoleChange.userId}/role`, {
-        role: pendingRoleChange.nextRole,
+        newRole: pendingRoleChange.nextRole,
       })
 
       setDashboardUsers((currentUsers) =>
