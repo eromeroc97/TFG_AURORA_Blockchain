@@ -1,4 +1,5 @@
 import { createHash } from 'crypto'
+import axios from 'axios'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { apiClient } from '../api/axios'
@@ -182,5 +183,41 @@ describe('Reset page', () => {
     )
 
     expect(await screen.findByText('Login Page')).toBeInTheDocument()
+  })
+
+  it('shows an inactive-account message when reset returns 403', async () => {
+    const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValue(true)
+    const password = 'Password123!'
+    const digestHex = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase()
+
+    mockDigest.mockResolvedValueOnce(Uint8Array.from(Buffer.from(digestHex, 'hex')).buffer)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '',
+    })
+    mockedApiClient.post
+      .mockResolvedValueOnce({ data: { valid: true } } as never)
+      .mockRejectedValueOnce({
+        response: {
+          status: 403,
+        },
+      } as never)
+
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+    fillValidPassword(password)
+    fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Guardar contraseña/i }))
+
+    expect(
+      await screen.findByText(/Tu cuenta no está activa para actualizar contraseña/i),
+    ).toBeInTheDocument()
+
+    isAxiosErrorSpy.mockRestore()
   })
 })

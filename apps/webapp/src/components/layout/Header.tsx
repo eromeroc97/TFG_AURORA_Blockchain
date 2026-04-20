@@ -11,7 +11,6 @@ type HeaderProps = {
 
 const navigationItems = [
   { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Ecosistemas', to: '/dashboard#ecosistemas' },
   { label: 'Auditoría', to: '/dashboard#auditoria' },
 ] as const
 

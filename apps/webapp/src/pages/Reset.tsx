@@ -236,6 +236,8 @@ export default function Reset() {
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 400) {
         setErrorMessage('El token de recuperación es inválido o ha expirado. Solicita uno nuevo.')
+      } else if (axios.isAxiosError(error) && error.response?.status === 403) {
+        setErrorMessage('Tu cuenta no está activa para actualizar contraseña. Contacta con soporte o un administrador.')
       } else {
         setErrorMessage('No se pudo actualizar la contraseña. Inténtalo de nuevo en unos minutos.')
       }
