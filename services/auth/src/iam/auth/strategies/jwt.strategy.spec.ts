@@ -18,7 +18,6 @@ describe('JwtStrategy', () => {
     sub: 'user-1',
     email: 'user@test.test',
     role: 'USER',
-    did: null,
   };
 
   beforeEach(() => {
