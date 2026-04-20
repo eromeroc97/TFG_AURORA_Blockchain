@@ -1,6 +1,7 @@
 import { ForbiddenException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { EcosystemStatus, Prisma } from '@prisma/client';
+import { createCipheriv, randomBytes } from 'crypto';
+import { EcosystemStatus, Prisma, Role, UserStatus } from '@prisma/client';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -31,7 +32,22 @@ describe('EcosystemsService', () => {
     name: 'eco-gateway',
     latitude: 40.4168,
     longitude: -3.7038,
-    ownerId: '11111111-1111-4111-8111-111111111111',
+  };
+
+  const actorId = '11111111-1111-4111-8111-111111111111';
+  const keyBuffer = Buffer.alloc(32, 7);
+
+  const encryptApiKeyForTest = (apiKey: string) => {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', keyBuffer, iv);
+    const ciphertext = Buffer.concat([cipher.update(apiKey, 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+
+    return {
+      apiKey: ciphertext.toString('base64'),
+      apiKeyIv: iv.toString('base64'),
+      apiKeyAuthTag: authTag.toString('base64'),
+    };
   };
 
   beforeEach(async () => {
@@ -51,83 +67,171 @@ describe('EcosystemsService', () => {
 
     service = module.get<EcosystemsService>(EcosystemsService);
     jest.clearAllMocks();
+    process.env.API_KEY_ENCRYPTION_KEY = keyBuffer.toString('base64');
   });
 
-  it('create persists ecosystem with ACTIVE status and child identity', async () => {
+  it('create persists ecosystem with ACTIVE status, child identity and encrypted API key', async () => {
     (prismaMock.user.findUnique as any).mockResolvedValue({
-      id: createDto.ownerId,
-      role: 'USER',
+      id: actorId,
+      role: Role.USER,
+      status: UserStatus.ACTIVE,
+      isActive: true,
       did: 'did:firefly:custom/user@test.test',
     });
     (fireflyMock.createChildIdentity as any).mockResolvedValue('did:firefly:custom/eco-gateway');
-    (prismaMock.ecosystem.create as any).mockResolvedValue({ id: 'eco-id' });
+    (prismaMock.ecosystem.create as any).mockResolvedValue({
+      id: 'eco-id',
+      name: createDto.name,
+      ownerId: actorId,
+      did: 'did:firefly:custom/eco-gateway',
+      certificateFingerprint: null,
+      status: EcosystemStatus.ACTIVE,
+      latitude: createDto.latitude,
+      longitude: createDto.longitude,
+      isOnline: false,
+      lastSeen: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-    await service.create(createDto);
+    const result = await service.create(createDto, actorId);
 
     expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-      where: { id: createDto.ownerId },
-      select: { id: true, role: true, did: true },
+      where: { id: actorId },
+      select: { id: true, role: true, status: true, isActive: true, did: true },
     });
     expect(fireflyMock.createChildIdentity).toHaveBeenCalledWith({
       name: 'eco-gateway',
       parentDid: 'did:firefly:custom/user@test.test',
     });
 
-    expect(prismaMock.ecosystem.create).toHaveBeenCalledWith({
-      data: {
-        name: 'eco-gateway',
-        ownerId: createDto.ownerId,
-        did: 'did:firefly:custom/eco-gateway',
-        status: EcosystemStatus.ACTIVE,
-        latitude: 40.4168,
-        longitude: -3.7038,
-      },
-    });
+    expect(prismaMock.ecosystem.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'eco-gateway',
+          ownerId: actorId,
+          did: 'did:firefly:custom/eco-gateway',
+          status: EcosystemStatus.ACTIVE,
+          latitude: 40.4168,
+          longitude: -3.7038,
+          apiKey: expect.any(String),
+          apiKeyIv: expect.any(String),
+          apiKeyAuthTag: expect.any(String),
+        }),
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({ id: 'eco-id', apiKey: expect.stringMatching(/^AUR-/) }));
+  });
+
+  it('create throws ForbiddenException when JWT subject is missing', async () => {
+    await expect(service.create(createDto, undefined)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
   });
 
   it('create throws NotFoundException when owner does not exist', async () => {
     (prismaMock.user.findUnique as any).mockResolvedValue(null);
 
-    await expect(service.create(createDto)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.create(createDto, actorId)).rejects.toBeInstanceOf(NotFoundException);
     expect(fireflyMock.createChildIdentity).not.toHaveBeenCalled();
     expect(prismaMock.ecosystem.create).not.toHaveBeenCalled();
   });
 
   it('create throws ForbiddenException when owner role is not USER', async () => {
     (prismaMock.user.findUnique as any).mockResolvedValue({
-      id: createDto.ownerId,
-      role: 'ADMIN',
+      id: actorId,
+      role: Role.ADMIN,
+      status: UserStatus.ACTIVE,
+      isActive: true,
       did: 'did:firefly:custom/admin@test.test',
     });
 
-    await expect(service.create(createDto)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.create(createDto, actorId)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(fireflyMock.createChildIdentity).not.toHaveBeenCalled();
+    expect(prismaMock.ecosystem.create).not.toHaveBeenCalled();
+  });
+
+  it('create throws ForbiddenException when owner is not ACTIVE/isActive', async () => {
+    (prismaMock.user.findUnique as any).mockResolvedValue({
+      id: actorId,
+      role: Role.USER,
+      status: UserStatus.PASSBLOCK,
+      isActive: true,
+      did: 'did:firefly:custom/user@test.test',
+    });
+
+    await expect(service.create(createDto, actorId)).rejects.toBeInstanceOf(ForbiddenException);
     expect(fireflyMock.createChildIdentity).not.toHaveBeenCalled();
     expect(prismaMock.ecosystem.create).not.toHaveBeenCalled();
   });
 
   it('create throws ForbiddenException when owner has no DID', async () => {
     (prismaMock.user.findUnique as any).mockResolvedValue({
-      id: createDto.ownerId,
-      role: 'USER',
+      id: actorId,
+      role: Role.USER,
+      status: UserStatus.ACTIVE,
+      isActive: true,
       did: null,
     });
 
-    await expect(service.create(createDto)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.create(createDto, actorId)).rejects.toBeInstanceOf(ForbiddenException);
     expect(fireflyMock.createChildIdentity).not.toHaveBeenCalled();
     expect(prismaMock.ecosystem.create).not.toHaveBeenCalled();
   });
 
   it('create throws InternalServerErrorException on failure', async () => {
     (prismaMock.user.findUnique as any).mockResolvedValue({
-      id: createDto.ownerId,
-      role: 'USER',
+      id: actorId,
+      role: Role.USER,
+      status: UserStatus.ACTIVE,
+      isActive: true,
       did: 'did:firefly:custom/user@test.test',
     });
     (fireflyMock.createChildIdentity as any).mockRejectedValue(new Error('firefly down'));
 
-    await expect(service.create(createDto)).rejects.toBeInstanceOf(
+    await expect(service.create(createDto, actorId)).rejects.toBeInstanceOf(
       InternalServerErrorException,
     );
+  });
+
+  it('getApiKey returns decrypted key for ecosystem owner', async () => {
+    const rawApiKey = 'AUR-TEST-API-KEY-123';
+    const encrypted = encryptApiKeyForTest(rawApiKey);
+
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({
+      id: 'eco-id',
+      ownerId: actorId,
+      apiKey: encrypted.apiKey,
+      apiKeyIv: encrypted.apiKeyIv,
+      apiKeyAuthTag: encrypted.apiKeyAuthTag,
+    });
+
+    const result = await service.getApiKey('eco-id', actorId);
+
+    expect(result).toEqual({ ecosystemId: 'eco-id', apiKey: rawApiKey });
+  });
+
+  it('getApiKey throws ForbiddenException for non-owner user', async () => {
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({
+      id: 'eco-id',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+      apiKey: 'cipher',
+      apiKeyIv: 'iv',
+      apiKeyAuthTag: 'tag',
+    });
+
+    await expect(service.getApiKey('eco-id', actorId)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('getApiKey throws NotFoundException when key fields are missing', async () => {
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({
+      id: 'eco-id',
+      ownerId: actorId,
+      apiKey: null,
+      apiKeyIv: null,
+      apiKeyAuthTag: null,
+    });
+
+    await expect(service.getApiKey('eco-id', actorId)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('delegates findAll/findOne/update/remove to prisma', async () => {
@@ -143,10 +247,21 @@ describe('EcosystemsService', () => {
 
     expect(prismaMock.ecosystem.findMany).toHaveBeenCalledWith({
       orderBy: { createdAt: 'desc' },
+      select: expect.any(Object),
     });
-    expect(prismaMock.ecosystem.findUnique).toHaveBeenCalledWith({ where: { id: '2' } });
-    expect(prismaMock.ecosystem.update).toHaveBeenCalledWith({ where: { id: '3' }, data: {} });
-    expect(prismaMock.ecosystem.delete).toHaveBeenCalledWith({ where: { id: '4' } });
+    expect(prismaMock.ecosystem.findUnique).toHaveBeenCalledWith({
+      where: { id: '2' },
+      select: expect.any(Object),
+    });
+    expect(prismaMock.ecosystem.update).toHaveBeenCalledWith({
+      where: { id: '3' },
+      data: {},
+      select: expect.any(Object),
+    });
+    expect(prismaMock.ecosystem.delete).toHaveBeenCalledWith({
+      where: { id: '4' },
+      select: expect.any(Object),
+    });
   });
 
   it('updateHeartbeat marks ecosystem online and sets lastSeen', async () => {
@@ -160,6 +275,7 @@ describe('EcosystemsService', () => {
         isOnline: true,
         lastSeen: expect.any(Date),
       },
+      select: expect.any(Object),
     });
   });
 
