@@ -70,3 +70,16 @@ input[data-password-input='true']::-webkit-caps-lock-indicator {
   visibility: hidden;
   pointer-events: none;
 }
+
+/* Keep Leaflet layers below app overlays (profile menu, modals). */
+.aurora-leaflet-map {
+  position: relative;
+  z-index: 0;
+}
+
+.aurora-leaflet-map .leaflet-pane,
+.aurora-leaflet-map .leaflet-control,
+.aurora-leaflet-map .leaflet-top,
+.aurora-leaflet-map .leaflet-bottom {
+  z-index: 1;
+}

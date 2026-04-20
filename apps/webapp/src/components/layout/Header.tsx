@@ -120,7 +120,7 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
             <div
               role="menu"
               aria-label="Perfil"
-              className="absolute right-0 mt-3 w-72 overflow-hidden rounded-3xl bg-white/95 p-2 shadow-[0_24px_50px_rgba(15,23,42,0.20),0_8px_20px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl"
+              className="absolute right-0 z-[70] mt-3 w-72 overflow-hidden rounded-3xl bg-white/95 p-2 shadow-[0_24px_50px_rgba(15,23,42,0.20),0_8px_20px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl"
             >
               <div className="rounded-2xl bg-background/70 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">

@@ -187,7 +187,7 @@ export default function AccountPage() {
       </section>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-2xl border border-gray-100 bg-white/95 shadow-2xl backdrop-blur-sm">
             <div className="border-b border-gray-100 px-6 py-5">
               <div className="flex items-start gap-3">

@@ -52,6 +52,13 @@ const apiUsers = [
     did: 'did:aurora:auditor2',
   },
   {
+    id: '8f0f0a2e-1111-4d8f-b1c2-123443211234',
+    email: 'admin2@aurora.local',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    did: 'did:aurora:admin2',
+  },
+  {
     id: '8d7f4f2c-3f1a-4e4e-8a2e-123456789abc',
     email: 'user2@aurora.local',
     role: 'USER',
@@ -64,6 +71,13 @@ const apiUsers = [
     role: 'USER',
     status: 'REVOKED',
     did: null,
+  },
+  {
+    id: '4e4d7c8b-22aa-4a7c-bf1f-111122223333',
+    email: 'global-admin@aurora.local',
+    role: 'GLOBAL_ADMIN',
+    status: 'ACTIVE',
+    did: 'did:aurora:global-admin',
   },
 ]
 
@@ -109,9 +123,90 @@ describe('Dashboard', () => {
     expect(screen.getByRole('columnheader', { name: /Rol/i })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: /Estado/i })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: /Acciones/i })).toBeInTheDocument()
+    expect(screen.getByText(/Usuarios activos/i)).toBeInTheDocument()
+    expect(screen.getByText(/Usuarios pendientes/i)).toBeInTheDocument()
+    expect(screen.getByText(/Usuarios bloqueados/i)).toBeInTheDocument()
     expect(screen.queryByText(/admin@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/global-admin@aurora.local/i)).not.toBeInTheDocument()
     expect(mockedApiClient.get).toHaveBeenCalledWith('/users')
     expect(screen.getByTestId('access-map')).toBeInTheDocument()
+  })
+
+  it('does not show revoked in status filter options', async () => {
+    render(<Dashboard />)
+
+    await screen.findByText(/user1@aurora.local/i)
+
+    const statusFilter = screen.getByRole('combobox', { name: /Estado/i })
+    expect(within(statusFilter).queryByRole('option', { name: /Revocado/i })).not.toBeInTheDocument()
+  })
+
+  it('prevents admin users from seeing GLOBAL_ADMIN role filter option', async () => {
+    render(<Dashboard />)
+
+    await screen.findByText(/user1@aurora.local/i)
+
+    const roleFilter = screen.getByRole('combobox', { name: /Rol/i })
+    expect(within(roleFilter).queryByRole('option', { name: /GLOBAL_ADMIN/i })).not.toBeInTheDocument()
+  })
+
+  it('prevents global admins from seeing GLOBAL_ADMIN role filter option', async () => {
+    mockAuthClaims = {
+      sub: '550e8400-e29b-41d4-a716-446655440000',
+      role: 'GLOBAL_ADMIN',
+      email: 'global-admin@aurora.es',
+      did: null,
+    }
+
+    render(<Dashboard />)
+
+    await screen.findByText(/user1@aurora.local/i)
+
+    const roleFilter = screen.getByRole('combobox', { name: /Rol/i })
+    expect(within(roleFilter).queryByRole('option', { name: /GLOBAL_ADMIN/i })).not.toBeInTheDocument()
+  })
+
+  it('allows admin to see ADMIN users but not manage their role or revocation', async () => {
+    render(<Dashboard />)
+
+    await screen.findByText(/admin2@aurora.local/i)
+
+    const adminRow = screen.getByText(/admin2@aurora.local/i).closest('tr')
+    expect(adminRow).not.toBeNull()
+
+    expect(within(adminRow as HTMLTableRowElement).queryByRole('button', { name: /Cambiar rol/i })).not.toBeInTheDocument()
+    expect(within(adminRow as HTMLTableRowElement).queryByRole('button', { name: /Revocar/i })).not.toBeInTheDocument()
+    expect(within(adminRow as HTMLTableRowElement).getByRole('button', { name: /Ver información/i })).toBeInTheDocument()
+  })
+
+  it('filters users by search term', async () => {
+    render(<Dashboard />)
+
+    await screen.findByText(/user1@aurora.local/i)
+
+    fireEvent.change(screen.getByPlaceholderText(/Email, ID o DID/i), {
+      target: { value: 'user2@aurora.local' },
+    })
+
+    expect(screen.getByText(/user2@aurora.local/i)).toBeInTheDocument()
+    expect(screen.queryByText(/user1@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/auditor@aurora.local/i)).not.toBeInTheDocument()
+  })
+
+  it('filters users by role and status', async () => {
+    render(<Dashboard />)
+
+    await screen.findByText(/user1@aurora.local/i)
+
+    const roleFilter = screen.getByRole('combobox', { name: /Rol/i })
+    const statusFilter = screen.getByRole('combobox', { name: /Estado/i })
+
+    fireEvent.change(roleFilter, { target: { value: 'USER' } })
+    fireEvent.change(statusFilter, { target: { value: 'PENDING' } })
+
+    expect(screen.getByText(/user2@aurora.local/i)).toBeInTheDocument()
+    expect(screen.queryByText(/user1@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/auditor@aurora.local/i)).not.toBeInTheDocument()
   })
 
   it('renders the user dashboard content', () => {
@@ -161,12 +256,13 @@ describe('Dashboard', () => {
     render(<Dashboard />)
 
     await screen.findByText(/user2@aurora.local/i)
+    await screen.findByText(/global-admin@aurora.local/i)
 
     expect(screen.getByRole('heading', { level: 2, name: /Gestión de usuarios/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: /^Ecosistemas instanciados$/i })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Ver información/i })).toHaveLength(5)
-    expect(screen.getAllByRole('button', { name: /Cambiar rol/i })).toHaveLength(4)
-    expect(screen.getAllByRole('button', { name: /Revocar/i })).toHaveLength(5)
+    expect(screen.getAllByRole('button', { name: /Ver información/i })).toHaveLength(7)
+    expect(screen.getAllByRole('button', { name: /Cambiar rol/i })).toHaveLength(6)
+    expect(screen.getAllByRole('button', { name: /Revocar/i })).toHaveLength(7)
     expect(screen.getAllByRole('button', { name: /Aprobar/i })).toHaveLength(1)
   })
 
@@ -177,15 +273,13 @@ describe('Dashboard', () => {
 
     const activeRow = screen.getByText(/user1@aurora.local/i).closest('tr')
     const pendingRow = screen.getByText(/user2@aurora.local/i).closest('tr')
-    const revokedRow = screen.getByText(/user3@aurora.local/i).closest('tr')
 
     expect(activeRow).not.toBeNull()
     expect(pendingRow).not.toBeNull()
-    expect(revokedRow).not.toBeNull()
+    expect(screen.queryByText(/user3@aurora.local/i)).not.toBeInTheDocument()
 
     expect(within(activeRow as HTMLTableRowElement).getByRole('button', { name: /Ver información/i })).toBeInTheDocument()
     expect(within(pendingRow as HTMLTableRowElement).getByRole('button', { name: /Ver información/i })).toBeInTheDocument()
-    expect(within(revokedRow as HTMLTableRowElement).queryByRole('button', { name: /Ver información/i })).not.toBeInTheDocument()
   })
 
   it('opens user information modal for active and pending users', async () => {
@@ -239,9 +333,7 @@ describe('Dashboard', () => {
       expect(mockedApiClient.delete).toHaveBeenCalledWith('/users/71ac8f45-8d9f-4e03-bfdf-3f0c81a4e7f4')
     })
 
-    const updatedRow = screen.getByText(/auditor@aurora.local/i).closest('tr')
-    expect(updatedRow).not.toBeNull()
-    expect(within(updatedRow as HTMLTableRowElement).getByText('Revocado')).toBeInTheDocument()
+    expect(screen.queryByText(/auditor@aurora.local/i)).not.toBeInTheDocument()
   })
 
   it('opens a confirmation modal before approving a pending user', async () => {
@@ -254,7 +346,7 @@ describe('Dashboard', () => {
 
     mockedApiClient.patch.mockResolvedValue({
       data: {
-        ...apiUsers[4],
+        ...apiUsers.find((user) => user.email === 'user2@aurora.local'),
         status: 'ACTIVE',
       },
     })

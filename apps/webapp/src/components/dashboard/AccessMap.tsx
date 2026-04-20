@@ -93,12 +93,12 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
   }
 
   return (
-    <div className="mt-5 h-[520px] w-full overflow-hidden rounded-[1.25rem] border border-primary/10 bg-white shadow-aurora">
+    <div className="relative z-0 mt-5 h-[520px] w-full overflow-hidden rounded-[1.25rem] border border-primary/10 bg-white shadow-aurora">
       <MapContainer
         center={CENTRAL_BRAIN_COORDS}
         zoom={6}
         scrollWheelZoom
-        className="h-full w-full"
+        className="aurora-leaflet-map h-full w-full"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

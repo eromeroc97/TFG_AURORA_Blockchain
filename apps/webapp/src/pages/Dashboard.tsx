@@ -48,6 +48,16 @@ type ApiUser = {
   did?: string | null
 }
 
+type UserRoleFilter = 'ALL' | 'USER' | 'AUDITOR' | 'ADMIN'
+type UserStatusFilter = 'ALL' | 'ACTIVE' | 'PENDING' | 'PASSBLOCK'
+
+const MAX_VISIBLE_USER_ROWS = 15
+const USER_TABLE_HEADER_HEIGHT_PX = 48
+const USER_TABLE_ROW_HEIGHT_PX = 48
+const MAX_SEARCH_TERM_LENGTH = 120
+const ALLOWED_USER_ROLE_FILTERS: UserRoleFilter[] = ['ALL', 'USER', 'AUDITOR', 'ADMIN']
+const ALLOWED_USER_STATUS_FILTERS: UserStatusFilter[] = ['ALL', 'ACTIVE', 'PENDING', 'PASSBLOCK']
+
 const ROLE_LABELS: Record<UserRole, string> = {
   USER: 'USER',
   AUDITOR: 'AUDITOR',
@@ -77,15 +87,19 @@ const normalizeApiUser = (user: ApiUser): DashboardUser => ({
   did: user.did,
 })
 
+const isVisibleUser = (user: Pick<DashboardUser, 'status'>) => user.status !== 'REVOKED'
+
 const getAssignableRoles = (adminRole: AdminRole) =>
   adminRole === 'GLOBAL_ADMIN' ? (['USER', 'AUDITOR', 'ADMIN'] as const) : (['USER', 'AUDITOR'] as const)
 
 export default function Dashboard() {
   const { authClaims } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
+  const isAdmin = role === 'ADMIN'
+  const isGlobalAdmin = role === 'GLOBAL_ADMIN'
   const authenticatedUserId = authClaims?.sub ?? null
   const [dashboardUsers, setDashboardUsers] = useState<DashboardUser[]>(() =>
-    USERS_MOCK.map(mapMockUserToDashboardUser),
+    USERS_MOCK.map(mapMockUserToDashboardUser).filter(isVisibleUser),
   )
   const [adminError, setAdminError] = useState<string | null>(null)
   const [pendingUserAction, setPendingUserAction] = useState<{
@@ -100,6 +114,9 @@ export default function Dashboard() {
     nextRole: UserRole
   } | null>(null)
   const [pendingUserInfo, setPendingUserInfo] = useState<DashboardUser | null>(null)
+  const [userSearchTerm, setUserSearchTerm] = useState('')
+  const [userRoleFilter, setUserRoleFilter] = useState<UserRoleFilter>('ALL')
+  const [userStatusFilter, setUserStatusFilter] = useState<UserStatusFilter>('ALL')
 
   const accessibleEcosystems = useMemo(() => {
     const canViewAll = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
@@ -170,12 +187,55 @@ export default function Dashboard() {
 
   // ADMIN Dashboard: Usuarios
   const users = useMemo(() => {
-    return dashboardUsers.filter((user) => user.id !== authenticatedUserId)
-  }, [authenticatedUserId, dashboardUsers])
+    return dashboardUsers
+      .filter(isVisibleUser)
+      .filter((user) => user.id !== authenticatedUserId)
+      .filter((user) => (isAdmin ? user.role !== 'GLOBAL_ADMIN' : true))
+  }, [authenticatedUserId, dashboardUsers, isAdmin])
+
+  const normalizedRoleFilter: UserRoleFilter = ALLOWED_USER_ROLE_FILTERS.includes(userRoleFilter)
+    ? userRoleFilter
+    : 'ALL'
+  const normalizedStatusFilter: UserStatusFilter = ALLOWED_USER_STATUS_FILTERS.includes(userStatusFilter)
+    ? userStatusFilter
+    : 'ALL'
+  const normalizedSearchTerm = userSearchTerm.trim().slice(0, MAX_SEARCH_TERM_LENGTH).toLowerCase()
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const matchesSearch =
+        normalizedSearchTerm.length === 0 ||
+        user.email.toLowerCase().includes(normalizedSearchTerm) ||
+        user.id.toLowerCase().includes(normalizedSearchTerm) ||
+        (user.did ?? '').toLowerCase().includes(normalizedSearchTerm)
+
+      const matchesRole = normalizedRoleFilter === 'ALL' || user.role === normalizedRoleFilter
+      const matchesStatus = normalizedStatusFilter === 'ALL' || user.status === normalizedStatusFilter
+
+      return matchesSearch && matchesRole && matchesStatus
+    })
+  }, [normalizedRoleFilter, normalizedSearchTerm, normalizedStatusFilter, users])
+
+  const userStats = useMemo(
+    () => ({
+      active: users.filter((user) => user.status === 'ACTIVE').length,
+      pending: users.filter((user) => user.status === 'PENDING').length,
+      blocked: users.filter((user) => user.status === 'PASSBLOCK').length,
+    }),
+    [users],
+  )
+
+  const canManageAdministratorUser = (user: DashboardUser) => isGlobalAdmin || user.role !== 'ADMIN'
+  const canViewUserInfo = (user: DashboardUser) => user.status === 'ACTIVE' || user.status === 'PENDING'
+  const canRevokeUser = (user: DashboardUser) => user.status !== 'REVOKED' && canManageAdministratorUser(user)
+  const canChangeUserRole = (user: DashboardUser) => user.status === 'ACTIVE' && canManageAdministratorUser(user)
+
+  const resolveManagedUser = (userId: string) => users.find((user) => user.id === userId) ?? null
 
   const canChangeRoles = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
   const assignableRoles = canChangeRoles ? getAssignableRoles(role as AdminRole) : []
   const canManageUsers = canChangeRoles
+  const userTableMaxHeight = USER_TABLE_HEADER_HEIGHT_PX + MAX_VISIBLE_USER_ROWS * USER_TABLE_ROW_HEIGHT_PX
 
   const quickNavItems = useMemo<QuickNavItem[]>(() => {
     if (role === 'USER') {
@@ -214,13 +274,13 @@ export default function Dashboard() {
           return
         }
 
-        setDashboardUsers(response.data.map(normalizeApiUser))
+        setDashboardUsers(response.data.map(normalizeApiUser).filter(isVisibleUser))
       } catch {
         if (!isMounted) {
           return
         }
 
-        setDashboardUsers(USERS_MOCK.map(mapMockUserToDashboardUser))
+        setDashboardUsers(USERS_MOCK.map(mapMockUserToDashboardUser).filter(isVisibleUser))
       }
     }
 
@@ -232,8 +292,25 @@ export default function Dashboard() {
   }, [canManageUsers])
 
   const handleOpenUserAction = (userId: string, userEmail: string, action: UserAction) => {
+    const targetUser = resolveManagedUser(userId)
+
     if (userId === authenticatedUserId) {
       setAdminError('No puedes gestionar tu propio usuario desde esta vista.')
+      return
+    }
+
+    if (!targetUser) {
+      setAdminError('Usuario objetivo no permitido o no disponible.')
+      return
+    }
+
+    if (action === 'approve' && targetUser.status !== 'PENDING') {
+      setAdminError('Solo puedes aprobar usuarios pendientes.')
+      return
+    }
+
+    if (action === 'revoke' && !canRevokeUser(targetUser)) {
+      setAdminError('No puedes revocar cuentas de administradores.')
       return
     }
 
@@ -248,6 +325,23 @@ export default function Dashboard() {
 
     if (userId === authenticatedUserId) {
       setAdminError('No puedes gestionar tu propio usuario desde esta vista.')
+      return
+    }
+
+    const targetUser = resolveManagedUser(userId)
+
+    if (!targetUser) {
+      setAdminError('Usuario objetivo no permitido o no disponible.')
+      return
+    }
+
+    if (isAdmin && currentRole === 'ADMIN') {
+      setAdminError('No puedes modificar el rol de usuarios administradores.')
+      return
+    }
+
+    if (!canChangeUserRole(targetUser)) {
+      setAdminError('No puedes modificar el rol de este usuario.')
       return
     }
 
@@ -266,8 +360,15 @@ export default function Dashboard() {
       return
     }
 
+    const targetUser = resolveManagedUser(user.id)
+
+    if (!targetUser || !canViewUserInfo(targetUser)) {
+      setAdminError('La información de este usuario no está disponible.')
+      return
+    }
+
     setAdminError(null)
-    setPendingUserInfo(user)
+    setPendingUserInfo(targetUser)
   }
 
   const handleConfirmUserAction = async () => {
@@ -278,6 +379,26 @@ export default function Dashboard() {
     if (pendingUserAction.userId === authenticatedUserId) {
       setPendingUserAction(null)
       setAdminError('No puedes gestionar tu propio usuario desde esta vista.')
+      return
+    }
+
+    const targetUser = resolveManagedUser(pendingUserAction.userId)
+
+    if (!targetUser) {
+      setPendingUserAction(null)
+      setAdminError('Usuario objetivo no permitido o no disponible.')
+      return
+    }
+
+    if (pendingUserAction.action === 'approve' && targetUser.status !== 'PENDING') {
+      setPendingUserAction(null)
+      setAdminError('Solo puedes aprobar usuarios pendientes.')
+      return
+    }
+
+    if (pendingUserAction.action === 'revoke' && !canRevokeUser(targetUser)) {
+      setPendingUserAction(null)
+      setAdminError('No puedes revocar cuentas de administradores.')
       return
     }
 
@@ -308,6 +429,26 @@ export default function Dashboard() {
     if (pendingRoleChange.userId === authenticatedUserId) {
       setPendingRoleChange(null)
       setAdminError('No puedes gestionar tu propio usuario desde esta vista.')
+      return
+    }
+
+    const targetUser = resolveManagedUser(pendingRoleChange.userId)
+
+    if (!targetUser) {
+      setPendingRoleChange(null)
+      setAdminError('Usuario objetivo no permitido o no disponible.')
+      return
+    }
+
+    if (!canChangeUserRole(targetUser)) {
+      setPendingRoleChange(null)
+      setAdminError('No puedes modificar el rol de este usuario.')
+      return
+    }
+
+    if (!assignableRoles.includes(pendingRoleChange.nextRole)) {
+      setPendingRoleChange(null)
+      setAdminError('El rol seleccionado no está permitido para tu perfil.')
       return
     }
 
@@ -443,29 +584,94 @@ export default function Dashboard() {
           <Users className="size-5 text-accent" />
           <h2 className="font-heading text-xl font-semibold">Gestión de usuarios</h2>
         </div>
-        <p className="mt-3 text-xs text-muted">Administración de usuarios y permisos en la plataforma</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-emerald-700">Usuarios activos</p>
+            <p className="mt-1 text-2xl font-semibold text-emerald-800">{userStats.active}</p>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-3">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-amber-700">Usuarios pendientes</p>
+            <p className="mt-1 text-2xl font-semibold text-amber-800">{userStats.pending}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-700">Usuarios bloqueados</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-800">{userStats.blocked}</p>
+          </div>
+        </div>
         {adminError ? <p className="mt-3 text-sm text-rose-600">{adminError}</p> : null}
 
         <div className="mt-6 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="pb-3 text-left font-semibold text-muted">Email</th>
-                <th className="pb-3 text-left font-semibold text-muted">Rol</th>
-                <th className="pb-3 text-left font-semibold text-muted">Estado</th>
-                <th className="pb-3 text-left font-semibold text-muted">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-surface/30 transition-colors">
-                  <td className="py-3 text-muted">{user.email}</td>
-                  <td className="py-3">
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Buscar</span>
+              <input
+                type="text"
+                value={userSearchTerm}
+                onChange={(event) => setUserSearchTerm(event.target.value.slice(0, MAX_SEARCH_TERM_LENGTH))}
+                placeholder="Email, ID o DID"
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Rol</span>
+              <select
+                value={userRoleFilter}
+                onChange={(event) => {
+                  const nextValue = event.target.value as UserRoleFilter
+                  setUserRoleFilter(ALLOWED_USER_ROLE_FILTERS.includes(nextValue) ? nextValue : 'ALL')
+                }}
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
+              >
+                <option value="ALL">Todos</option>
+                <option value="USER">USER</option>
+                <option value="AUDITOR">AUDITOR</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Estado</span>
+              <select
+                value={userStatusFilter}
+                onChange={(event) => {
+                  const nextValue = event.target.value as UserStatusFilter
+                  setUserStatusFilter(ALLOWED_USER_STATUS_FILTERS.includes(nextValue) ? nextValue : 'ALL')
+                }}
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
+              >
+                <option value="ALL">Todos</option>
+                <option value="ACTIVE">Activo</option>
+                <option value="PENDING">Pendiente</option>
+                <option value="PASSBLOCK">Bloqueado</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mb-3 text-xs text-muted">
+            Mostrando {filteredUsers.length} usuario{filteredUsers.length === 1 ? '' : 's'}
+          </div>
+
+          <div className="overflow-auto rounded-xl border border-border/70" style={{ maxHeight: `${userTableMaxHeight}px` }}>
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-white">
+                <tr className="border-b border-border">
+                  <th className="px-3 py-3 text-left font-semibold text-muted">Email</th>
+                  <th className="px-3 py-3 text-left font-semibold text-muted">Rol</th>
+                  <th className="px-3 py-3 text-left font-semibold text-muted">Estado</th>
+                  <th className="px-3 py-3 text-left font-semibold text-muted">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredUsers.map((user) => (
+                <tr key={user.id} className="h-12 hover:bg-surface/30 transition-colors">
+                  <td className="px-3 py-0 text-muted align-middle">{user.email}</td>
+                  <td className="px-3 py-0 align-middle">
                     <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary">
                       {user.role}
                     </span>
                   </td>
-                  <td className="py-3">
+                  <td className="px-3 py-0 align-middle">
                     <span
                       className={`text-xs font-medium px-2 py-1 rounded-full ${
                         user.status === 'ACTIVE'
@@ -480,9 +686,9 @@ export default function Dashboard() {
                       {USER_STATUS_LABELS[user.status]}
                     </span>
                   </td>
-                  <td className="py-3">
+                  <td className="px-3 py-0 align-middle">
                     <div className="flex gap-2">
-                      {(user.status === 'ACTIVE' || user.status === 'PENDING') && (
+                      {canViewUserInfo(user) && (
                         <button
                           type="button"
                           onClick={() => handleOpenUserInfo(user)}
@@ -491,7 +697,7 @@ export default function Dashboard() {
                           Ver información
                         </button>
                       )}
-                      {user.status === 'ACTIVE' && (
+                      {canChangeUserRole(user) && (
                         <button
                           type="button"
                           onClick={() => handleOpenRoleChange(user.id, user.email, user.role as UserRole)}
@@ -509,7 +715,7 @@ export default function Dashboard() {
                           Aprobar
                         </button>
                       )}
-                      {user.status !== 'REVOKED' && (
+                      {canRevokeUser(user) && (
                         <button
                           type="button"
                           onClick={() => handleOpenUserAction(user.id, user.email, 'revoke')}
@@ -521,14 +727,22 @@ export default function Dashboard() {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+                ))}
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-6 text-center text-sm text-muted">
+                      No hay usuarios que coincidan con los filtros.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </article>
 
       {pendingUserAction ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
@@ -569,7 +783,7 @@ export default function Dashboard() {
       ) : null}
 
       {pendingUserInfo ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
@@ -610,7 +824,7 @@ export default function Dashboard() {
       ) : null}
 
       {pendingRoleChange ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className="flex size-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
