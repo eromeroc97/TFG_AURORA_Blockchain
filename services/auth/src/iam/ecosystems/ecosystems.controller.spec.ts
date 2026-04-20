@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { Role } from '@prisma/client';
 import { EcosystemsController } from './ecosystems.controller';
 import { EcosystemsService } from './ecosystems.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
@@ -14,6 +15,14 @@ describe('EcosystemsController', () => {
     update: jest.fn(),
     remove: jest.fn(),
     updateHeartbeat: jest.fn(),
+    getApiKey: jest.fn(),
+  };
+
+  const userRequest = {
+    user: {
+      sub: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+      role: Role.USER,
+    },
   };
 
   beforeEach(async () => {
@@ -32,24 +41,33 @@ describe('EcosystemsController', () => {
     delete process.env.TEST_OWNER_ID;
   });
 
-  it('create uses dto ownerId when provided', async () => {
-    const dto: CreateEcosystemDto = { name: 'eco-1', ownerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa' };
+  it('create resolves owner from authenticated JWT subject', async () => {
+    const dto: CreateEcosystemDto = { name: 'eco-1' };
     (ecosystemsServiceMock.create as any).mockResolvedValue({ id: 'eco-id' });
 
-    await controller.create(dto);
+    await controller.create(dto, userRequest);
 
-    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto);
+    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto, userRequest.user.sub);
   });
 
   it('create forwards the full dto to service', async () => {
     const dto: CreateEcosystemDto = {
       name: 'eco-2',
-      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+      latitude: 40.4168,
+      longitude: -3.7038,
     };
 
-    await controller.create(dto);
+    await controller.create(dto, userRequest);
 
-    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto);
+    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto, userRequest.user.sub);
+  });
+
+  it('getApiKey delegates ecosystem ownership check to service', async () => {
+    (ecosystemsServiceMock.getApiKey as any).mockResolvedValue({ ecosystemId: 'eco-id', apiKey: 'AUR-KEY' });
+
+    await controller.getApiKey('eco-id', userRequest);
+
+    expect(ecosystemsServiceMock.getApiKey).toHaveBeenCalledWith('eco-id', userRequest.user.sub);
   });
 
   it('routes read/write methods to service', async () => {

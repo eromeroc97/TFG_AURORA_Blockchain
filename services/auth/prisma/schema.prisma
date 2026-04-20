@@ -74,6 +74,9 @@ model Ecosystem {
 
   did                    String?         @unique
   certificateFingerprint String?         @unique
+  apiKey                 String?         @map("api_key")
+  apiKeyIv               String?         @map("api_key_iv")
+  apiKeyAuthTag          String?         @map("api_key_auth_tag")
   status                 EcosystemStatus @default(PENDING)
 
   latitude  Float?
