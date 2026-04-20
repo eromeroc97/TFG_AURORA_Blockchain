@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateEcosystemDto {
 	@ApiProperty({
@@ -31,12 +31,4 @@ export class CreateEcosystemDto {
 	@IsLongitude()
 	longitude?: number;
 
-	@ApiProperty({
-		description: 'Owner del ecosistema. Debe ser un usuario aprobado previamente.',
-		example: '11111111-1111-1111-1111-111111111111',
-		required: true,
-	})
-	@IsNotEmpty()
-	@IsUUID('4')
-	ownerId!: string;
 }

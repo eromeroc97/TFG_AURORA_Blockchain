@@ -1,9 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { EcosystemsService } from './ecosystems.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
 import { Roles, JwtAuthGuard, RolesGuard } from '../auth';
+
+type AuthenticatedRequest = {
+  user?: {
+    sub?: string;
+    role?: Role;
+  };
+};
 
 @Controller('ecosystems')
 export class EcosystemsController {
@@ -12,8 +19,15 @@ export class EcosystemsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.USER)
-  create(@Body() createEcosystemDto: CreateEcosystemDto) {
-    return this.ecosystemsService.create(createEcosystemDto);
+  create(@Body() createEcosystemDto: CreateEcosystemDto, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.create(createEcosystemDto, request.user?.sub);
+  }
+
+  @Get(':id/api-key')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  getApiKey(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getApiKey(id, request.user?.sub);
   }
 
   @Get()
