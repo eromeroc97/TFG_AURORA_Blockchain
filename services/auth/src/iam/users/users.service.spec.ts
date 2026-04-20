@@ -782,6 +782,12 @@ describe('UsersService', () => {
           createdAt: expect.any(Date),
         }),
       });
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+        where: { id: createdUserRecord.id },
+        data: {
+          status: UserStatus.PASSBLOCK,
+        },
+      });
       expect(mailServiceMock.sendRecoverEmail).toHaveBeenCalledWith(
         createdUserRecord.email,
         `http://localhost:5173/reset?token=${encodeURIComponent(rawToken)}`,
@@ -794,6 +800,7 @@ describe('UsersService', () => {
       await service.createPasswordResetToken('missing@aurora.local');
 
       expect(prismaServiceMock.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
       expect(mailServiceMock.sendRecoverEmail).not.toHaveBeenCalled();
     });
 
@@ -803,6 +810,7 @@ describe('UsersService', () => {
       await service.createPasswordResetToken(createdUserRecord.email);
 
       expect(prismaServiceMock.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
       expect(mailServiceMock.sendRecoverEmail).not.toHaveBeenCalled();
     });
   });
