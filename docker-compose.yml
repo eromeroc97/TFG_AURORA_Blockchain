@@ -11,8 +11,9 @@ services:
       - seq
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`)"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`)"
       - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.routers.auth.priority=100"
       - "traefik.http.services.auth.loadbalancer.server.port=3001"
       - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api"
       - "traefik.http.routers.auth.middlewares=auth-strip"
@@ -205,6 +206,7 @@ services:
       - ./services/auth/.env
     environment:
       ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
     ports:
       - "5341:5341"
       - "8081:80"
