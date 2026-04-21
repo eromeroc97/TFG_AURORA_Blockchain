@@ -57,6 +57,8 @@ services:
     build:
       context: ./services/iot-manager
       dockerfile: Dockerfile
+    env_file:
+      - ./services/iot-manager/.env
     depends_on:
       - mongo-db
     labels:
