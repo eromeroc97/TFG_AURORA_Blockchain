@@ -2,11 +2,11 @@ import { BadRequestException, Body, Controller, ForbiddenException, Headers, Pos
 import { EcosystemsService } from './ecosystems.service';
 import { ValidateApiKeyDto } from './dto/validate-api-key.dto';
 
-@Controller('internal/ecosystems')
-export class InternalEcosystemsController {
+@Controller('internal/auth')
+export class InternalAuthController {
   constructor(private readonly ecosystemsService: EcosystemsService) {}
 
-  @Post('validate-api-key')
+  @Post('validate-ecosystem')
   async validateApiKey(
     @Headers('authorization') authorization: string | undefined,
     @Headers('x-api-key') apiKey: string | undefined,
