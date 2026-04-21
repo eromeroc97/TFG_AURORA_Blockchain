@@ -7,6 +7,7 @@ const testConfig: AppConfig = {
   port: 3002,
   mongoUri: 'mongodb://mongo-db:27017/aurora_telemetry',
   fireflyApiUrl: 'http://localhost:5000/api/v1/namespaces/default',
+  macVendorApiBaseUrl: 'https://api.macvendors.com',
   iotApiKeyPositiveTtlMs: 60_000,
   iotApiKeyNegativeTtlMs: 15_000,
 };

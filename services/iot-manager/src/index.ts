@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { buildApiKeyCache, type ApiKeyCache } from './api-key-cache';
 import { loadConfig, type AppConfig } from './config';
+import { DeviceDiscoveryService } from './device-discovery';
 import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
 
 type ApiKeyValidationResult = {
@@ -185,6 +186,7 @@ export const buildApp = (options: AppOptions = {}) => {
   const app = Fastify({ logger: true });
   const telemetryStore = options.telemetryStore ?? new MongoTelemetryStore(config.mongoUri);
   const shouldCloseStore = !options.telemetryStore;
+  const deviceDiscovery = new DeviceDiscoveryService(config);
 
   const apiKeyValidator = options.apiKeyValidator ?? buildDefaultApiKeyValidator(config);
   const positiveTtlMs = options.positiveTtlMs ?? config.iotApiKeyPositiveTtlMs ?? DEFAULT_POSITIVE_TTL_MS;
@@ -384,6 +386,16 @@ export const buildApp = (options: AppOptions = {}) => {
 
       void Promise.resolve().then(() => {
         broadcastToFirefly(hash, savedTelemetry.id, authContext.did);
+      });
+
+      void Promise.resolve().then(async () => {
+        await deviceDiscovery.discoverAndSync(
+          {
+            ecosystemId,
+            devices: request.body.devices,
+          },
+          request.log,
+        );
       });
 
       return reply.code(202).send({

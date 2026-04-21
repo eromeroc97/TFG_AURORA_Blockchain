@@ -3,6 +3,9 @@ export type AppConfig = {
   mongoUri: string;
   fireflyApiUrl: string;
   redisUrl?: string;
+  macVendorApiBaseUrl: string;
+  authDeviceLookupUrl?: string;
+  authDeviceRegisterUrl?: string;
   authValidateApiKeyUrl?: string;
   authInternalToken?: string;
   iotApiKeyStaticMap?: string;
@@ -40,6 +43,9 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     mongoUri,
     fireflyApiUrl,
     redisUrl: env.REDIS_URL?.trim() || undefined,
+    macVendorApiBaseUrl: env.MAC_VENDOR_API_BASE_URL?.trim() || 'https://api.macvendors.com',
+    authDeviceLookupUrl: env.AUTH_DEVICE_LOOKUP_URL?.trim() || undefined,
+    authDeviceRegisterUrl: env.AUTH_DEVICE_REGISTER_URL?.trim() || undefined,
     authValidateApiKeyUrl: env.AUTH_VALIDATE_API_KEY_URL?.trim() || undefined,
     authInternalToken: env.AUTH_INTERNAL_TOKEN?.trim() || undefined,
     iotApiKeyStaticMap: env.IOT_API_KEY_STATIC_MAP,
