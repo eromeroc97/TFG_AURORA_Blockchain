@@ -198,6 +198,24 @@ services:
     networks:
       - aurora-secure-net
 
+  mongo-express:
+    image: mongo-express:latest
+    restart: unless-stopped
+    # Exponemos el puerto SOLO a localhost por seguridad
+    ports:
+      - "127.0.0.1:8090:8081"
+    environment:
+      # Cadena de conexión interna usando el nombre del servicio (mongo-db) y credenciales root
+      ME_CONFIG_MONGODB_URL: mongodb://admin:secret_password_tfg@mongo-db:27017/
+      
+      # Credenciales de Basic Auth para entrar a la propia interfaz web (pon las que quieras)
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: aurora_admin
+    networks:
+      - aurora-secure-net
+    depends_on:
+      - mongo-db
+
 networks:
   aurora-secure-net:
     driver: bridge

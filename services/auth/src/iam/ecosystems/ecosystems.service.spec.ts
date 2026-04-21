@@ -234,6 +234,62 @@ describe('EcosystemsService', () => {
     await expect(service.getApiKey('eco-id', actorId)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('validateApiKey returns ecosystem identity and updates coordinates for an active ecosystem', async () => {
+    const rawApiKey = 'AUR-VALID-API-KEY-123';
+    const encrypted = encryptApiKeyForTest(rawApiKey);
+
+    (prismaMock.ecosystem.findMany as any).mockResolvedValue([
+      {
+        id: 'eco-id',
+        did: 'did:firefly:custom/eco-id',
+        status: EcosystemStatus.ACTIVE,
+        apiKey: encrypted.apiKey,
+        apiKeyIv: encrypted.apiKeyIv,
+        apiKeyAuthTag: encrypted.apiKeyAuthTag,
+      },
+    ]);
+    (prismaMock.ecosystem.update as any).mockResolvedValue({ id: 'eco-id' });
+
+    const result = await service.validateApiKey(rawApiKey, 40.4168, -3.7038);
+
+    expect(prismaMock.ecosystem.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      select: expect.any(Object),
+    });
+    expect(prismaMock.ecosystem.update).toHaveBeenCalledWith({
+      where: { id: 'eco-id' },
+      data: {
+        latitude: 40.4168,
+        longitude: -3.7038,
+      },
+      select: { id: true },
+    });
+    expect(result).toEqual({
+      valid: true,
+      ecosystemId: 'eco-id',
+      did: 'did:firefly:custom/eco-id',
+      status: EcosystemStatus.ACTIVE,
+    });
+  });
+
+  it('validateApiKey returns invalid when no ecosystem matches the api key', async () => {
+    (prismaMock.ecosystem.findMany as any).mockResolvedValue([
+      {
+        id: 'eco-id',
+        did: 'did:firefly:custom/eco-id',
+        status: EcosystemStatus.ACTIVE,
+        apiKey: 'cipher',
+        apiKeyIv: 'iv',
+        apiKeyAuthTag: 'tag',
+      },
+    ]);
+
+    const result = await service.validateApiKey('AUR-UNKNOWN-KEY', 40.4168, -3.7038);
+
+    expect(prismaMock.ecosystem.update).not.toHaveBeenCalled();
+    expect(result).toEqual({ valid: false });
+  });
+
   it('delegates findAll/findOne/update/remove to prisma', async () => {
     (prismaMock.ecosystem.findMany as any).mockResolvedValue([{ id: '1' }]);
     (prismaMock.ecosystem.findUnique as any).mockResolvedValue({ id: '2' });

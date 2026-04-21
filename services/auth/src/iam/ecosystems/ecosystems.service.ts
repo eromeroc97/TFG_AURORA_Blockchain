@@ -34,6 +34,15 @@ export class EcosystemsService {
     updatedAt: true,
   } as const;
 
+  private readonly ecosystemApiKeySelect = {
+    id: true,
+    did: true,
+    status: true,
+    apiKey: true,
+    apiKeyIv: true,
+    apiKeyAuthTag: true,
+  } as const;
+
   private getApiKeyEncryptionKey(): Buffer {
     const rawKey = process.env.API_KEY_ENCRYPTION_KEY;
 
@@ -198,6 +207,65 @@ export class EcosystemsService {
     return {
       ecosystemId: ecosystem.id,
       apiKey,
+    };
+  }
+
+  async validateApiKey(apiKey: string, latitude: number, longitude: number) {
+    const normalizedApiKey = apiKey.trim();
+
+    if (!normalizedApiKey) {
+      throw new BadRequestException('API key is required');
+    }
+
+    const ecosystems = await this.prisma.ecosystem.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: this.ecosystemApiKeySelect,
+    });
+
+    for (const ecosystem of ecosystems) {
+      if (!ecosystem.apiKey || !ecosystem.apiKeyIv || !ecosystem.apiKeyAuthTag) {
+        continue;
+      }
+
+      try {
+        const decodedApiKey = this.decryptApiKey({
+          apiKeyCiphertext: ecosystem.apiKey,
+          apiKeyIv: ecosystem.apiKeyIv,
+          apiKeyAuthTag: ecosystem.apiKeyAuthTag,
+        });
+
+        if (decodedApiKey !== normalizedApiKey) {
+          continue;
+        }
+
+        if (ecosystem.status === EcosystemStatus.ACTIVE) {
+          await this.prisma.ecosystem.update({
+            where: { id: ecosystem.id },
+            data: {
+              latitude,
+              longitude,
+            },
+            select: { id: true },
+          });
+        }
+
+        return {
+          valid: true,
+          ecosystemId: ecosystem.id,
+          did: ecosystem.did,
+          status: ecosystem.status,
+        };
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+
+        continue;
+      }
+    }
+
+    return {
+      valid: false,
     };
   }
 
