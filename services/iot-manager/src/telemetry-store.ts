@@ -4,7 +4,8 @@ export type TelemetryDocument = {
   timestamp: Date;
   metadata: {
     ecosystemId: string;
-    macAddress: string | null;
+    latitude: number;
+    longitude: number;
   };
   payload: Record<string, unknown>;
   hash: string;
@@ -14,7 +15,8 @@ export type TelemetryDocument = {
 
 export type SaveTelemetryInput = {
   ecosystemId: string;
-  macAddress: string | null;
+  latitude: number;
+  longitude: number;
   payload: Record<string, unknown>;
   hash: string;
   timestamp: Date;
@@ -85,7 +87,8 @@ export class MongoTelemetryStore implements TelemetryStore {
       timestamp: input.timestamp,
       metadata: {
         ecosystemId: input.ecosystemId,
-        macAddress: input.macAddress,
+        latitude: input.latitude,
+        longitude: input.longitude,
       },
       payload: input.payload,
       hash: input.hash,

@@ -118,7 +118,7 @@ describe('IoT manager smoke tests', () => {
   it('/v1/ingest (POST) should accept valid active ecosystem api keys', async () => {
     const savedInputs: SaveTelemetryInput[] = [];
     const telemetryStore = createMockTelemetryStore(savedInputs);
-    const payload = {
+    const requestPayload = {
       latitude: 39.8568,
       longitude: -4.0245,
       devices: [
@@ -148,14 +148,14 @@ describe('IoT manager smoke tests', () => {
         'x-api-key': 'AUR-valid',
       },
       payload: {
-        latitude: payload.latitude,
-        longitude: payload.longitude,
-        devices: payload.devices,
+        latitude: requestPayload.latitude,
+        longitude: requestPayload.longitude,
+        devices: requestPayload.devices,
         timestamp: '2026-04-21T10:00:00.000Z',
       },
     });
 
-    const expectedHash = buildExpectedPayloadHash(payload);
+    const expectedHash = buildExpectedPayloadHash({ devices: requestPayload.devices });
 
     expect(response.statusCode).toBe(202);
     expect(response.json()).toEqual(
@@ -171,8 +171,11 @@ describe('IoT manager smoke tests', () => {
     expect(savedInputs[0]).toEqual(
       expect.objectContaining({
         ecosystemId: 'eco-123',
-        macAddress: 'AA:BB:CC:DD:EE:FF',
-        payload,
+        latitude: 39.8568,
+        longitude: -4.0245,
+        payload: {
+          devices: requestPayload.devices,
+        },
         hash: expectedHash,
         timestamp: new Date('2026-04-21T10:00:00.000Z'),
       }),
@@ -303,7 +306,15 @@ describe('IoT manager smoke tests', () => {
 
     expect(response.statusCode).toBe(202);
     expect(savedInputs).toHaveLength(1);
-    expect(savedInputs[0].macAddress).toBeNull();
+    expect(savedInputs[0]).toEqual(
+      expect.objectContaining({
+        latitude: 38.994,
+        longitude: -1.856,
+        payload: {
+          devices: [],
+        },
+      }),
+    );
 
     await app.close();
   });

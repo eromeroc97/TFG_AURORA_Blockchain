@@ -365,15 +365,14 @@ export const buildApp = (options: AppOptions = {}) => {
       }
 
       const payload = {
-        latitude: request.body.latitude,
-        longitude: request.body.longitude,
         devices: request.body.devices,
       };
 
       const hash = buildPayloadHash(payload);
       const savedTelemetry = await telemetryStore.save({
         ecosystemId,
-        macAddress: request.body.devices[0]?.mac_addr ?? null,
+        latitude: request.body.latitude,
+        longitude: request.body.longitude,
         payload,
         hash,
         timestamp: eventTimestamp,
