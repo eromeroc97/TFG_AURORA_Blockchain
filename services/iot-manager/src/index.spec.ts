@@ -71,7 +71,6 @@ describe('IoT manager smoke tests', () => {
       method: 'POST',
       url: '/v1/ingest',
       payload: {
-        api_key: 'AUR-valid',
         latitude: 39.8568,
         longitude: -4.0245,
         devices: [],
@@ -101,7 +100,6 @@ describe('IoT manager smoke tests', () => {
         'x-api-key': 'AUR-invalid',
       },
       payload: {
-        api_key: 'AUR-invalid',
         latitude: 39.8568,
         longitude: -4.0245,
         devices: [],
@@ -135,7 +133,12 @@ describe('IoT manager smoke tests', () => {
     const app = buildApp({
       config: testConfig,
       telemetryStore,
-      apiKeyValidator: async () => ({ valid: true, ecosystemId: 'eco-123', status: 'ACTIVE' }),
+      apiKeyValidator: async () => ({
+        valid: true,
+        ecosystemId: 'eco-123',
+        did: 'did:firefly:custom/eco-123',
+        status: 'ACTIVE',
+      }),
     });
 
     const response = await app.inject({
@@ -145,7 +148,6 @@ describe('IoT manager smoke tests', () => {
         'x-api-key': 'AUR-valid',
       },
       payload: {
-        api_key: 'AUR-valid',
         latitude: payload.latitude,
         longitude: payload.longitude,
         devices: payload.devices,
@@ -179,6 +181,52 @@ describe('IoT manager smoke tests', () => {
     await app.close();
   });
 
+  it('/v1/ingest (POST) should forward apiKey latitude and longitude to auth validation', async () => {
+    let capturedInput:
+      | {
+          apiKey: string;
+          latitude: number;
+          longitude: number;
+        }
+      | null = null;
+
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore([]),
+      apiKeyValidator: async (input) => {
+        capturedInput = input;
+        return {
+          valid: true,
+          ecosystemId: 'eco-forward',
+          did: 'did:firefly:custom/eco-forward',
+          status: 'ACTIVE',
+        };
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/ingest',
+      headers: {
+        'x-api-key': 'AUR-forward',
+      },
+      payload: {
+        latitude: 40.0,
+        longitude: -3.7,
+        devices: [],
+      },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(capturedInput).toEqual({
+      apiKey: 'AUR-forward',
+      latitude: 40.0,
+      longitude: -3.7,
+    });
+
+    await app.close();
+  });
+
   it('/v1/ingest (POST) should use positive cache to avoid repetitive auth validations', async () => {
     let validationCalls = 0;
     const app = buildApp({
@@ -187,12 +235,11 @@ describe('IoT manager smoke tests', () => {
       positiveTtlMs: 60_000,
       apiKeyValidator: async () => {
         validationCalls += 1;
-        return { valid: true, ecosystemId: 'eco-cache', status: 'ACTIVE' };
+        return { valid: true, ecosystemId: 'eco-cache', did: 'did:firefly:custom/eco-cache', status: 'ACTIVE' };
       },
     });
 
     const requestPayload = {
-      api_key: 'AUR-cache-valid',
       latitude: 39.8568,
       longitude: -4.0245,
       devices: [
@@ -228,46 +275,17 @@ describe('IoT manager smoke tests', () => {
     await app.close();
   });
 
-  it('/v1/ingest (POST) should reject when api_key body does not match x-api-key header', async () => {
-    const app = buildApp({
-      config: testConfig,
-      telemetryStore: createMockTelemetryStore([]),
-      apiKeyValidator: async () => ({ valid: true, ecosystemId: 'eco-123', status: 'ACTIVE' }),
-    });
-
-    const response = await app.inject({
-      method: 'POST',
-      url: '/v1/ingest',
-      headers: {
-        'x-api-key': 'AUR-valid',
-      },
-      payload: {
-        api_key: 'AUR-different',
-        latitude: 39.8568,
-        longitude: -4.0245,
-        devices: [
-          {
-            mac_addr: 'AA:BB:CC:DD:EE:FF',
-          },
-        ],
-      },
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({
-      error: 'API_KEY_MISMATCH',
-      message: 'Body api_key does not match authenticated x-api-key header',
-    });
-
-    await app.close();
-  });
-
   it('/v1/ingest (POST) should accept empty devices array', async () => {
     const savedInputs: SaveTelemetryInput[] = [];
     const app = buildApp({
       config: testConfig,
       telemetryStore: createMockTelemetryStore(savedInputs),
-      apiKeyValidator: async () => ({ valid: true, ecosystemId: 'eco-456', status: 'ACTIVE' }),
+      apiKeyValidator: async () => ({
+        valid: true,
+        ecosystemId: 'eco-456',
+        did: 'did:firefly:custom/eco-456',
+        status: 'ACTIVE',
+      }),
     });
 
     const response = await app.inject({
@@ -277,7 +295,6 @@ describe('IoT manager smoke tests', () => {
         'x-api-key': 'AUR-empty-devices',
       },
       payload: {
-        api_key: 'AUR-empty-devices',
         latitude: 38.994,
         longitude: -1.856,
         devices: [],
@@ -295,7 +312,12 @@ describe('IoT manager smoke tests', () => {
     const app = buildApp({
       config: testConfig,
       telemetryStore: createMockTelemetryStore([]),
-      apiKeyValidator: async () => ({ valid: true, ecosystemId: 'eco-789', status: 'ACTIVE' }),
+      apiKeyValidator: async () => ({
+        valid: true,
+        ecosystemId: 'eco-789',
+        did: 'did:firefly:custom/eco-789',
+        status: 'ACTIVE',
+      }),
     });
 
     const response = await app.inject({
@@ -305,7 +327,6 @@ describe('IoT manager smoke tests', () => {
         'x-api-key': 'AUR-invalid-device',
       },
       payload: {
-        api_key: 'AUR-invalid-device',
         latitude: 39.0,
         longitude: -3.9,
         devices: [{ model: 'No MAC device' }],

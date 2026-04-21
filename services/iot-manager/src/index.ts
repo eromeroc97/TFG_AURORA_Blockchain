@@ -7,13 +7,20 @@ import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
 type ApiKeyValidationResult = {
   valid: boolean;
   ecosystemId?: string;
+  did?: string;
   status?: string;
+};
+
+type ApiKeyValidationInput = {
+  apiKey: string;
+  latitude: number;
+  longitude: number;
 };
 
 type AppOptions = {
   config?: AppConfig;
   telemetryStore?: TelemetryStore;
-  apiKeyValidator?: (apiKey: string) => Promise<ApiKeyValidationResult>;
+  apiKeyValidator?: (input: ApiKeyValidationInput) => Promise<ApiKeyValidationResult>;
   positiveTtlMs?: number;
   negativeTtlMs?: number;
   now?: () => number;
@@ -23,6 +30,7 @@ type CachedApiKeyValidation =
   | {
       kind: 'valid';
       ecosystemId: string;
+      did: string;
       expiresAt: number;
     }
   | {
@@ -32,11 +40,10 @@ type CachedApiKeyValidation =
 
 type AuthContext = {
   ecosystemId: string;
-  apiKey: string;
+  did: string;
 };
 
 type IngestRequestBody = {
-  api_key: string;
   latitude: number;
   longitude: number;
   devices: Array<{
@@ -92,7 +99,9 @@ const buildPayloadHash = (payload: Record<string, unknown>): string => {
   return createHash('sha256').update(JSON.stringify(normalizedPayload)).digest('hex');
 };
 
-const parseStaticMap = (raw: string | undefined): Record<string, string> => {
+const parseStaticMap = (
+  raw: string | undefined,
+): Record<string, { ecosystemId: string; did: string }> => {
 
   if (!raw) {
     return {};
@@ -104,12 +113,36 @@ const parseStaticMap = (raw: string | undefined): Record<string, string> => {
       return {};
     }
 
-    return Object.entries(parsed).reduce<Record<string, string>>((acc, [key, value]) => {
-      if (typeof key === 'string' && typeof value === 'string' && key.trim() && value.trim()) {
-        acc[key] = value;
+    return Object.entries(parsed).reduce<Record<string, { ecosystemId: string; did: string }>>(
+      (acc, [key, value]) => {
+        if (typeof key !== 'string' || !key.trim()) {
+          return acc;
+        }
+
+        if (typeof value === 'string' && value.trim()) {
+          acc[key] = {
+            ecosystemId: value.trim(),
+            did: `did:firefly:custom/${value.trim()}`,
+          };
+          return acc;
+        }
+
+        if (
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          typeof (value as Record<string, unknown>).ecosystemId === 'string' &&
+          typeof (value as Record<string, unknown>).did === 'string'
+        ) {
+          acc[key] = {
+            ecosystemId: (value as Record<string, string>).ecosystemId.trim(),
+            did: (value as Record<string, string>).did.trim(),
+          };
+        }
+
+        return acc;
       }
-      return acc;
-    }, {});
+    , {});
   } catch {
     return {};
   }
@@ -120,15 +153,19 @@ const buildDefaultApiKeyValidator = (config: AppConfig) => {
   const internalToken = config.authInternalToken;
   const staticMap = parseStaticMap(config.iotApiKeyStaticMap);
 
-  return async (apiKey: string): Promise<ApiKeyValidationResult> => {
+  return async (input: ApiKeyValidationInput): Promise<ApiKeyValidationResult> => {
     if (validationUrl) {
       const response = await fetch(validationUrl, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
+          'x-api-key': input.apiKey,
           ...(internalToken ? { authorization: `Bearer ${internalToken}` } : {}),
         },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({
+          latitude: input.latitude,
+          longitude: input.longitude,
+        }),
       });
 
       if (!response.ok) {
@@ -139,11 +176,12 @@ const buildDefaultApiKeyValidator = (config: AppConfig) => {
       return payload;
     }
 
-    const ecosystemId = staticMap[apiKey];
-    if (ecosystemId) {
+    const mappedEntry = staticMap[input.apiKey];
+    if (mappedEntry) {
       return {
         valid: true,
-        ecosystemId,
+        ecosystemId: mappedEntry.ecosystemId,
+        did: mappedEntry.did,
         status: 'ACTIVE',
       };
     }
@@ -177,7 +215,7 @@ export const buildApp = (options: AppOptions = {}) => {
     };
   });
 
-  const authenticateApiKey = async (request: FastifyRequest, reply: FastifyReply) => {
+  const authenticateApiKey = async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply: FastifyReply) => {
     const apiKey = getApiKeyFromHeader(request);
 
     if (!apiKey) {
@@ -196,7 +234,7 @@ export const buildApp = (options: AppOptions = {}) => {
       if (cached.kind === 'valid') {
         (request as AuthenticatedFastifyRequest).authContext = {
           ecosystemId: cached.ecosystemId,
-          apiKey,
+          did: cached.did,
         };
         return;
       }
@@ -215,7 +253,11 @@ export const buildApp = (options: AppOptions = {}) => {
     let validationResult: ApiKeyValidationResult;
 
     try {
-      validationResult = await apiKeyValidator(apiKey);
+      validationResult = await apiKeyValidator({
+        apiKey,
+        latitude: request.body.latitude,
+        longitude: request.body.longitude,
+      });
     } catch (error) {
       request.log.error({ error }, 'API key validation provider is unavailable');
       reply.code(503).send({
@@ -225,7 +267,7 @@ export const buildApp = (options: AppOptions = {}) => {
       return;
     }
 
-    if (!validationResult.valid || !validationResult.ecosystemId) {
+    if (!validationResult.valid || !validationResult.ecosystemId || !validationResult.did) {
       apiKeyValidationCache.set(cacheKey, {
         kind: 'invalid',
         expiresAt: currentTs + negativeTtlMs,
@@ -252,16 +294,26 @@ export const buildApp = (options: AppOptions = {}) => {
     apiKeyValidationCache.set(cacheKey, {
       kind: 'valid',
       ecosystemId: validationResult.ecosystemId,
+      did: validationResult.did,
       expiresAt: currentTs + positiveTtlMs,
     });
     (request as AuthenticatedFastifyRequest).authContext = {
       ecosystemId: validationResult.ecosystemId,
-      apiKey,
+      did: validationResult.did,
     };
   };
 
-  const broadcastToFirefly = (hash: string, mongoId: string) => {
-    console.log('[STUB] Simulando envio a FireFly del hash:', hash, 'mongoId:', mongoId, 'url:', config.fireflyApiUrl);
+  const broadcastToFirefly = (hash: string, mongoId: string, ecosystemDid: string) => {
+    console.log(
+      '[STUB] Simulando envio a FireFly del hash:',
+      hash,
+      'mongoId:',
+      mongoId,
+      'did:',
+      ecosystemDid,
+      'url:',
+      config.fireflyApiUrl,
+    );
   };
 
   app.post(
@@ -271,9 +323,8 @@ export const buildApp = (options: AppOptions = {}) => {
       schema: {
         body: {
           type: 'object',
-          required: ['api_key', 'latitude', 'longitude', 'devices'],
+          required: ['latitude', 'longitude', 'devices'],
           properties: {
-            api_key: { type: 'string', minLength: 1 },
             latitude: { type: 'number' },
             longitude: { type: 'number' },
             devices: {
@@ -304,13 +355,6 @@ export const buildApp = (options: AppOptions = {}) => {
         });
       }
 
-      if (request.body.api_key !== authContext.apiKey) {
-        return reply.code(400).send({
-          error: 'API_KEY_MISMATCH',
-          message: 'Body api_key does not match authenticated x-api-key header',
-        });
-      }
-
       const eventTimestamp = request.body.timestamp ? new Date(request.body.timestamp) : new Date(now());
 
       if (Number.isNaN(eventTimestamp.getTime())) {
@@ -336,7 +380,7 @@ export const buildApp = (options: AppOptions = {}) => {
       });
 
       void Promise.resolve().then(() => {
-        broadcastToFirefly(hash, savedTelemetry.id);
+        broadcastToFirefly(hash, savedTelemetry.id, authContext.did);
       });
 
       return reply.code(202).send({

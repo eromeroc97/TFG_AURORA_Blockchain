@@ -3,9 +3,14 @@ $bodyFile = "services/iot-manager/test-json/01-smarthome-minimal.json"
 $requestParams = @{
   Method = 'Post'
   Uri = 'http://localhost/api/telemetry/v1/ingest'
-  Headers = @{ 'x-api-key' = 'TU_API_KEY_REAL' }
+  Headers = @{ 'x-api-key' = 'AUR-r-z3Rcder-jGa9_21eaFMgsD3Dk1_ibA7I61g8Ly5hA' }
   ContentType = 'application/json'
   InFile = $bodyFile
 }
 
 Invoke-WebRequest @requestParams
+
+
+docker-compose up -d --build webapp
+
+docker-compose up -d --build auth-service mailpit iot-manager docker-socket-proxy api-gateway postgres-db mongo-db redis seq
