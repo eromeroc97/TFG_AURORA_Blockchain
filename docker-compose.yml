@@ -17,8 +17,6 @@ services:
       - "traefik.http.services.auth.loadbalancer.server.port=3001"
       - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api"
       - "traefik.http.routers.auth.middlewares=auth-strip"
-      - "traefik.http.routers.auth-internal.rule=PathPrefix(`/internal/auth`)"
-      - "traefik.http.routers.auth-internal.entrypoints=internal"
       - "traefik.http.routers.auth-internal.service=auth"
       - "traefik.http.routers.auth-internal.priority=200"
       - "traefik.docker.network=aurora-secure-net"
