@@ -1,0 +1,22 @@
+{
+  "api_key": "REEMPLAZAR_CON_API_KEY_REAL",
+  "latitude": 39.8568,
+  "longitude": -4.0245,
+  "timestamp": "2026-04-21T10:30:00.000Z",
+  "devices": [
+    {
+      "mac_addr": "AA:BB:CC:DD:EE:01",
+      "model": "ESP32-WROOM-32",
+      "name": "Gateway Principal",
+      "vendor": "Espressif",
+      "firmware": "1.0.3"
+    },
+    {
+      "mac_addr": "AA:BB:CC:DD:EE:02",
+      "model": "Shelly Plug S",
+      "name": "Enchufe Salon",
+      "vendor": "Shelly",
+      "power_source": "AC"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+$bodyFile = "services/iot-manager/test-json/01-smarthome-minimal.json"
+
+$requestParams = @{
+  Method = 'Post'
+  Uri = 'http://localhost/api/telemetry/v1/ingest'
+  Headers = @{ 'x-api-key' = 'TU_API_KEY_REAL' }
+  ContentType = 'application/json'
+  InFile = $bodyFile
+}
+
+Invoke-WebRequest @requestParams

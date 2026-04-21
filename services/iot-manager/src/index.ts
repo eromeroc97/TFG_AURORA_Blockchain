@@ -1,6 +1,8 @@
 import 'dotenv/config';
-import { createHash, randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
+import { loadConfig, type AppConfig } from './config';
+import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
 
 type ApiKeyValidationResult = {
   valid: boolean;
@@ -9,6 +11,8 @@ type ApiKeyValidationResult = {
 };
 
 type AppOptions = {
+  config?: AppConfig;
+  telemetryStore?: TelemetryStore;
   apiKeyValidator?: (apiKey: string) => Promise<ApiKeyValidationResult>;
   positiveTtlMs?: number;
   negativeTtlMs?: number;
@@ -28,6 +32,18 @@ type CachedApiKeyValidation =
 
 type AuthContext = {
   ecosystemId: string;
+  apiKey: string;
+};
+
+type IngestRequestBody = {
+  api_key: string;
+  latitude: number;
+  longitude: number;
+  devices: Array<{
+    mac_addr: string;
+    [key: string]: unknown;
+  }>;
+  timestamp?: string;
 };
 
 type AuthenticatedFastifyRequest = FastifyRequest & {
@@ -36,19 +52,6 @@ type AuthenticatedFastifyRequest = FastifyRequest & {
 
 const DEFAULT_POSITIVE_TTL_MS = 60_000;
 const DEFAULT_NEGATIVE_TTL_MS = 15_000;
-
-const parseEnvNumber = (rawValue: string | undefined): number | null => {
-  if (!rawValue) {
-    return null;
-  }
-
-  const parsed = Number(rawValue);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-};
 
 const getApiKeyFromHeader = (request: FastifyRequest): string | null => {
   const headerValue = request.headers['x-api-key'];
@@ -67,8 +70,29 @@ const getApiKeyFromHeader = (request: FastifyRequest): string | null => {
 
 const hashApiKey = (apiKey: string): string => createHash('sha256').update(apiKey).digest('hex');
 
-const parseStaticMap = (): Record<string, string> => {
-  const raw = process.env.IOT_API_KEY_STATIC_MAP;
+const stableSortObject = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(stableSortObject);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .reduce<Record<string, unknown>>((acc, [key, nestedValue]) => {
+        acc[key] = stableSortObject(nestedValue);
+        return acc;
+      }, {});
+  }
+
+  return value;
+};
+
+const buildPayloadHash = (payload: Record<string, unknown>): string => {
+  const normalizedPayload = stableSortObject(payload);
+  return createHash('sha256').update(JSON.stringify(normalizedPayload)).digest('hex');
+};
+
+const parseStaticMap = (raw: string | undefined): Record<string, string> => {
 
   if (!raw) {
     return {};
@@ -91,10 +115,10 @@ const parseStaticMap = (): Record<string, string> => {
   }
 };
 
-const buildDefaultApiKeyValidator = () => {
-  const validationUrl = process.env.AUTH_VALIDATE_API_KEY_URL;
-  const internalToken = process.env.AUTH_INTERNAL_TOKEN;
-  const staticMap = parseStaticMap();
+const buildDefaultApiKeyValidator = (config: AppConfig) => {
+  const validationUrl = config.authValidateApiKeyUrl;
+  const internalToken = config.authInternalToken;
+  const staticMap = parseStaticMap(config.iotApiKeyStaticMap);
 
   return async (apiKey: string): Promise<ApiKeyValidationResult> => {
     if (validationUrl) {
@@ -129,15 +153,22 @@ const buildDefaultApiKeyValidator = () => {
 };
 
 export const buildApp = (options: AppOptions = {}) => {
+  const config = options.config ?? loadConfig();
   const app = Fastify({ logger: true });
+  const telemetryStore = options.telemetryStore ?? new MongoTelemetryStore(config.mongoUri);
+  const shouldCloseStore = !options.telemetryStore;
 
-  const apiKeyValidator = options.apiKeyValidator ?? buildDefaultApiKeyValidator();
-  const positiveTtlFromEnv = parseEnvNumber(process.env.IOT_API_KEY_POSITIVE_TTL_MS);
-  const negativeTtlFromEnv = parseEnvNumber(process.env.IOT_API_KEY_NEGATIVE_TTL_MS);
-  const positiveTtlMs = options.positiveTtlMs ?? positiveTtlFromEnv ?? DEFAULT_POSITIVE_TTL_MS;
-  const negativeTtlMs = options.negativeTtlMs ?? negativeTtlFromEnv ?? DEFAULT_NEGATIVE_TTL_MS;
+  const apiKeyValidator = options.apiKeyValidator ?? buildDefaultApiKeyValidator(config);
+  const positiveTtlMs = options.positiveTtlMs ?? config.iotApiKeyPositiveTtlMs ?? DEFAULT_POSITIVE_TTL_MS;
+  const negativeTtlMs = options.negativeTtlMs ?? config.iotApiKeyNegativeTtlMs ?? DEFAULT_NEGATIVE_TTL_MS;
   const now = options.now ?? (() => Date.now());
   const apiKeyValidationCache = new Map<string, CachedApiKeyValidation>();
+
+  app.addHook('onClose', async () => {
+    if (shouldCloseStore) {
+      await telemetryStore.close();
+    }
+  });
 
   app.get('/health', async () => {
     return {
@@ -163,7 +194,10 @@ export const buildApp = (options: AppOptions = {}) => {
 
     if (cached && cached.expiresAt > currentTs) {
       if (cached.kind === 'valid') {
-        (request as AuthenticatedFastifyRequest).authContext = { ecosystemId: cached.ecosystemId };
+        (request as AuthenticatedFastifyRequest).authContext = {
+          ecosystemId: cached.ecosystemId,
+          apiKey,
+        };
         return;
       }
 
@@ -220,7 +254,14 @@ export const buildApp = (options: AppOptions = {}) => {
       ecosystemId: validationResult.ecosystemId,
       expiresAt: currentTs + positiveTtlMs,
     });
-    (request as AuthenticatedFastifyRequest).authContext = { ecosystemId: validationResult.ecosystemId };
+    (request as AuthenticatedFastifyRequest).authContext = {
+      ecosystemId: validationResult.ecosystemId,
+      apiKey,
+    };
+  };
+
+  const broadcastToFirefly = (hash: string, mongoId: string) => {
+    console.log('[STUB] Simulando envio a FireFly del hash:', hash, 'mongoId:', mongoId, 'url:', config.fireflyApiUrl);
   };
 
   app.post(
@@ -230,25 +271,31 @@ export const buildApp = (options: AppOptions = {}) => {
       schema: {
         body: {
           type: 'object',
-          required: ['ts', 'gatewayId', 'measurements'],
+          required: ['api_key', 'latitude', 'longitude', 'devices'],
           properties: {
-            ts: { type: 'string', minLength: 1 },
-            gatewayId: { type: 'string', minLength: 1 },
-            measurements: {
-              type: 'object',
-              additionalProperties: true,
+            api_key: { type: 'string', minLength: 1 },
+            latitude: { type: 'number' },
+            longitude: { type: 'number' },
+            devices: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['mac_addr'],
+                properties: {
+                  mac_addr: { type: 'string', minLength: 1 },
+                },
+                additionalProperties: true,
+              },
             },
-            metadata: {
-              type: 'object',
-              additionalProperties: true,
-            },
+            timestamp: { type: 'string', format: 'date-time' },
           },
           additionalProperties: true,
         },
       },
     },
-    async (request, reply) => {
-      const ecosystemId = (request as AuthenticatedFastifyRequest).authContext?.ecosystemId;
+    async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply) => {
+      const authContext = (request as AuthenticatedFastifyRequest).authContext;
+      const ecosystemId = authContext?.ecosystemId;
 
       if (!ecosystemId) {
         return reply.code(401).send({
@@ -257,10 +304,46 @@ export const buildApp = (options: AppOptions = {}) => {
         });
       }
 
+      if (request.body.api_key !== authContext.apiKey) {
+        return reply.code(400).send({
+          error: 'API_KEY_MISMATCH',
+          message: 'Body api_key does not match authenticated x-api-key header',
+        });
+      }
+
+      const eventTimestamp = request.body.timestamp ? new Date(request.body.timestamp) : new Date(now());
+
+      if (Number.isNaN(eventTimestamp.getTime())) {
+        return reply.code(400).send({
+          error: 'INVALID_TIMESTAMP',
+          message: 'timestamp must be a valid ISO-8601 date-time string',
+        });
+      }
+
+      const payload = {
+        latitude: request.body.latitude,
+        longitude: request.body.longitude,
+        devices: request.body.devices,
+      };
+
+      const hash = buildPayloadHash(payload);
+      const savedTelemetry = await telemetryStore.save({
+        ecosystemId,
+        macAddress: request.body.devices[0]?.mac_addr ?? null,
+        payload,
+        hash,
+        timestamp: eventTimestamp,
+      });
+
+      void Promise.resolve().then(() => {
+        broadcastToFirefly(hash, savedTelemetry.id);
+      });
+
       return reply.code(202).send({
-        ingestId: randomUUID(),
+        ingestId: savedTelemetry.id,
         status: 'ACCEPTED',
         ecosystemId,
+        hash,
         receivedAt: new Date(now()).toISOString(),
       });
     },
@@ -270,12 +353,12 @@ export const buildApp = (options: AppOptions = {}) => {
 };
 
 const start = async () => {
-  const app = buildApp();
-  const listenPort = parseEnvNumber(process.env.PORT) ?? 3002;
+  const config = loadConfig();
+  const app = buildApp({ config });
 
   try {
     await app.listen({
-      port: listenPort,
+      port: config.port,
       host: '0.0.0.0',
     });
   } catch (err) {
