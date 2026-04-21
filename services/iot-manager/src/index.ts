@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createHash } from 'crypto';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
+import { buildApiKeyCache, type ApiKeyCache } from './api-key-cache';
 import { loadConfig, type AppConfig } from './config';
 import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
 
@@ -21,22 +22,11 @@ type AppOptions = {
   config?: AppConfig;
   telemetryStore?: TelemetryStore;
   apiKeyValidator?: (input: ApiKeyValidationInput) => Promise<ApiKeyValidationResult>;
+  apiKeyCache?: ApiKeyCache;
   positiveTtlMs?: number;
   negativeTtlMs?: number;
   now?: () => number;
 };
-
-type CachedApiKeyValidation =
-  | {
-      kind: 'valid';
-      ecosystemId: string;
-      did: string;
-      expiresAt: number;
-    }
-  | {
-      kind: 'invalid';
-      expiresAt: number;
-    };
 
 type AuthContext = {
   ecosystemId: string;
@@ -57,7 +47,7 @@ type AuthenticatedFastifyRequest = FastifyRequest & {
   authContext?: AuthContext;
 };
 
-const DEFAULT_POSITIVE_TTL_MS = 60_000;
+const DEFAULT_POSITIVE_TTL_MS = 600_000;
 const DEFAULT_NEGATIVE_TTL_MS = 15_000;
 
 const getApiKeyFromHeader = (request: FastifyRequest): string | null => {
@@ -200,11 +190,17 @@ export const buildApp = (options: AppOptions = {}) => {
   const positiveTtlMs = options.positiveTtlMs ?? config.iotApiKeyPositiveTtlMs ?? DEFAULT_POSITIVE_TTL_MS;
   const negativeTtlMs = options.negativeTtlMs ?? config.iotApiKeyNegativeTtlMs ?? DEFAULT_NEGATIVE_TTL_MS;
   const now = options.now ?? (() => Date.now());
-  const apiKeyValidationCache = new Map<string, CachedApiKeyValidation>();
+  const apiKeyCache = options.apiKeyCache ?? buildApiKeyCache(config, positiveTtlMs);
+  const shouldCloseApiKeyCache = !options.apiKeyCache;
+  const invalidApiKeyCache = new Map<string, { expiresAt: number }>();
 
   app.addHook('onClose', async () => {
     if (shouldCloseStore) {
       await telemetryStore.close();
+    }
+
+    if (shouldCloseApiKeyCache) {
+      await apiKeyCache.close();
     }
   });
 
@@ -228,17 +224,23 @@ export const buildApp = (options: AppOptions = {}) => {
 
     const cacheKey = hashApiKey(apiKey);
     const currentTs = now();
-    const cached = apiKeyValidationCache.get(cacheKey);
 
-    if (cached && cached.expiresAt > currentTs) {
-      if (cached.kind === 'valid') {
+    try {
+      const cachedValidApiKey = await apiKeyCache.get(cacheKey);
+      if (cachedValidApiKey) {
         (request as AuthenticatedFastifyRequest).authContext = {
-          ecosystemId: cached.ecosystemId,
-          did: cached.did,
+          ecosystemId: cachedValidApiKey.ecosystemId,
+          did: cachedValidApiKey.did,
         };
         return;
       }
+    } catch (error) {
+      request.log.warn({ error }, 'Redis API key cache unavailable while reading');
+    }
 
+    const cachedInvalid = invalidApiKeyCache.get(cacheKey);
+
+    if (cachedInvalid && cachedInvalid.expiresAt > currentTs) {
       reply.code(401).send({
         error: 'API_KEY_INVALID',
         message: 'API key is invalid',
@@ -246,8 +248,8 @@ export const buildApp = (options: AppOptions = {}) => {
       return;
     }
 
-    if (cached && cached.expiresAt <= currentTs) {
-      apiKeyValidationCache.delete(cacheKey);
+    if (cachedInvalid && cachedInvalid.expiresAt <= currentTs) {
+      invalidApiKeyCache.delete(cacheKey);
     }
 
     let validationResult: ApiKeyValidationResult;
@@ -268,8 +270,7 @@ export const buildApp = (options: AppOptions = {}) => {
     }
 
     if (!validationResult.valid || !validationResult.ecosystemId || !validationResult.did) {
-      apiKeyValidationCache.set(cacheKey, {
-        kind: 'invalid',
+      invalidApiKeyCache.set(cacheKey, {
         expiresAt: currentTs + negativeTtlMs,
       });
       reply.code(401).send({
@@ -280,8 +281,7 @@ export const buildApp = (options: AppOptions = {}) => {
     }
 
     if (validationResult.status && validationResult.status.toUpperCase() !== 'ACTIVE') {
-      apiKeyValidationCache.set(cacheKey, {
-        kind: 'invalid',
+      invalidApiKeyCache.set(cacheKey, {
         expiresAt: currentTs + negativeTtlMs,
       });
       reply.code(403).send({
@@ -291,12 +291,16 @@ export const buildApp = (options: AppOptions = {}) => {
       return;
     }
 
-    apiKeyValidationCache.set(cacheKey, {
-      kind: 'valid',
-      ecosystemId: validationResult.ecosystemId,
-      did: validationResult.did,
-      expiresAt: currentTs + positiveTtlMs,
-    });
+    invalidApiKeyCache.delete(cacheKey);
+    try {
+      await apiKeyCache.set(cacheKey, {
+        ecosystemId: validationResult.ecosystemId,
+        did: validationResult.did,
+      });
+    } catch (error) {
+      request.log.warn({ error }, 'Redis API key cache unavailable while writing');
+    }
+
     (request as AuthenticatedFastifyRequest).authContext = {
       ecosystemId: validationResult.ecosystemId,
       did: validationResult.did,

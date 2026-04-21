@@ -218,6 +218,19 @@ services:
     depends_on:
       - mongo-db
 
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: unless-stopped
+    # Exponemos el puerto SOLO a localhost por seguridad
+    ports:
+      - "127.0.0.1:8091:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    networks:
+      - aurora-secure-net
+    depends_on:
+      - redis
+
 networks:
   aurora-secure-net:
     driver: bridge

@@ -2,6 +2,7 @@ export type AppConfig = {
   port: number;
   mongoUri: string;
   fireflyApiUrl: string;
+  redisUrl?: string;
   authValidateApiKeyUrl?: string;
   authInternalToken?: string;
   iotApiKeyStaticMap?: string;
@@ -38,12 +39,13 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     port: parsePositiveNumber(env.PORT, 3002, 'PORT'),
     mongoUri,
     fireflyApiUrl,
+    redisUrl: env.REDIS_URL?.trim() || undefined,
     authValidateApiKeyUrl: env.AUTH_VALIDATE_API_KEY_URL?.trim() || undefined,
     authInternalToken: env.AUTH_INTERNAL_TOKEN?.trim() || undefined,
     iotApiKeyStaticMap: env.IOT_API_KEY_STATIC_MAP,
     iotApiKeyPositiveTtlMs: parsePositiveNumber(
       env.IOT_API_KEY_POSITIVE_TTL_MS,
-      60_000,
+      600_000,
       'IOT_API_KEY_POSITIVE_TTL_MS',
     ),
     iotApiKeyNegativeTtlMs: parsePositiveNumber(
