@@ -44,6 +44,60 @@ export class DevicesService {
     });
   }
 
+  async existsByMacAddress(ecosystemId: string, macAddress: string): Promise<boolean> {
+    const device = await this.prisma.device.findUnique({
+      where: {
+        ecosystemId_macAddress: {
+          ecosystemId,
+          macAddress,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return device !== null;
+  }
+
+  async registerFromDiscovery(
+    ecosystemId: string,
+    macAddress: string,
+    vendor?: string,
+    preferredName?: string,
+  ) {
+    const existingDevice = await this.prisma.device.findUnique({
+      where: {
+        ecosystemId_macAddress: {
+          ecosystemId,
+          macAddress,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingDevice) {
+      return existingDevice;
+    }
+
+    const name = preferredName?.trim() || macAddress;
+
+    return this.prisma.device.create({
+      data: {
+        ecosystemId,
+        name,
+        fingerprint: macAddress,
+        macAddress,
+        vendor: vendor ?? null,
+        status: DeviceStatus.PENDING,
+        did: null,
+      },
+      select: this.deviceSelect,
+    });
+  }
+
   findAll() {
     return this.prisma.device.findMany({
       orderBy: { createdAt: 'desc' },
