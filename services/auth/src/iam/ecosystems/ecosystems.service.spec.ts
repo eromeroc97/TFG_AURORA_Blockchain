@@ -19,6 +19,7 @@ describe('EcosystemsService', () => {
       create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
@@ -237,6 +238,11 @@ describe('EcosystemsService', () => {
     const result = await service.findAll();
 
     expect(prismaMock.ecosystem.findMany).toHaveBeenCalledWith({
+      where: {
+        status: {
+          not: EcosystemStatus.REVOKED,
+        },
+      },
       orderBy: { createdAt: 'desc' },
       select: expect.objectContaining({
         _count: {
@@ -274,7 +280,14 @@ describe('EcosystemsService', () => {
     const result = await service.findDevicesForEcosystem('eco-id');
 
     expect(prismaMock.device.findMany).toHaveBeenCalledWith({
-      where: { ecosystemId: 'eco-id' },
+      where: {
+        ecosystemId: 'eco-id',
+        ecosystem: {
+          status: {
+            not: EcosystemStatus.REVOKED,
+          },
+        },
+      },
       select: {
         id: true,
         name: true,
@@ -329,6 +342,104 @@ describe('EcosystemsService', () => {
     });
 
     await expect(service.getApiKey('eco-id', actorId)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('update allows the ecosystem owner to change the name', async () => {
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({
+      id: 'eco-id',
+      ownerId: actorId,
+      status: EcosystemStatus.ACTIVE,
+    });
+    (prismaMock.ecosystem.update as any).mockResolvedValue({
+      id: 'eco-id',
+      name: 'updated-name',
+      ownerId: actorId,
+      did: 'did:firefly:custom/eco-id',
+      certificateFingerprint: null,
+      status: EcosystemStatus.ACTIVE,
+      latitude: 0,
+      longitude: 0,
+      isOnline: false,
+      lastSeen: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.update('eco-id', { name: 'updated-name' }, actorId);
+
+    expect(prismaMock.ecosystem.findUnique).toHaveBeenCalledWith({
+      where: { id: 'eco-id' },
+      select: { id: true, ownerId: true, status: true },
+    });
+    expect(prismaMock.ecosystem.update).toHaveBeenCalledWith({
+      where: { id: 'eco-id' },
+      data: { name: 'updated-name' },
+      select: expect.any(Object),
+    });
+    expect(result).toEqual(expect.objectContaining({ id: 'eco-id', name: 'updated-name' }));
+  });
+
+  it('update throws ForbiddenException when user is not the ecosystem owner', async () => {
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({
+      id: 'eco-id',
+      ownerId: 'other-user-id',
+      status: EcosystemStatus.ACTIVE,
+    });
+
+    await expect(service.update('eco-id', { name: 'updated-name' }, actorId)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.ecosystem.update).not.toHaveBeenCalled();
+  });
+
+  it('remove revokes the ecosystem instead of deleting it', async () => {
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({
+      id: 'eco-id',
+      ownerId: actorId,
+      status: EcosystemStatus.ACTIVE,
+    });
+    (prismaMock.ecosystem.update as any).mockResolvedValue({
+      id: 'eco-id',
+      name: 'REVOKED_eco-id',
+      ownerId: actorId,
+      did: null,
+      certificateFingerprint: null,
+      status: EcosystemStatus.REVOKED,
+      latitude: null,
+      longitude: null,
+      isOnline: false,
+      lastSeen: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.remove('eco-id', actorId);
+
+    expect(prismaMock.ecosystem.update).toHaveBeenCalledWith({
+      where: { id: 'eco-id' },
+      data: {
+        status: EcosystemStatus.REVOKED,
+        name: 'REVOKED_eco-id',
+        did: null,
+        certificateFingerprint: null,
+        apiKey: null,
+        apiKeyIv: null,
+        apiKeyAuthTag: null,
+        isOnline: false,
+        lastSeen: null,
+      },
+      select: expect.any(Object),
+    });
+    expect(result.status).toBe(EcosystemStatus.REVOKED);
+  });
+
+  it('remove throws ForbiddenException when user is not the ecosystem owner', async () => {
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({
+      id: 'eco-id',
+      ownerId: 'other-user-id',
+      status: EcosystemStatus.ACTIVE,
+    });
+
+    await expect(service.remove('eco-id', actorId)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.ecosystem.update).not.toHaveBeenCalled();
   });
 
   it('validateApiKey returns ecosystem identity and updates coordinates for an active ecosystem', async () => {
@@ -389,21 +500,31 @@ describe('EcosystemsService', () => {
 
   it('delegates findAll/findOne/update/remove to prisma', async () => {
     (prismaMock.ecosystem.findMany as any).mockResolvedValue([{ id: '1' }]);
-    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({ id: '2' });
+    (prismaMock.ecosystem.findFirst as any).mockResolvedValue({ id: '2' });
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({ id: '3', ownerId: actorId, status: EcosystemStatus.ACTIVE });
     (prismaMock.ecosystem.update as any).mockResolvedValue({ id: '3' });
-    (prismaMock.ecosystem.delete as any).mockResolvedValue({ id: '4' });
 
     await service.findAll();
     await service.findOne('2');
-    await service.update('3', {});
-    await service.remove('4');
+    await service.update('3', {}, actorId);
+    await service.remove('4', actorId);
 
     expect(prismaMock.ecosystem.findMany).toHaveBeenCalledWith({
+      where: {
+        status: {
+          not: EcosystemStatus.REVOKED,
+        },
+      },
       orderBy: { createdAt: 'desc' },
       select: expect.any(Object),
     });
-    expect(prismaMock.ecosystem.findUnique).toHaveBeenCalledWith({
-      where: { id: '2' },
+    expect(prismaMock.ecosystem.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: '2',
+        status: {
+          not: EcosystemStatus.REVOKED,
+        },
+      },
       select: expect.any(Object),
     });
     expect(prismaMock.ecosystem.update).toHaveBeenCalledWith({
@@ -411,8 +532,19 @@ describe('EcosystemsService', () => {
       data: {},
       select: expect.any(Object),
     });
-    expect(prismaMock.ecosystem.delete).toHaveBeenCalledWith({
+    expect(prismaMock.ecosystem.update).toHaveBeenCalledWith({
       where: { id: '4' },
+      data: {
+        status: EcosystemStatus.REVOKED,
+        name: 'REVOKED_4',
+        did: null,
+        certificateFingerprint: null,
+        apiKey: null,
+        apiKeyIv: null,
+        apiKeyAuthTag: null,
+        isOnline: false,
+        lastSeen: null,
+      },
       select: expect.any(Object),
     });
   });

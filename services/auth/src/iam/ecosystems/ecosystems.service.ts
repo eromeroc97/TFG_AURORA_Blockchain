@@ -281,6 +281,11 @@ export class EcosystemsService {
 
   findAll() {
     return this.prisma.ecosystem.findMany({
+      where: {
+        status: {
+          not: EcosystemStatus.REVOKED,
+        },
+      },
       orderBy: { createdAt: 'desc' },
       select: {
         ...this.ecosystemSelect,
@@ -294,17 +299,55 @@ export class EcosystemsService {
   }
 
   findOne(id: string) {
-    return this.prisma.ecosystem.findUnique({ where: { id }, select: this.ecosystemSelect });
+    return this.prisma.ecosystem.findFirst({
+      where: {
+        id,
+        status: {
+          not: EcosystemStatus.REVOKED,
+        },
+      },
+      select: this.ecosystemSelect,
+    });
   }
 
   findDevicesForEcosystem(ecosystemId: string) {
     return this.prisma.device.findMany({
-      where: { ecosystemId },
+      where: {
+        ecosystemId,
+        ecosystem: {
+          status: {
+            not: EcosystemStatus.REVOKED,
+          },
+        },
+      },
       select: this.ecosystemDeviceSelect,
     });
   }
 
-  update(id: string, updateEcosystemDto: UpdateEcosystemDto) {
+  private async getActiveEcosystem(id: string) {
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        ownerId: true,
+        status: true,
+      },
+    });
+
+    if (!ecosystem || ecosystem.status === EcosystemStatus.REVOKED) {
+      throw new NotFoundException('Ecosystem not found');
+    }
+
+    return ecosystem;
+  }
+
+  async update(id: string, updateEcosystemDto: UpdateEcosystemDto, actorId?: string) {
+    const ecosystem = await this.getActiveEcosystem(id);
+
+    if (!actorId || ecosystem.ownerId !== actorId) {
+      throw new ForbiddenException('No tienes permisos para modificar este ecosistema');
+    }
+
     return this.prisma.ecosystem.update({
       where: { id },
       data: updateEcosystemDto,
@@ -312,8 +355,28 @@ export class EcosystemsService {
     });
   }
 
-  remove(id: string) {
-    return this.prisma.ecosystem.delete({ where: { id }, select: this.ecosystemSelect });
+  async remove(id: string, actorId?: string) {
+    const ecosystem = await this.getActiveEcosystem(id);
+
+    if (!actorId || ecosystem.ownerId !== actorId) {
+      throw new ForbiddenException('No tienes permisos para dar de baja este ecosistema');
+    }
+
+    return this.prisma.ecosystem.update({
+      where: { id },
+      data: {
+        status: EcosystemStatus.REVOKED,
+        name: `REVOKED_${id}`,
+        did: null,
+        certificateFingerprint: null,
+        apiKey: null,
+        apiKeyIv: null,
+        apiKeyAuthTag: null,
+        isOnline: false,
+        lastSeen: null,
+      },
+      select: this.ecosystemSelect,
+    });
   }
 
   async updateHeartbeat(id: string) {

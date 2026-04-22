@@ -46,8 +46,10 @@ export class EcosystemsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateEcosystemDto: UpdateEcosystemDto) {
-    return this.ecosystemsService.update(id, updateEcosystemDto);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  update(@Param('id') id: string, @Body() updateEcosystemDto: UpdateEcosystemDto, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.update(id, updateEcosystemDto, request.user?.sub);
   }
 
   @Patch(':id/heartbeat')
@@ -55,8 +57,17 @@ export class EcosystemsController {
     return this.ecosystemsService.updateHeartbeat(id);
   }
 
+  @Post(':id/revoke')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  revoke(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.remove(id, request.user?.sub);
+  }
+
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.ecosystemsService.remove(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.remove(id, request.user?.sub);
   }
 }

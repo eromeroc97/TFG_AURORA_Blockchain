@@ -81,15 +81,23 @@ describe('EcosystemsController', () => {
     await controller.findAll();
     await controller.findDevices('eco');
     await controller.findOne('eco');
-    await controller.update('eco', {});
+    await controller.update('eco', {}, userRequest);
     await controller.updateHeartbeat('eco');
-    await controller.remove('eco');
+    await controller.remove('eco', userRequest);
 
     expect(ecosystemsServiceMock.findAll).toHaveBeenCalled();
     expect(ecosystemsServiceMock.findDevicesForEcosystem).toHaveBeenCalledWith('eco');
     expect(ecosystemsServiceMock.findOne).toHaveBeenCalledWith('eco');
-    expect(ecosystemsServiceMock.update).toHaveBeenCalledWith('eco', {});
+    expect(ecosystemsServiceMock.update).toHaveBeenCalledWith('eco', {}, userRequest.user.sub);
     expect(ecosystemsServiceMock.updateHeartbeat).toHaveBeenCalledWith('eco');
-    expect(ecosystemsServiceMock.remove).toHaveBeenCalledWith('eco');
+    expect(ecosystemsServiceMock.remove).toHaveBeenCalledWith('eco', userRequest.user.sub);
+  });
+
+  it('routes revoke endpoint to service remove with auth subject', async () => {
+    (ecosystemsServiceMock.remove as any).mockResolvedValue({ id: 'eco' });
+
+    await controller.revoke('eco', userRequest);
+
+    expect(ecosystemsServiceMock.remove).toHaveBeenCalledWith('eco', userRequest.user.sub);
   });
 });
