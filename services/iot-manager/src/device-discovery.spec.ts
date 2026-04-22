@@ -83,6 +83,47 @@ describe('DeviceDiscoveryService', () => {
     );
   });
 
+  it('normalizes non-canonical mac address formats to canonical separator form', async () => {
+    const fetchMock = jest
+      .fn<Promise<MockResponse>, [RequestInfo | URL, RequestInit | undefined]>()
+      .mockResolvedValueOnce(createResponse({ ok: true, json: { exists: false } }))
+      .mockResolvedValueOnce(createResponse({ ok: true, status: 201 }));
+
+    const service = new DeviceDiscoveryService(baseConfig, fetchMock as unknown as typeof fetch);
+
+    await service.discoverAndSync(
+      {
+        ecosystemId: 'eco-1',
+        devices: [{ mac_addr: 'aabb.ccdd.ee02', vendor: 'VendorB' }],
+      },
+      logger,
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      baseConfig.authDeviceLookupUrl,
+      expect.objectContaining({
+        body: JSON.stringify({
+          ecosystemId: 'eco-1',
+          macAddress: 'AA:BB:CC:DD:EE:02',
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      baseConfig.authDeviceRegisterUrl,
+      expect.objectContaining({
+        body: JSON.stringify({
+          ecosystemId: 'eco-1',
+          macAddress: 'AA:BB:CC:DD:EE:02',
+          vendor: 'VendorB',
+          preferredName: undefined,
+        }),
+      }),
+    );
+  });
+
   it('does not register when auth says device already exists', async () => {
     const fetchMock = jest
       .fn<Promise<MockResponse>, [RequestInfo | URL, RequestInit | undefined]>()

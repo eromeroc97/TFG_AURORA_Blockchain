@@ -82,6 +82,25 @@ services:
       retries: 3
       start_period: 10s
 
+  webapp:
+    image: caddy:2.8.4-alpine
+    depends_on:
+      - api-gateway
+    volumes:
+      - ./apps/webapp/dist:/usr/share/caddy:ro
+      - ./apps/webapp/Caddyfile:/etc/caddy/Caddyfile:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webapp.rule=PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/traefik`)"
+      - "traefik.http.routers.webapp.entrypoints=web"
+      - "traefik.http.routers.webapp.priority=1"
+      - "traefik.http.services.webapp.loadbalancer.server.port=80"
+      - "traefik.docker.network=aurora-secure-net"
+    networks:
+      - aurora-secure-net
+    expose:
+      - "80"
+
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     environment:

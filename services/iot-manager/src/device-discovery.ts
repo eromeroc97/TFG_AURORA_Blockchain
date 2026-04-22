@@ -20,7 +20,15 @@ type LoggerLike = {
   warn(payload: unknown, message: string): void;
 };
 
-const normalizeMacAddress = (macAddress: string): string => macAddress.trim().toUpperCase();
+const normalizeMacAddress = (macAddress: string): string => {
+  const cleaned = macAddress.trim().replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+
+  if (!/^[A-F0-9]{12}$/.test(cleaned)) {
+    throw new Error(`Invalid MAC address format: ${macAddress}`);
+  }
+
+  return cleaned.match(/.{2}/g)!.join(':');
+};
 
 const extractVendor = (device: DevicePayload): string | undefined => {
   if (typeof device.vendor !== 'string') {
