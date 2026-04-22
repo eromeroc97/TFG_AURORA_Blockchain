@@ -213,6 +213,22 @@ export const buildApp = (options: AppOptions = {}) => {
     };
   });
 
+  app.get('/iot/devices/:deviceId/last-interaction', async (request: FastifyRequest<{ Params: { deviceId: string } }>, reply: FastifyReply) => {
+    const deviceId = request.params.deviceId?.trim();
+
+    if (!deviceId) {
+      return reply.code(400).send({
+        error: 'INVALID_DEVICE_ID',
+        message: 'deviceId param is required',
+      });
+    }
+
+    const lastInteractionAt = await telemetryStore.findLastInteraction(deviceId);
+    return reply.code(200).send({
+      lastInteractionAt: lastInteractionAt ? lastInteractionAt.toISOString() : null,
+    });
+  });
+
   const authenticateApiKey = async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply: FastifyReply) => {
     const apiKey = getApiKeyFromHeader(request);
 

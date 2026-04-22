@@ -28,6 +28,7 @@ export type SaveTelemetryResult = {
 
 export interface TelemetryStore {
   save(input: SaveTelemetryInput): Promise<SaveTelemetryResult>;
+  findLastInteraction(deviceId: string): Promise<Date | null>;
   close(): Promise<void>;
 }
 
@@ -99,6 +100,37 @@ export class MongoTelemetryStore implements TelemetryStore {
     return {
       id: result.insertedId.toString(),
     };
+  }
+
+  async findLastInteraction(deviceId: string): Promise<Date | null> {
+    const collection = await this.ensureCollection();
+
+    const normalizedDeviceId = deviceId.trim();
+    const searchClauses: Array<Record<string, unknown>> = [
+      { 'payload.devices.id': normalizedDeviceId },
+      { 'payload.devices.deviceId': normalizedDeviceId },
+    ];
+
+    const normalizedMac = normalizedDeviceId.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    if (/^[A-F0-9]{12}$/.test(normalizedMac)) {
+      const macVariants = [
+        normalizedMac,
+        normalizedMac.match(/.{2}/g)?.join(':') ?? normalizedMac,
+        normalizedMac.match(/.{2}/g)?.join('-') ?? normalizedMac,
+        normalizedMac.match(/.{2}/g)?.join('.') ?? normalizedMac,
+      ];
+
+      searchClauses.push({ 'payload.devices.mac_addr': { $in: macVariants } });
+    }
+
+    const document = await collection
+      .find({ $or: searchClauses })
+      .sort({ timestamp: -1 })
+      .limit(1)
+      .project({ timestamp: 1 })
+      .next();
+
+    return document?.timestamp ?? null;
   }
 
   async close(): Promise<void> {

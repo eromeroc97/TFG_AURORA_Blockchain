@@ -17,6 +17,23 @@ const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryS
     savedInputs.push(input);
     return { id: `mongo-${savedInputs.length}` };
   },
+  findLastInteraction: async (deviceId: string) => {
+    const found = [...savedInputs]
+      .reverse()
+      .find((input) =>
+        Array.isArray(input.payload.devices) &&
+        input.payload.devices.some(
+          (device) =>
+            device?.id === deviceId ||
+            device?.deviceId === deviceId ||
+            device?.mac_addr === deviceId ||
+            device?.mac_addr?.replace(/[^a-fA-F0-9]/g, '').toUpperCase() ===
+              deviceId.replace(/[^a-fA-F0-9]/g, '').toUpperCase(),
+        ),
+      );
+
+    return found?.timestamp ?? null;
+  },
   close: async () => {
     return;
   },
@@ -346,6 +363,77 @@ describe('IoT manager smoke tests', () => {
     });
 
     expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it('/iot/devices/:deviceId/last-interaction (GET) should return the last interaction timestamp if available', async () => {
+    const savedInputs: SaveTelemetryInput[] = [
+      {
+        ecosystemId: 'eco-123',
+        latitude: 39.0,
+        longitude: -4.0,
+        payload: {
+          devices: [
+            {
+              id: 'device-abc',
+              mac_addr: 'AA:BB:CC:DD:EE:FF',
+            },
+          ],
+        },
+        hash: 'hash-1',
+        timestamp: new Date('2026-04-21T10:00:00.000Z'),
+      },
+      {
+        ecosystemId: 'eco-123',
+        latitude: 39.0,
+        longitude: -4.0,
+        payload: {
+          devices: [
+            {
+              id: 'device-abc',
+              mac_addr: 'AA:BB:CC:DD:EE:FF',
+            },
+          ],
+        },
+        hash: 'hash-2',
+        timestamp: new Date('2026-04-21T10:05:00.000Z'),
+      },
+    ];
+
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore(savedInputs),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/iot/devices/device-abc/last-interaction',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      lastInteractionAt: '2026-04-21T10:05:00.000Z',
+    });
+
+    await app.close();
+  });
+
+  it('/iot/devices/:deviceId/last-interaction (GET) should return null when no interaction exists', async () => {
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore([]),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/iot/devices/missing-device/last-interaction',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      lastInteractionAt: null,
+    });
 
     await app.close();
   });
