@@ -1,6 +1,6 @@
 import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DeviceStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
@@ -21,7 +21,6 @@ describe('DevicesService', () => {
 
   const createDto: CreateDeviceDto = {
     name: 'sensor-01',
-    fingerprint: 'AA:BB:CC:DD:EE:FF',
     ecosystemId: '11111111-1111-4111-8111-111111111111',
   };
 
@@ -48,21 +47,15 @@ describe('DevicesService', () => {
     expect(prismaMock.device.create).toHaveBeenCalledWith({
       data: {
         name: createDto.name,
-        fingerprint: createDto.fingerprint,
         ecosystemId: createDto.ecosystemId,
         macAddress: null,
         vendor: null,
-        status: DeviceStatus.PENDING,
-        did: null,
       },
       select: {
         id: true,
         name: true,
-        fingerprint: true,
         macAddress: true,
         vendor: true,
-        status: true,
-        did: true,
         ecosystemId: true,
         createdAt: true,
         updatedAt: true,
@@ -81,21 +74,15 @@ describe('DevicesService', () => {
     expect(prismaMock.device.create).toHaveBeenCalledWith({
       data: {
         name: createDto.name,
-        fingerprint: createDto.fingerprint,
         ecosystemId: createDto.ecosystemId,
         macAddress: 'AA:BB:CC:DD:EE:FF',
         vendor: null,
-        status: DeviceStatus.PENDING,
-        did: null,
       },
       select: {
         id: true,
         name: true,
-        fingerprint: true,
         macAddress: true,
         vendor: true,
-        status: true,
-        did: true,
         ecosystemId: true,
         createdAt: true,
         updatedAt: true,
@@ -147,20 +134,39 @@ describe('DevicesService', () => {
       data: {
         ecosystemId: 'eco-id',
         name: 'sensor-humedad-01',
-        fingerprint: 'AA:BB:CC:DD:EE:FF',
         macAddress: 'AA:BB:CC:DD:EE:FF',
         vendor: 'Cisco',
-        status: DeviceStatus.PENDING,
-        did: null,
       },
       select: {
         id: true,
         name: true,
-        fingerprint: true,
         macAddress: true,
         vendor: true,
-        status: true,
-        did: true,
+        ecosystemId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  });
+
+  it('registerFromDiscovery uses the default name when no preferred name is provided', async () => {
+    (prismaMock.device.findUnique as any).mockResolvedValue(null);
+    (prismaMock.device.create as any).mockResolvedValue({ id: 'device-id' });
+
+    await service.registerFromDiscovery('eco-id', 'aa-bb-cc-dd-ee-ff', 'Cisco');
+
+    expect(prismaMock.device.create).toHaveBeenCalledWith({
+      data: {
+        ecosystemId: 'eco-id',
+        name: 'Nuevo dispositivo',
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+        vendor: 'Cisco',
+      },
+      select: {
+        id: true,
+        name: true,
+        macAddress: true,
+        vendor: true,
         ecosystemId: true,
         createdAt: true,
         updatedAt: true,
@@ -187,11 +193,8 @@ describe('DevicesService', () => {
       select: {
         id: true,
         name: true,
-        fingerprint: true,
         macAddress: true,
         vendor: true,
-        status: true,
-        did: true,
         ecosystemId: true,
         createdAt: true,
         updatedAt: true,

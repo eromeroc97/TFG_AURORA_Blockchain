@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DeviceStatus } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateDeviceDto {
   @ApiProperty({
@@ -10,14 +9,6 @@ export class CreateDeviceDto {
   @IsString()
   @IsNotEmpty()
   name!: string;
-
-  @ApiProperty({
-    description: 'Fingerprint o identificador unico del dispositivo.',
-    example: 'AA:BB:CC:DD:EE:FF',
-  })
-  @IsString()
-  @IsNotEmpty()
-  fingerprint!: string;
 
   @ApiProperty({
     description: 'UUID del ecosistema propietario del dispositivo.',
@@ -41,18 +32,4 @@ export class CreateDeviceDto {
   @IsString()
   vendor?: string;
 
-  @ApiPropertyOptional({    description: 'Estado del dispositivo.',
-    example: DeviceStatus.PENDING,
-  })
-  @IsOptional()
-  @IsEnum(DeviceStatus)
-  status?: DeviceStatus;
-
-  @ApiPropertyOptional({
-    description: 'DID del dispositivo en blockchain.',
-    example: 'did:aurora:device:abc123',
-  })
-  @IsOptional()
-  @IsString()
-  did?: string | null;
 }

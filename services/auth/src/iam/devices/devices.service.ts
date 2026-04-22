@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DeviceStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
@@ -16,11 +16,8 @@ export class DevicesService {
   private readonly deviceSelect = {
     id: true,
     name: true,
-    fingerprint: true,
     macAddress: true,
     vendor: true,
-    status: true,
-    did: true,
     ecosystemId: true,
     createdAt: true,
     updatedAt: true,
@@ -55,12 +52,9 @@ export class DevicesService {
     return this.prisma.device.create({
       data: {
         name: createDeviceDto.name,
-        fingerprint: createDeviceDto.fingerprint,
         ecosystemId: createDeviceDto.ecosystemId,
         macAddress: this.normalizeMacAddress(createDeviceDto.macAddress),
         vendor: createDeviceDto.vendor ?? null,
-        status: createDeviceDto.status ?? DeviceStatus.PENDING,
-        did: createDeviceDto.did ?? null,
       },
       select: this.deviceSelect,
     });
@@ -106,17 +100,14 @@ export class DevicesService {
       return existingDevice;
     }
 
-    const name = preferredName?.trim() || normalizedMac;
+    const name = preferredName?.trim() || 'Nuevo dispositivo';
 
     return this.prisma.device.create({
       data: {
         ecosystemId,
         name,
-        fingerprint: normalizedMac,
         macAddress: normalizedMac,
         vendor: vendor ?? null,
-        status: DeviceStatus.PENDING,
-        did: null,
       },
       select: this.deviceSelect,
     });

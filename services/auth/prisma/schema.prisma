@@ -26,12 +26,6 @@ enum EcosystemStatus {
   REVOKED
 }
 
-enum DeviceStatus {
-  PENDING
-  ACTIVE
-  REVOKED
-}
-
 model User {
   id                 String     @id @default(uuid()) @db.Uuid
   email              String     @unique
@@ -100,14 +94,9 @@ model Device {
   ecosystemId String    @db.Uuid
   ecosystem   Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
 
-  name        String
-  fingerprint String       @unique
-  macAddress  String?      @db.VarChar(255)
-  vendor      String?
-  status      DeviceStatus @default(PENDING)
-  did         String?      @unique
-
-  // Identidad Zero-Trust de la maquina: activa solo tras validacion y/o provisionado blockchain.
+  name       String
+  macAddress String? @db.VarChar(255)
+  vendor     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
