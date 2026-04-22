@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { DeviceStatus } from '@prisma/client';
 import { DevicesController } from './devices.controller';
 import { DevicesService } from './devices.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
@@ -43,9 +42,7 @@ describe('DevicesController', () => {
   it('create should call DevicesService.create', async () => {
     const dto: CreateDeviceDto = {
       name: 'sensor-1',
-      fingerprint: 'AA:BB:CC:DD:EE:FF',
       ecosystemId: '11111111-1111-4111-8111-111111111111',
-      status: DeviceStatus.PENDING,
     };
 
     await controller.create(dto);
