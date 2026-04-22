@@ -46,7 +46,26 @@ const ecosystems: AccessMapEcosystem[] = [
     lat: 39.876,
     lng: -4.025,
     isShared: false,
-    devices: ['Sensores de movimiento', 'Cámara interior'],
+    devices: [
+      {
+        id: 'device-001',
+        name: 'Sensores de movimiento',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-001',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-002',
+        name: 'Cámara interior',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-001',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   },
   {
     id: 'eco-002',
@@ -55,7 +74,26 @@ const ecosystems: AccessMapEcosystem[] = [
     lat: 39.862,
     lng: -4.025,
     isShared: true,
-    devices: ['Gateway IoT', 'Sensor de apertura'],
+    devices: [
+      {
+        id: 'device-003',
+        name: 'Gateway IoT',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-002',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-004',
+        name: 'Sensor de apertura',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-002',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   },
 ]
 
@@ -109,6 +147,7 @@ describe('AccessMap', () => {
     render(<AccessMap ecosystems={[ecosystems[0]]} />)
 
     expect(screen.getByText(/Acceso a dispositivos restringido/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Sensores de movimiento/i)).not.toBeInTheDocument()
     expect(screen.getByText(/Cerebro Central/i)).toBeInTheDocument()
   })
 
@@ -122,5 +161,6 @@ describe('AccessMap', () => {
     render(<AccessMap ecosystems={[ecosystems[0]]} />)
 
     expect(screen.getByText(/Acceso a dispositivos restringido/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Sensores de movimiento/i)).not.toBeInTheDocument()
   })
 })

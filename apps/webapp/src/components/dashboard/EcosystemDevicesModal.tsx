@@ -1,0 +1,370 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Check, Info, Pencil, X } from 'lucide-react'
+import { apiClient } from '../../api/axios'
+import type { AccessMapDevice, AccessMapEcosystem } from './access-map.data'
+
+type EcosystemDevicesModalProps = {
+  ecosystem: AccessMapEcosystem
+  onClose: () => void
+  onDeviceUpdated: (device: AccessMapDevice) => void
+  onEcosystemUpdated: (ecosystem: AccessMapEcosystem) => void
+  onEcosystemRevoked: (ecosystemId: string) => void
+  canManageEcosystem: boolean
+}
+
+export default function EcosystemDevicesModal({
+  ecosystem,
+  onClose,
+  onDeviceUpdated,
+  onEcosystemUpdated,
+  onEcosystemRevoked,
+  canManageEcosystem,
+}: EcosystemDevicesModalProps) {
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(ecosystem.devices[0]?.id ?? null)
+  const [selectedDevice, setSelectedDevice] = useState<AccessMapDevice | null>(ecosystem.devices[0] ?? null)
+  const [editedDeviceName, setEditedDeviceName] = useState<string>(ecosystem.devices[0]?.name ?? '')
+  const [editedEcosystemName, setEditedEcosystemName] = useState<string>(ecosystem.name)
+  const [isDeviceLoading, setIsDeviceLoading] = useState(false)
+  const [isSavingDeviceName, setIsSavingDeviceName] = useState(false)
+  const [isEditingEcosystemName, setIsEditingEcosystemName] = useState(false)
+  const [isSavingEcosystemName, setIsSavingEcosystemName] = useState(false)
+  const [isConfirmingRevoke, setIsConfirmingRevoke] = useState(false)
+  const [modalError, setModalError] = useState<string | null>(null)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [ecosystemError, setEcosystemError] = useState<string | null>(null)
+  const [ecosystemSaveMessage, setEcosystemSaveMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSelectedDeviceId(ecosystem.devices[0]?.id ?? null)
+    setSelectedDevice(ecosystem.devices[0] ?? null)
+    setEditedDeviceName(ecosystem.devices[0]?.name ?? '')
+    setEditedEcosystemName(ecosystem.name)
+    setIsEditingEcosystemName(false)
+    setEcosystemError(null)
+    setModalError(null)
+    setSaveMessage(null)
+  }, [ecosystem])
+
+  useEffect(() => {
+    if (!selectedDeviceId) {
+      setSelectedDevice(null)
+      setEditedDeviceName('')
+      return
+    }
+
+    const loadDeviceDetails = async () => {
+      setIsDeviceLoading(true)
+      setModalError(null)
+
+      try {
+        const response = await apiClient.get<AccessMapDevice>(`/devices/${selectedDeviceId}`)
+        const deviceDetails = response.data
+
+        setSelectedDevice(deviceDetails)
+        setEditedDeviceName(deviceDetails.name)
+      } catch {
+        const persistedDevice = ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
+        setSelectedDevice(persistedDevice)
+        setEditedDeviceName(persistedDevice?.name ?? '')
+        setModalError('No se pudo cargar información detallada del dispositivo. Se muestra la información disponible.')
+      } finally {
+        setIsDeviceLoading(false)
+      }
+    }
+
+    void loadDeviceDetails()
+  }, [selectedDeviceId, ecosystem.devices])
+
+  const displayedDevice = useMemo(() => {
+    return selectedDevice ?? ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
+  }, [ecosystem.devices, selectedDevice, selectedDeviceId])
+
+  const handleSelectDevice = (device: AccessMapDevice) => {
+    setSelectedDeviceId(device.id)
+    setSaveMessage(null)
+    setModalError(null)
+  }
+
+  const handleSaveDeviceName = async () => {
+    if (!displayedDevice) {
+      return
+    }
+
+    const trimmedName = editedDeviceName.trim()
+    if (trimmedName.length === 0 || trimmedName === displayedDevice.name) {
+      return
+    }
+
+    setIsSavingDeviceName(true)
+    setModalError(null)
+
+    try {
+      const response = await apiClient.patch<AccessMapDevice>(`/devices/${displayedDevice.id}`, {
+        name: trimmedName,
+      })
+
+      setSelectedDevice(response.data)
+      onDeviceUpdated(response.data)
+      setSaveMessage('Nombre actualizado correctamente.')
+    } catch {
+      setModalError('No se pudo actualizar el nombre del dispositivo. Inténtalo de nuevo.')
+    } finally {
+      setIsSavingDeviceName(false)
+    }
+  }
+
+  const handleSaveEcosystemName = () => {
+    const trimmedName = editedEcosystemName.trim()
+    if (trimmedName.length === 0 || trimmedName === ecosystem.name) {
+      return
+    }
+
+    setIsSavingEcosystemName(true)
+    setEcosystemError(null)
+
+    try {
+      const updatedEcosystem = {
+        ...ecosystem,
+        name: trimmedName,
+      }
+
+      onEcosystemUpdated(updatedEcosystem)
+      setEcosystemSaveMessage('Nombre del ecosistema actualizado correctamente.')
+      setIsEditingEcosystemName(false)
+    } catch {
+      setEcosystemError('No se pudo actualizar el nombre del ecosistema. Inténtalo de nuevo.')
+    } finally {
+      setIsSavingEcosystemName(false)
+    }
+  }
+
+  const handleConfirmRevoke = () => {
+    onEcosystemRevoked(ecosystem.id)
+    setIsConfirmingRevoke(false)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-6xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-primary">Dispositivos del ecosistema</h3>
+            {isEditingEcosystemName ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  aria-label="Nombre del ecosistema"
+                  value={editedEcosystemName}
+                  onChange={(event) => setEditedEcosystemName(event.target.value)}
+                  className="w-full max-w-md rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveEcosystemName}
+                  disabled={
+                    isSavingEcosystemName || editedEcosystemName.trim().length === 0 || editedEcosystemName.trim() === ecosystem.name
+                  }
+                  className="inline-flex items-center justify-center rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingEcosystemName ? 'Guardando...' : 'Guardar nombre ecosistema'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingEcosystemName(false)
+                    setEditedEcosystemName(ecosystem.name)
+                    setEcosystemError(null)
+                    setEcosystemSaveMessage(null)
+                  }}
+                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-sm text-muted">{ecosystem.name}</p>
+                {canManageEcosystem ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingEcosystemName(true)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-surface/70"
+                    >
+                      <Pencil className="size-4" />
+                      Editar ecosistema
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingRevoke(true)}
+                      className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+                    >
+                      Dar de baja ecosistema
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            )}
+            {ecosystemError ? <p className="mt-2 text-sm text-rose-600">{ecosystemError}</p> : null}
+            {ecosystemSaveMessage ? <p className="mt-2 text-sm text-emerald-700">{ecosystemSaveMessage}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar modal de dispositivos"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-primary transition-colors hover:bg-surface/70"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+          <div className="rounded-3xl border border-border bg-surface/60 p-4 overflow-hidden">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Lista de dispositivos</p>
+            <div className="mt-4 max-h-[calc(100vh-20rem)] overflow-y-auto pr-2 space-y-2">
+              {ecosystem.devices.length > 0 ? (
+                ecosystem.devices.map((device) => (
+                  <button
+                    key={device.id}
+                    type="button"
+                    onClick={() => handleSelectDevice(device)}
+                    className={`w-full rounded-2xl px-4 py-3 text-left transition-colors ${
+                      device.id === selectedDeviceId ? 'bg-primary/10 text-primary' : 'bg-white text-primary/80 hover:bg-surface/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">{device.name}</span>
+                      <span className="text-[0.65rem] uppercase tracking-[0.2em] text-muted">ID</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted">{device.macAddress ?? 'MAC no registrada'}</p>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">
+                  No hay dispositivos registrados para este ecosistema.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-border bg-surface/60 p-6 overflow-hidden">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Detalles del dispositivo</p>
+                <p className="mt-1 text-sm text-muted">Selecciona un dispositivo para ver la información completa.</p>
+              </div>
+              <div className="rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] text-accent">
+                Actualización local
+              </div>
+            </div>
+
+            {modalError ? <p className="mt-4 text-sm text-rose-600">{modalError}</p> : null}
+            {saveMessage ? <p className="mt-4 text-sm text-emerald-700">{saveMessage}</p> : null}
+
+            {isDeviceLoading ? (
+              <div className="mt-6 rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">Cargando datos del dispositivo...</div>
+            ) : displayedDevice ? (
+              <div className="mt-6 space-y-4 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-primary">Nombre del dispositivo</span>
+                  <input
+                    type="text"
+                    value={editedDeviceName}
+                    onChange={(event) => setEditedDeviceName(event.target.value)}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+                  />
+                </label>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-border bg-white p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Mac address</p>
+                    <p className="mt-2 text-sm text-primary">{displayedDevice.macAddress ?? 'No disponible'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-white p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Vendor</p>
+                    <p className="mt-2 text-sm text-primary">{displayedDevice.vendor ?? 'No disponible'}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-border bg-white p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Ecosistema</p>
+                    <p className="mt-2 text-sm text-primary">{ecosystem.name}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-white p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Última actualización</p>
+                    <p className="mt-2 text-sm text-primary">{new Date(displayedDevice.updatedAt).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-white p-4 text-sm text-muted">
+                  <p className="font-semibold text-primary">Información adicional</p>
+                  <p className="mt-2">
+                    Para ver datos de telemetría y metadatos extendidos desde Mongo / el microservicio IoT, se requiere una integración de backend adicional.
+                  </p>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingDeviceName || editedDeviceName.trim().length === 0 || editedDeviceName.trim() === displayedDevice.name}
+                    onClick={handleSaveDeviceName}
+                    className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingDeviceName ? 'Guardando...' : 'Guardar nombre'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">
+                Selecciona un dispositivo para ver su información.
+              </div>
+            )}
+          </div>
+        </div>
+        {isConfirmingRevoke ? (
+          <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
+            <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
+                  <X className="size-5" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-primary">Confirmar baja de ecosistema</h3>
+                  <p className="text-sm leading-6 text-muted">
+                    ¿Estás seguro de que quieres dar de baja el ecosistema <strong>{ecosystem.name}</strong>? Esta acción lo eliminará de tu lista.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingRevoke(false)}
+                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRevoke}
+                  className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                >
+                  Confirmar baja
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}

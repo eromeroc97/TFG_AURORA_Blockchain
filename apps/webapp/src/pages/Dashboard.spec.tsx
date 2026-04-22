@@ -133,6 +133,36 @@ const apiEcosystems = [
   },
 ]
 
+const apiDevices = [
+  {
+    id: 'dev-1',
+    name: 'Sensor de movimiento',
+    macAddress: 'AA:BB:CC:DD:EE:01',
+    vendor: 'Acme',
+    ecosystemId: 'eco-1',
+    createdAt: '2026-04-20T00:00:00.000Z',
+    updatedAt: '2026-04-20T00:00:00.000Z',
+  },
+  {
+    id: 'dev-2',
+    name: 'Cámara interior',
+    macAddress: 'AA:BB:CC:DD:EE:02',
+    vendor: 'Fujitsu',
+    ecosystemId: 'eco-1',
+    createdAt: '2026-04-20T00:00:00.000Z',
+    updatedAt: '2026-04-20T00:00:00.000Z',
+  },
+  {
+    id: 'dev-3',
+    name: 'Inversor solar',
+    macAddress: 'AA:BB:CC:DD:EE:03',
+    vendor: 'SolarTech',
+    ecosystemId: 'eco-2',
+    createdAt: '2026-04-20T00:00:00.000Z',
+    updatedAt: '2026-04-20T00:00:00.000Z',
+  },
+]
+
 jest.mock('../api/axios', () => ({
   apiClient: {
     get: jest.fn(),
@@ -167,6 +197,22 @@ describe('Dashboard', () => {
         return Promise.resolve({ data: { ecosystemId: 'eco-1', apiKey: 'AUR-EXISTING-KEY-123' } })
       }
 
+      if (url.startsWith('/ecosystems/') && url.endsWith('/devices')) {
+        const ecosystemId = url.replace('/ecosystems/', '').replace('/devices', '')
+        return Promise.resolve({ data: apiDevices.filter((device) => device.ecosystemId === ecosystemId) })
+      }
+
+      if (url.startsWith('/devices/')) {
+        const deviceId = url.replace('/devices/', '')
+        const device = apiDevices.find((item) => item.id === deviceId)
+
+        if (!device) {
+          return Promise.reject(new Error(`Device not found ${deviceId}`))
+        }
+
+        return Promise.resolve({ data: device })
+      }
+
       return Promise.reject(new Error(`Unhandled GET mock for ${url}`))
     })
     mockedApiClient.post.mockResolvedValue({
@@ -187,6 +233,26 @@ describe('Dashboard', () => {
       },
     })
     mockedApiClient.patch.mockReset()
+    mockedApiClient.patch.mockImplementation((url: string, body: unknown) => {
+      if (url.startsWith('/devices/')) {
+        const deviceId = url.replace('/devices/', '')
+        const device = apiDevices.find((item) => item.id === deviceId)
+
+        if (!device) {
+          return Promise.reject(new Error(`Device not found ${deviceId}`))
+        }
+
+        const updatedDevice = {
+          ...device,
+          ...(body as { name?: string }),
+          updatedAt: '2026-04-21T00:00:00.000Z',
+        }
+
+        return Promise.resolve({ data: updatedDevice })
+      }
+
+      return Promise.reject(new Error(`Unhandled PATCH mock for ${url}`))
+    })
     mockedApiClient.delete.mockReset()
     mockedApiClient.post.mockClear()
     clipboardWriteTextMock.mockClear()
@@ -343,7 +409,7 @@ describe('Dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirmar y generar API key/i }))
 
     expect(await screen.findByText(/API key generada/i)).toBeInTheDocument()
-    expect(screen.getByText(/Ecosistema Test Usuario/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Ecosistema Test Usuario/i)).toBeInTheDocument()
     expect(mockedApiClient.post).toHaveBeenCalledWith('/ecosystems', {
       name: 'Ecosistema Test Usuario',
     })
@@ -641,5 +707,94 @@ describe('Dashboard', () => {
     const select = screen.getByRole('combobox', { name: /Nuevo rol/i })
     expect(within(select).getByRole('option', { name: /ADMIN/i })).toBeInTheDocument()
     expect(within(select).queryByRole('option', { name: /GLOBAL_ADMIN/i })).not.toBeInTheDocument()
+  })
+
+  it('opens the ecosystem devices modal and saves an edited device name', async () => {
+    mockAuthClaims = {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'USER',
+      email: 'user@aurora.es',
+    }
+
+    render(<Dashboard />)
+
+    const ecosystemButton = await screen.findByRole('button', { name: /^Hogar Inteligente - Toledo Norte$/i })
+    fireEvent.click(ecosystemButton)
+
+    expect(await screen.findByRole('heading', { name: /Dispositivos del ecosistema/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Sensor de movimiento/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Sensor de movimiento/i }))
+
+    const nameInput = await screen.findByRole('textbox', { name: /Nombre del dispositivo/i })
+    expect(nameInput).toHaveValue('Sensor de movimiento')
+
+    fireEvent.change(nameInput, { target: { value: 'Sensor movimiento actualizado' } })
+    const saveButton = screen.getByRole('button', { name: /Guardar nombre/i })
+
+    fireEvent.click(saveButton)
+
+    await waitFor(() => {
+      expect(mockedApiClient.patch).toHaveBeenCalledWith('/devices/dev-1', {
+        name: 'Sensor movimiento actualizado',
+      })
+    })
+
+    expect(screen.getByRole('textbox', { name: /Nombre del dispositivo/i })).toHaveValue('Sensor movimiento actualizado')
+  })
+
+  it('allows a user to edit the ecosystem name from the devices modal', async () => {
+    mockAuthClaims = {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'USER',
+      email: 'user@aurora.es',
+    }
+
+    render(<Dashboard />)
+
+    const ecosystemButton = await screen.findByRole('button', { name: /^Hogar Inteligente - Toledo Norte$/i })
+    fireEvent.click(ecosystemButton)
+
+    expect(await screen.findByRole('button', { name: /Editar ecosistema/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Editar ecosistema/i }))
+
+    const ecosystemNameInput = screen.getByRole('textbox', { name: /Nombre del ecosistema/i })
+    fireEvent.change(ecosystemNameInput, { target: { value: 'Hogar Inteligente - Toledo Sur' } })
+    fireEvent.click(screen.getByRole('button', { name: /Guardar nombre ecosistema/i }))
+
+    expect((await screen.findAllByText(/Hogar Inteligente - Toledo Sur/i)).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Nombre del ecosistema actualizado correctamente\./i)).toBeInTheDocument()
+  })
+
+  it('allows a user to revoke an ecosystem from the devices modal', async () => {
+    mockAuthClaims = {
+      sub: '123e4567-e89b-12d3-a456-426614174000',
+      role: 'USER',
+      email: 'user@aurora.es',
+    }
+
+    render(<Dashboard />)
+
+    const ecosystemButton = await screen.findByRole('button', { name: /^Hogar Inteligente - Toledo Norte$/i })
+    fireEvent.click(ecosystemButton)
+
+    expect(await screen.findByRole('button', { name: /Dar de baja ecosistema/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Dar de baja ecosistema/i }))
+
+    expect(await screen.findByRole('heading', { name: /Confirmar baja de ecosistema/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar baja/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^Hogar Inteligente - Toledo Norte$/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('prevents admin users from opening ecosystem device details', async () => {
+    render(<Dashboard />)
+
+    const ecosystemButton = await screen.findByRole('button', { name: /^Hogar Inteligente - Toledo Norte$/i })
+    fireEvent.click(ecosystemButton)
+
+    expect(screen.queryByRole('heading', { name: /Dispositivos del ecosistema/i })).not.toBeInTheDocument()
   })
 })

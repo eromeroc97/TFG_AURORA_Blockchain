@@ -133,11 +133,15 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
                       Dispositivos
                     </p>
-                    <ul className="mt-1 list-disc pl-4 text-xs text-muted">
-                      {node.devices.map((device) => (
-                        <li key={device}>{device}</li>
-                      ))}
-                    </ul>
+                    {node.devices.length > 0 ? (
+                      <ul className="mt-1 list-disc pl-4 text-xs text-muted">
+                        {node.devices.map((device) => (
+                          <li key={device.id}>{device.name}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted">No hay dispositivos registrados.</p>
+                    )}
                   </div>
                 ) : role === 'ADMIN' || role === 'GLOBAL_ADMIN' ? (
                   <p className="text-xs font-semibold text-rose-700">Acceso a dispositivos restringido</p>

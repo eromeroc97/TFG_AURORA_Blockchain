@@ -10,7 +10,8 @@ import federLogo from '../assets/FEDER.png'
 import clmLogo from '../assets/CLM.png'
 import { apiClient } from '../api/axios'
 import AccessMap from '../components/dashboard/AccessMap'
-import { type AccessMapEcosystem } from '../components/dashboard/access-map.data'
+import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
+import { type AccessMapDevice, type AccessMapEcosystem } from '../components/dashboard/access-map.data'
 import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
 import { USERS_MOCK } from '../components/dashboard/users.data'
 import { useAuth } from '../context/auth-context'
@@ -59,6 +60,16 @@ type ApiEcosystem = {
   longitude: number | null
   isOnline: boolean
   lastSeen: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type ApiDevice = {
+  id: string
+  name: string
+  macAddress: string | null
+  vendor: string | null
+  ecosystemId: string
   createdAt: string
   updatedAt: string
 }
@@ -127,26 +138,53 @@ const getAssignableRoles = (adminRole: AdminRole) =>
 
 const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 8)}••••••••${apiKey.slice(-6)}`
 
-const mapApiEcosystemToUserOwned = (ecosystem: ApiEcosystem): UserOwnedEcosystem => ({
+const mapApiEcosystemToUserOwned = (ecosystem: ApiEcosystem, devices: ApiDevice[] = []): UserOwnedEcosystem => ({
   id: ecosystem.id,
   name: ecosystem.name,
   ownerId: ecosystem.ownerId,
   lat: ecosystem.latitude,
   lng: ecosystem.longitude,
   isShared: false,
-  devices: [],
+  devices,
   apiKey: null,
 })
 
-const mapApiEcosystemToAccessMap = (ecosystem: ApiEcosystem): AccessMapEcosystem => ({
+const mapApiEcosystemToAccessMap = (ecosystem: ApiEcosystem, devices: ApiDevice[] = []): AccessMapEcosystem => ({
   id: ecosystem.id,
   name: ecosystem.name,
   ownerId: ecosystem.ownerId,
   lat: ecosystem.latitude,
   lng: ecosystem.longitude,
   isShared: false,
-  devices: [],
+  devices,
 })
+
+const loadDevicesForEcosystem = async (ecosystemId: string): Promise<ApiDevice[]> => {
+  try {
+    const response = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystemId}/devices`)
+    return response.data
+  } catch {
+    return []
+  }
+}
+
+const loadDevicesForEcosystems = async (ecosystems: ApiEcosystem[]) => {
+  const results = await Promise.allSettled(
+    ecosystems.map((ecosystem) => loadDevicesForEcosystem(ecosystem.id)),
+  )
+
+  return ecosystems.reduce<Record<string, ApiDevice[]>>((accumulator, ecosystem, index) => {
+    const result = results[index]
+
+    if (result.status === 'fulfilled') {
+      accumulator[ecosystem.id] = result.value
+    } else {
+      accumulator[ecosystem.id] = []
+    }
+
+    return accumulator
+  }, {})
+}
 
 const getEcosystemErrorMessage = (error: unknown, fallbackMessage: string) => {
   if (!axios.isAxiosError(error)) {
@@ -171,6 +209,7 @@ export default function Dashboard() {
   const role = (authClaims?.role ?? 'USER').toUpperCase()
   const isAdmin = role === 'ADMIN'
   const isGlobalAdmin = role === 'GLOBAL_ADMIN'
+  const canOpenEcosystemDevicesModal = role === 'USER' || role === 'AUDITOR'
   const authenticatedUserId = authClaims?.sub ?? null
   const [dashboardUsers, setDashboardUsers] = useState<DashboardUser[]>(() =>
     USERS_MOCK.map(mapMockUserToDashboardUser).filter(isVisibleUser),
@@ -209,6 +248,9 @@ export default function Dashboard() {
   const [apiKeyLoadingByEcosystemId, setApiKeyLoadingByEcosystemId] = useState<Record<string, boolean>>({})
   const [apiKeyErrorByEcosystemId, setApiKeyErrorByEcosystemId] = useState<Record<string, string | null>>({})
   const [copiedKeyTag, setCopiedKeyTag] = useState<string | null>(null)
+  const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
+  const [deviceOperationMessage, setDeviceOperationMessage] = useState<string | null>(null)
+  const canManageSelectedEcosystem = selectedEcosystem?.ownerId === authenticatedUserId
 
   const copyToClipboard = async (value: string, tag: string) => {
     try {
@@ -240,6 +282,74 @@ export default function Dashboard() {
     setNewEcosystemApiKey(null)
     setNewEcosystemId(null)
     setIsCreateEcosystemModalOpen(true)
+  }
+
+  const openEcosystemDevicesModal = (ecosystem: AccessMapEcosystem) => {
+    if (!canOpenEcosystemDevicesModal) {
+      return
+    }
+
+    setSelectedEcosystem(ecosystem)
+    setDeviceOperationMessage(null)
+  }
+
+  const closeEcosystemDevicesModal = () => {
+    setSelectedEcosystem(null)
+    setDeviceOperationMessage(null)
+  }
+
+  const updateDeviceInState = (updatedDevice: AccessMapDevice) => {
+    const updateEcosystems = <T extends AccessMapEcosystem>(ecosystems: T[]): T[] =>
+      ecosystems.map((ecosystem) => {
+        if (ecosystem.devices.some((device) => device.id === updatedDevice.id)) {
+          return {
+            ...ecosystem,
+            devices: ecosystem.devices.map((device) =>
+              device.id === updatedDevice.id ? updatedDevice : device,
+            ),
+          }
+        }
+
+        return ecosystem
+      })
+
+    setAllEcosystems((current) => updateEcosystems(current))
+    setUserOwnedEcosystems((current) => updateEcosystems(current))
+
+    if (selectedEcosystem?.devices.some((device) => device.id === updatedDevice.id)) {
+      setSelectedEcosystem((current) =>
+        current
+          ? {
+              ...current,
+              devices: current.devices.map((device) =>
+                device.id === updatedDevice.id ? updatedDevice : device,
+              ),
+            }
+          : current,
+      )
+    }
+  }
+
+  const updateEcosystemInState = (updatedEcosystem: AccessMapEcosystem) => {
+    const updateEcosystems = <T extends AccessMapEcosystem>(ecosystems: T[]): T[] =>
+      ecosystems.map((ecosystem) =>
+        ecosystem.id === updatedEcosystem.id ? { ...ecosystem, name: updatedEcosystem.name } : ecosystem,
+      )
+
+    setAllEcosystems((current) => updateEcosystems(current))
+    setUserOwnedEcosystems((current) => updateEcosystems(current))
+
+    if (selectedEcosystem?.id === updatedEcosystem.id) {
+      setSelectedEcosystem(updatedEcosystem)
+    }
+  }
+
+  const revokeEcosystemFromState = (ecosystemId: string) => {
+    setAllEcosystems((current) => current.filter((ecosystem) => ecosystem.id !== ecosystemId))
+    setUserOwnedEcosystems((current) => current.filter((ecosystem) => ecosystem.id !== ecosystemId))
+    if (selectedEcosystem?.id === ecosystemId) {
+      setSelectedEcosystem(null)
+    }
   }
 
   const fetchEcosystemApiKey = async (ecosystemId: string) => {
@@ -505,13 +615,25 @@ export default function Dashboard() {
           return
         }
 
+        const devicesByEcosystemId = await loadDevicesForEcosystems(response.data)
+
         const ownedEcosystems = response.data
           .filter((ecosystem) => ecosystem.ownerId === authenticatedUserId)
-          .map(mapApiEcosystemToUserOwned)
-        const mappedEcosystems = response.data.map(mapApiEcosystemToAccessMap)
+          .map((ecosystem) => mapApiEcosystemToUserOwned(ecosystem, devicesByEcosystemId[ecosystem.id] || []))
+        const mappedEcosystems = response.data.map((ecosystem) =>
+          mapApiEcosystemToAccessMap(ecosystem, devicesByEcosystemId[ecosystem.id] || []),
+        )
 
-        setAllEcosystems(mappedEcosystems)
-        setUserOwnedEcosystems(ownedEcosystems)
+        setAllEcosystems((currentEcosystems) => {
+          const nextIds = new Set(mappedEcosystems.map((ecosystem) => ecosystem.id))
+          const preserved = currentEcosystems.filter((ecosystem) => !nextIds.has(ecosystem.id))
+          return [...preserved, ...mappedEcosystems]
+        })
+        setUserOwnedEcosystems((currentEcosystems) => {
+          const nextIds = new Set(ownedEcosystems.map((ecosystem) => ecosystem.id))
+          const preserved = currentEcosystems.filter((ecosystem) => !nextIds.has(ecosystem.id))
+          return [...preserved, ...ownedEcosystems]
+        })
       } catch {
         if (!isMounted) {
           return
@@ -743,7 +865,7 @@ export default function Dashboard() {
 
   const renderUserDashboard = () => (
     <>
-      <article id="mis-ecosistemas" className="scroll-mt-28 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
+        <article id="mis-ecosistemas" className="scroll-mt-28 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-primary">
             <House className="size-5 text-accent" />
@@ -767,10 +889,20 @@ export default function Dashboard() {
             userOwnedEcosystems.map((ecosystem) => (
               <div
                 key={ecosystem.id}
+                onClick={() => openEcosystemDevicesModal(ecosystem)}
                 className="flex items-center justify-between rounded-lg border border-border/50 bg-surface/30 p-4 hover:border-border hover:bg-surface/50 transition-colors cursor-pointer"
               >
                 <div>
-                  <p className="font-medium text-primary">{ecosystem.name}</p>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      openEcosystemDevicesModal(ecosystem)
+                    }}
+                    className="font-medium text-primary transition-colors hover:text-accent"
+                  >
+                    {ecosystem.name}
+                  </button>
                   <p className="text-xs text-muted mt-1">{ecosystem.devices.length} dispositivos</p>
                   {apiKeysByEcosystemId[ecosystem.id] ? (
                     <div className="mt-2 flex items-center gap-2 text-xs">
@@ -844,10 +976,20 @@ export default function Dashboard() {
             userSharedEcosystems.map((ecosystem) => (
               <div
                 key={ecosystem.id}
+                onClick={() => openEcosystemDevicesModal(ecosystem)}
                 className="flex items-center justify-between rounded-lg border border-border/50 bg-surface/30 p-4 hover:border-border hover:bg-surface/50 transition-colors cursor-pointer"
               >
                 <div>
-                  <p className="font-medium text-primary">{ecosystem.name}</p>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      openEcosystemDevicesModal(ecosystem)
+                    }}
+                    className="font-medium text-primary transition-colors hover:text-accent"
+                  >
+                    {ecosystem.name}
+                  </button>
                   <p className="text-xs text-muted mt-1">
                     {ecosystem.devices.length} dispositivos • Compartido por otro usuario
                   </p>
@@ -990,16 +1132,30 @@ export default function Dashboard() {
         {allEcosystems.map((ecosystem) => (
           <div
             key={ecosystem.id}
+            onClick={() => openEcosystemDevicesModal(ecosystem)}
             className="flex items-center justify-between rounded-lg border border-border/50 bg-surface/30 p-4 hover:border-border hover:bg-surface/50 transition-colors cursor-pointer group"
           >
             <div>
-              <p className="font-medium text-primary group-hover:text-accent transition-colors">{ecosystem.name}</p>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openEcosystemDevicesModal(ecosystem)
+                }}
+                className="font-medium text-primary group-hover:text-accent transition-colors"
+              >
+                {ecosystem.name}
+              </button>
               <p className="text-xs text-muted mt-1">
                 {ecosystem.devices.length} dispositivos • Propietario: {USERS_MOCK.find((u) => u.id === ecosystem.ownerId)?.name}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button className="text-xs font-medium px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors">
+              <button
+                type="button"
+                onClick={() => openEcosystemDevicesModal(ecosystem)}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              >
                 Ver detalles
               </button>
             </div>
@@ -1324,10 +1480,20 @@ export default function Dashboard() {
           {allEcosystems.map((ecosystem) => (
             <div
               key={ecosystem.id}
+              onClick={() => openEcosystemDevicesModal(ecosystem)}
               className="flex items-center justify-between rounded-lg border border-border/50 bg-surface/30 p-4 hover:border-border hover:bg-surface/50 transition-colors"
             >
               <div>
-                <p className="font-medium text-primary">{ecosystem.name}</p>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openEcosystemDevicesModal(ecosystem)
+                  }}
+                  className="font-medium text-primary transition-colors hover:text-accent"
+                >
+                  {ecosystem.name}
+                </button>
                 <p className="text-xs text-muted mt-1">Propietario: {USERS_MOCK.find((u) => u.id === ecosystem.ownerId)?.name}</p>
               </div>
               <div className="flex items-center gap-2">
@@ -1411,6 +1577,17 @@ export default function Dashboard() {
       {role === 'USER' && renderUserDashboard()}
       {role === 'AUDITOR' && renderAuditorDashboard()}
       {(role === 'ADMIN' || role === 'GLOBAL_ADMIN') && renderAdminDashboard()}
+
+      {canOpenEcosystemDevicesModal && selectedEcosystem ? (
+        <EcosystemDevicesModal
+          ecosystem={selectedEcosystem}
+          onClose={closeEcosystemDevicesModal}
+          onDeviceUpdated={updateDeviceInState}
+          onEcosystemUpdated={updateEcosystemInState}
+          onEcosystemRevoked={revokeEcosystemFromState}
+          canManageEcosystem={canManageSelectedEcosystem}
+        />
+      ) : null}
 
       <footer className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted">

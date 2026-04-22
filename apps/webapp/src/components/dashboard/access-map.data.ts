@@ -1,3 +1,13 @@
+export type AccessMapDevice = {
+  id: string
+  name: string
+  macAddress: string | null
+  vendor: string | null
+  ecosystemId: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type AccessMapEcosystem = {
   id: string
   name: string
@@ -5,7 +15,7 @@ export type AccessMapEcosystem = {
   lat: number | null
   lng: number | null
   isShared: boolean
-  devices: string[]
+  devices: AccessMapDevice[]
 }
 
 export const ACCESS_MAP_ECOSYSTEMS_MOCK: AccessMapEcosystem[] = [
@@ -16,7 +26,35 @@ export const ACCESS_MAP_ECOSYSTEMS_MOCK: AccessMapEcosystem[] = [
     lat: 39.876,
     lng: -4.025,
     isShared: false,
-    devices: ['Sensores de movimiento', 'Cámara interior', 'Medidor energético'],
+    devices: [
+      {
+        id: 'device-001',
+        name: 'Sensores de movimiento',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-001',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-002',
+        name: 'Cámara interior',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-001',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-003',
+        name: 'Medidor energético',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-001',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   },
   {
     id: 'eco-002',
@@ -25,7 +63,35 @@ export const ACCESS_MAP_ECOSYSTEMS_MOCK: AccessMapEcosystem[] = [
     lat: 39.862,
     lng: -4.025,
     isShared: true,
-    devices: ['Gateway IoT', 'Sensor de apertura', 'Control de acceso'],
+    devices: [
+      {
+        id: 'device-004',
+        name: 'Gateway IoT',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-002',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-005',
+        name: 'Sensor de apertura',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-002',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-006',
+        name: 'Control de acceso',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-002',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   },
   {
     id: 'eco-003',
@@ -34,7 +100,35 @@ export const ACCESS_MAP_ECOSYSTEMS_MOCK: AccessMapEcosystem[] = [
     lat: 38.994,
     lng: -1.856,
     isShared: false,
-    devices: ['Inversor solar', 'Medidor de consumo', 'Sensor térmico'],
+    devices: [
+      {
+        id: 'device-007',
+        name: 'Inversor solar',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-003',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-008',
+        name: 'Medidor de consumo',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-003',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-009',
+        name: 'Sensor térmico',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-003',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   },
   {
     id: 'eco-004',
@@ -43,6 +137,34 @@ export const ACCESS_MAP_ECOSYSTEMS_MOCK: AccessMapEcosystem[] = [
     lat: 38.986,
     lng: -3.932,
     isShared: true,
-    devices: ['Sirena perimetral', 'Detector de humo', 'Control de persianas'],
+    devices: [
+      {
+        id: 'device-010',
+        name: 'Sirena perimetral',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-004',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-011',
+        name: 'Detector de humo',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-004',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'device-012',
+        name: 'Control de persianas',
+        macAddress: null,
+        vendor: null,
+        ecosystemId: 'eco-004',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   },
 ]
