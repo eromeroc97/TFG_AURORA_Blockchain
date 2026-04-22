@@ -249,7 +249,6 @@ export default function Dashboard() {
   const [apiKeyErrorByEcosystemId, setApiKeyErrorByEcosystemId] = useState<Record<string, string | null>>({})
   const [copiedKeyTag, setCopiedKeyTag] = useState<string | null>(null)
   const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
-  const [deviceOperationMessage, setDeviceOperationMessage] = useState<string | null>(null)
   const canManageSelectedEcosystem = selectedEcosystem?.ownerId === authenticatedUserId
 
   const copyToClipboard = async (value: string, tag: string) => {
@@ -290,12 +289,10 @@ export default function Dashboard() {
     }
 
     setSelectedEcosystem(ecosystem)
-    setDeviceOperationMessage(null)
   }
 
   const closeEcosystemDevicesModal = () => {
     setSelectedEcosystem(null)
-    setDeviceOperationMessage(null)
   }
 
   const updateDeviceInState = (updatedDevice: AccessMapDevice) => {

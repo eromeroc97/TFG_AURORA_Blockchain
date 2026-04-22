@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Info, Pencil, X } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
 import { apiClient } from '../../api/axios'
 import type { AccessMapDevice, AccessMapEcosystem } from './access-map.data'
 
