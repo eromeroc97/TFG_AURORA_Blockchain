@@ -1,0 +1,21 @@
+services/auth
+- Añadir endpoint PATCH /ecosystems/:id para actualizar el nombre del ecosistema.
+  - Validar que el usuario autenticado es propietario del ecosistema.
+  - Devolver el ecosistema actualizado en la respuesta.
+- Añadir endpoint DELETE /ecosystems/:id (o POST /ecosystems/:id/revoke) para dar de baja/revocar el ecosistema.
+  - Validar que el usuario autenticado es propietario.
+  - Opcionalmente, marcar el ecosistema como revocado/desactivado en lugar de eliminarlo físicamente.
+- Garantizar que la lista de ecosistemas devuelta por GET /ecosystems refleja cambios de nombre y estado de revocación.
+- Asegurar control de acceso consistente para evitar que ADMIN/GLOBAL_ADMIN vean detalles de dispositivos directamente.
+
+services/iot-manager
+- Añadir endpoint GET /iot/devices/:deviceId/last-interaction.
+  - Consultar la última entrada registrada del dispositivo en la base de datos/telemetría.
+  - Devolver un objeto con `lastInteractionAt` en formato ISO 8601.
+- Garantizar que el servicio puede buscar rápidamente la última interacción por deviceId.
+- Opcional: normalizar el resultado si no hay interacción registrada (404 o { lastInteractionAt: null }).
+- En la siguiente iteración, permitir que la UI determine `ONLINE` si la última interacción es <= 5 minutos.
+
+Notas generales
+- El frontend ya está preparado para usar `/iot/devices/:deviceId/last-interaction` y mostrar ONLINE/OFFLINE en el modal.
+- En la próxima iteración se debe alinear el backend para soportar la edición y revocación de ecosistemas junto con el estado de conexión de dispositivos.

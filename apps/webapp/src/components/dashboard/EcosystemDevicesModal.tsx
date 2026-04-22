@@ -25,6 +25,10 @@ export default function EcosystemDevicesModal({
   const [editedDeviceName, setEditedDeviceName] = useState<string>(ecosystem.devices[0]?.name ?? '')
   const [editedEcosystemName, setEditedEcosystemName] = useState<string>(ecosystem.name)
   const [isDeviceLoading, setIsDeviceLoading] = useState(false)
+  const [isDeviceStatusLoading, setIsDeviceStatusLoading] = useState(false)
+  const [isDeviceOnline, setIsDeviceOnline] = useState<boolean | null>(null)
+  const [lastInteractionAt, setLastInteractionAt] = useState<string | null>(null)
+  const [deviceStatusError, setDeviceStatusError] = useState<string | null>(null)
   const [isSavingDeviceName, setIsSavingDeviceName] = useState(false)
   const [isEditingEcosystemName, setIsEditingEcosystemName] = useState(false)
   const [isSavingEcosystemName, setIsSavingEcosystemName] = useState(false)
@@ -74,6 +78,40 @@ export default function EcosystemDevicesModal({
 
     void loadDeviceDetails()
   }, [selectedDeviceId, ecosystem.devices])
+
+  useEffect(() => {
+    if (!selectedDeviceId) {
+      setLastInteractionAt(null)
+      setIsDeviceOnline(null)
+      setDeviceStatusError(null)
+      return
+    }
+
+    const loadDeviceStatus = async () => {
+      setIsDeviceStatusLoading(true)
+      setDeviceStatusError(null)
+
+      try {
+        const response = await apiClient.get<{ lastInteractionAt: string }>(
+          `/iot/devices/${selectedDeviceId}/last-interaction`,
+        )
+        const interactionAt = response.data.lastInteractionAt
+        setLastInteractionAt(interactionAt)
+
+        const lastInteractionDate = new Date(interactionAt).getTime()
+        const currentTime = Date.now()
+        setIsDeviceOnline(currentTime - lastInteractionDate <= 5 * 60 * 1000)
+      } catch {
+        setLastInteractionAt(null)
+        setIsDeviceOnline(null)
+        setDeviceStatusError('No se pudo calcular el estado de conexión del dispositivo.')
+      } finally {
+        setIsDeviceStatusLoading(false)
+      }
+    }
+
+    void loadDeviceStatus()
+  }, [selectedDeviceId])
 
   const displayedDevice = useMemo(() => {
     return selectedDevice ?? ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
@@ -143,6 +181,22 @@ export default function EcosystemDevicesModal({
     setIsConfirmingRevoke(false)
     onClose()
   }
+
+  const deviceStatusLabel = isDeviceStatusLoading
+    ? 'Verificando estado'
+    : isDeviceOnline === true
+      ? 'ONLINE'
+      : isDeviceOnline === false
+        ? 'OFFLINE'
+        : 'Desconocido'
+
+  const deviceStatusClassName = isDeviceStatusLoading
+    ? 'border border-accent/20 bg-accent/10 text-accent'
+    : isDeviceOnline === true
+      ? 'border border-emerald-200 bg-emerald-100 text-emerald-700'
+      : isDeviceOnline === false
+        ? 'border border-rose-200 bg-rose-50 text-rose-700'
+        : 'border border-slate-200 bg-slate-100 text-slate-700'
 
   return (
     <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
@@ -254,11 +308,16 @@ export default function EcosystemDevicesModal({
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Detalles del dispositivo</p>
                 <p className="mt-1 text-sm text-muted">Selecciona un dispositivo para ver la información completa.</p>
               </div>
-              <div className="rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] text-accent">
-                Actualización local
+              <div className={`rounded-full px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] ${deviceStatusClassName}`}>
+                {deviceStatusLabel}
               </div>
             </div>
-
+            {lastInteractionAt ? (
+              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
+                Última interacción: {new Date(lastInteractionAt).toLocaleString()}
+              </p>
+            ) : null}
+            {deviceStatusError ? <p className="mt-2 text-sm text-rose-600">{deviceStatusError}</p> : null}
             {modalError ? <p className="mt-4 text-sm text-rose-600">{modalError}</p> : null}
             {saveMessage ? <p className="mt-4 text-sm text-emerald-700">{saveMessage}</p> : null}
 

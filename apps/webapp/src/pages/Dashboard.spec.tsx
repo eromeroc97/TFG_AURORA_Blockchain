@@ -202,6 +202,15 @@ describe('Dashboard', () => {
         return Promise.resolve({ data: apiDevices.filter((device) => device.ecosystemId === ecosystemId) })
       }
 
+      if (url.startsWith('/iot/devices/') && url.endsWith('/last-interaction')) {
+        const deviceId = url.replace('/iot/devices/', '').replace('/last-interaction', '')
+        return Promise.resolve({
+          data: {
+            lastInteractionAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+          },
+        })
+      }
+
       if (url.startsWith('/devices/')) {
         const deviceId = url.replace('/devices/', '')
         const device = apiDevices.find((item) => item.id === deviceId)
@@ -723,6 +732,7 @@ describe('Dashboard', () => {
 
     expect(await screen.findByRole('heading', { name: /Dispositivos del ecosistema/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sensor de movimiento/i })).toBeInTheDocument()
+    expect(await screen.findByText(/ONLINE/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Sensor de movimiento/i }))
 
