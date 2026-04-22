@@ -4,7 +4,7 @@ services/auth
   - Devolver el ecosistema actualizado en la respuesta.
 - Añadir endpoint DELETE /ecosystems/:id (o POST /ecosystems/:id/revoke) para dar de baja/revocar el ecosistema.
   - Validar que el usuario autenticado es propietario.
-  - Opcionalmente, marcar el ecosistema como revocado/desactivado en lugar de eliminarlo físicamente.
+  - Marcar el ecosistema como status REVOKED en lugar de eliminarlo físicamente de la bd y anonimizar sus datos usando el uuid.
 - Garantizar que la lista de ecosistemas devuelta por GET /ecosystems refleja cambios de nombre y estado de revocación.
 - Asegurar control de acceso consistente para evitar que ADMIN/GLOBAL_ADMIN vean detalles de dispositivos directamente.
 
