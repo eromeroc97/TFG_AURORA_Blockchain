@@ -96,6 +96,8 @@ export class DevicesService {
       },
     });
 
+    // Preserve the existing device record and its name if the device was previously registered.
+    // This avoids overwriting any name the user may have changed later from the webapp.
     if (existingDevice) {
       return existingDevice;
     }

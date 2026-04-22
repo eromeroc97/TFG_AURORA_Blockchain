@@ -12,6 +12,7 @@ describe('EcosystemsController', () => {
     create: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
+    findDevicesForEcosystem: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
     updateHeartbeat: jest.fn(),
@@ -78,12 +79,14 @@ describe('EcosystemsController', () => {
     (ecosystemsServiceMock.remove as any).mockResolvedValue({ id: 'eco' });
 
     await controller.findAll();
+    await controller.findDevices('eco');
     await controller.findOne('eco');
     await controller.update('eco', {});
     await controller.updateHeartbeat('eco');
     await controller.remove('eco');
 
     expect(ecosystemsServiceMock.findAll).toHaveBeenCalled();
+    expect(ecosystemsServiceMock.findDevicesForEcosystem).toHaveBeenCalledWith('eco');
     expect(ecosystemsServiceMock.findOne).toHaveBeenCalledWith('eco');
     expect(ecosystemsServiceMock.update).toHaveBeenCalledWith('eco', {});
     expect(ecosystemsServiceMock.updateHeartbeat).toHaveBeenCalledWith('eco');

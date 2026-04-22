@@ -174,13 +174,14 @@ describe('DevicesService', () => {
     });
   });
 
-  it('registerFromDiscovery returns existing device when it already exists', async () => {
-    (prismaMock.device.findUnique as any).mockResolvedValue({ id: 'existing-device-id' });
+  it('registerFromDiscovery returns existing device and preserves user-assigned name when it already exists', async () => {
+    const existingDevice = { id: 'existing-device-id', name: 'Nombre personalizado' };
+    (prismaMock.device.findUnique as any).mockResolvedValue(existingDevice);
 
     const result = await service.registerFromDiscovery('eco-id', 'AA:BB:CC:DD:EE:FF', 'Cisco', 'sensor-humedad-01');
 
     expect(prismaMock.device.create).not.toHaveBeenCalled();
-    expect(result).toEqual({ id: 'existing-device-id' });
+    expect(result).toEqual(existingDevice);
   });
 
   it('delegates findAll to prisma', async () => {

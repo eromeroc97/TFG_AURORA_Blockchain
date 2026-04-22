@@ -22,6 +22,9 @@ describe('EcosystemsService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    device: {
+      findMany: jest.fn(),
+    },
   };
 
   const fireflyMock = {
@@ -208,6 +211,100 @@ describe('EcosystemsService', () => {
     const result = await service.getApiKey('eco-id', actorId);
 
     expect(result).toEqual({ ecosystemId: 'eco-id', apiKey: rawApiKey });
+  });
+
+  it('findAll returns ecosystems with device count', async () => {
+    (prismaMock.ecosystem.findMany as any).mockResolvedValue([
+      {
+        id: 'eco-id',
+        name: 'eco-1',
+        ownerId: actorId,
+        did: 'did:firefly:custom/eco-1',
+        certificateFingerprint: null,
+        status: 'ACTIVE',
+        latitude: 0,
+        longitude: 0,
+        isOnline: false,
+        lastSeen: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        _count: {
+          devices: 3,
+        },
+      },
+    ]);
+
+    const result = await service.findAll();
+
+    expect(prismaMock.ecosystem.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      select: expect.objectContaining({
+        _count: {
+          select: {
+            devices: true,
+          },
+        },
+      }),
+    });
+    expect(result[0]._count.devices).toBe(3);
+  });
+
+  it('findDevicesForEcosystem returns full device list for the selected ecosystem', async () => {
+    (prismaMock.device.findMany as any).mockResolvedValue([
+      {
+        id: 'device-1',
+        name: 'Sensor A',
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+        vendor: 'Vendor A',
+        ecosystemId: 'eco-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'device-2',
+        name: 'Sensor B',
+        macAddress: '11:22:33:44:55:66',
+        vendor: 'Vendor B',
+        ecosystemId: 'eco-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const result = await service.findDevicesForEcosystem('eco-id');
+
+    expect(prismaMock.device.findMany).toHaveBeenCalledWith({
+      where: { ecosystemId: 'eco-id' },
+      select: {
+        id: true,
+        name: true,
+        macAddress: true,
+        vendor: true,
+        ecosystemId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    expect(result).toEqual([
+      {
+        id: 'device-1',
+        name: 'Sensor A',
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+        vendor: 'Vendor A',
+        ecosystemId: 'eco-id',
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+      },
+      {
+        id: 'device-2',
+        name: 'Sensor B',
+        macAddress: '11:22:33:44:55:66',
+        vendor: 'Vendor B',
+        ecosystemId: 'eco-id',
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+      },
+    ]);
   });
 
   it('getApiKey throws ForbiddenException for non-owner user', async () => {

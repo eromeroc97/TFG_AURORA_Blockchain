@@ -34,6 +34,16 @@ export class EcosystemsService {
     updatedAt: true,
   } as const;
 
+  private readonly ecosystemDeviceSelect = {
+    id: true,
+    name: true,
+    macAddress: true,
+    vendor: true,
+    ecosystemId: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const;
+
   private readonly ecosystemApiKeySelect = {
     id: true,
     did: true,
@@ -272,12 +282,26 @@ export class EcosystemsService {
   findAll() {
     return this.prisma.ecosystem.findMany({
       orderBy: { createdAt: 'desc' },
-      select: this.ecosystemSelect,
+      select: {
+        ...this.ecosystemSelect,
+        _count: {
+          select: {
+            devices: true,
+          },
+        },
+      },
     });
   }
 
   findOne(id: string) {
     return this.prisma.ecosystem.findUnique({ where: { id }, select: this.ecosystemSelect });
+  }
+
+  findDevicesForEcosystem(ecosystemId: string) {
+    return this.prisma.device.findMany({
+      where: { ecosystemId },
+      select: this.ecosystemDeviceSelect,
+    });
   }
 
   update(id: string, updateEcosystemDto: UpdateEcosystemDto) {

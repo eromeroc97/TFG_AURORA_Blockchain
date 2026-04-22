@@ -35,6 +35,11 @@ export class EcosystemsController {
     return this.ecosystemsService.findAll();
   }
 
+  @Get(':id/devices')
+  findDevices(@Param('id') id: string) {
+    return this.ecosystemsService.findDevicesForEcosystem(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ecosystemsService.findOne(id);
