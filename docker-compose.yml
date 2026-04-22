@@ -65,10 +65,10 @@ services:
       - mongo-db
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.telemetry.rule=PathPrefix(`/api/telemetry`)"
+      - "traefik.http.routers.telemetry.rule=PathPrefix(`/api/telemetry`) || PathPrefix(`/api/iot`)"
       - "traefik.http.routers.telemetry.entrypoints=web"
       - "traefik.http.services.telemetry.loadbalancer.server.port=3002"
-      - "traefik.http.middlewares.telemetry-strip.stripprefix.prefixes=/api/telemetry"
+      - "traefik.http.middlewares.telemetry-strip.stripprefix.prefixes=/api/telemetry,/api/iot"
       - "traefik.http.routers.telemetry.middlewares=telemetry-strip"
       - "traefik.docker.network=aurora-secure-net"
     networks:
