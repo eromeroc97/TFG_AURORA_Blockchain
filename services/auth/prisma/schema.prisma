@@ -102,6 +102,8 @@ model Device {
 
   name        String
   fingerprint String       @unique
+  macAddress  String?      @db.VarChar(255)
+  vendor      String?
   status      DeviceStatus @default(PENDING)
   did         String?      @unique
 
@@ -111,4 +113,5 @@ model Device {
   updatedAt DateTime @updatedAt
 
   @@index([ecosystemId])
+  @@unique([ecosystemId, macAddress])
 }

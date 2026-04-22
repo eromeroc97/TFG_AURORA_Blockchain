@@ -26,8 +26,22 @@ export class CreateDeviceDto {
   @IsUUID('4')
   ecosystemId!: string;
 
+  @ApiPropertyOptional({    description: 'Dirección MAC del dispositivo.',
+    example: 'AA:BB:CC:DD:EE:FF',
+  })
+  @IsOptional()
+  @IsString()
+  macAddress?: string;
+
   @ApiPropertyOptional({
-    description: 'Estado del dispositivo.',
+    description: 'Proveedor o vendor del dispositivo.',
+    example: 'Cisco',
+  })
+  @IsOptional()
+  @IsString()
+  vendor?: string;
+
+  @ApiPropertyOptional({    description: 'Estado del dispositivo.',
     example: DeviceStatus.PENDING,
   })
   @IsOptional()
