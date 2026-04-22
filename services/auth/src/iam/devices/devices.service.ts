@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   InternalServerErrorException,
   Injectable,
   NotFoundException,
@@ -25,6 +26,27 @@ export class DevicesService {
     updatedAt: true,
   } as const;
 
+  private normalizeMacAddress(rawMacAddress: string | null | undefined): string | null {
+    if (!rawMacAddress?.trim()) {
+      return null;
+    }
+
+    const cleaned = rawMacAddress.trim().replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    if (!/^[A-F0-9]{12}$/.test(cleaned)) {
+      throw new BadRequestException(`Invalid MAC address format: ${rawMacAddress}`);
+    }
+
+    return cleaned.match(/.{2}/g)!.join(':');
+  }
+
+  private normalizeMacAddressRequired(rawMacAddress: string): string {
+    const normalized = this.normalizeMacAddress(rawMacAddress);
+    if (!normalized) {
+      throw new BadRequestException(`Invalid MAC address format: ${rawMacAddress}`);
+    }
+    return normalized;
+  }
+
   private isNotFoundError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
   }
@@ -35,7 +57,7 @@ export class DevicesService {
         name: createDeviceDto.name,
         fingerprint: createDeviceDto.fingerprint,
         ecosystemId: createDeviceDto.ecosystemId,
-        macAddress: createDeviceDto.macAddress ?? null,
+        macAddress: this.normalizeMacAddress(createDeviceDto.macAddress),
         vendor: createDeviceDto.vendor ?? null,
         status: createDeviceDto.status ?? DeviceStatus.PENDING,
         did: createDeviceDto.did ?? null,
@@ -45,11 +67,12 @@ export class DevicesService {
   }
 
   async existsByMacAddress(ecosystemId: string, macAddress: string): Promise<boolean> {
+    const normalizedMac = this.normalizeMacAddressRequired(macAddress);
     const device = await this.prisma.device.findUnique({
       where: {
         ecosystemId_macAddress: {
           ecosystemId,
-          macAddress,
+          macAddress: normalizedMac,
         },
       },
       select: {
@@ -66,11 +89,12 @@ export class DevicesService {
     vendor?: string,
     preferredName?: string,
   ) {
+    const normalizedMac = this.normalizeMacAddressRequired(macAddress);
     const existingDevice = await this.prisma.device.findUnique({
       where: {
         ecosystemId_macAddress: {
           ecosystemId,
-          macAddress,
+          macAddress: normalizedMac,
         },
       },
       select: {
@@ -82,14 +106,14 @@ export class DevicesService {
       return existingDevice;
     }
 
-    const name = preferredName?.trim() || macAddress;
+    const name = preferredName?.trim() || normalizedMac;
 
     return this.prisma.device.create({
       data: {
         ecosystemId,
         name,
-        fingerprint: macAddress,
-        macAddress,
+        fingerprint: normalizedMac,
+        macAddress: normalizedMac,
         vendor: vendor ?? null,
         status: DeviceStatus.PENDING,
         did: null,
@@ -119,10 +143,17 @@ export class DevicesService {
   }
 
   async update(id: string, updateDeviceDto: UpdateDeviceDto) {
+    const normalizedMacAddress = updateDeviceDto.macAddress
+      ? this.normalizeMacAddress(updateDeviceDto.macAddress)
+      : undefined;
+
     try {
       return await this.prisma.device.update({
         where: { id },
-        data: updateDeviceDto,
+        data: {
+          ...updateDeviceDto,
+          ...(normalizedMacAddress && { macAddress: normalizedMacAddress }),
+        },
         select: this.deviceSelect,
       });
     } catch (error) {

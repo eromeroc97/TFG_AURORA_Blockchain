@@ -70,10 +70,43 @@ describe('DevicesService', () => {
     });
   });
 
+  it('create normalizes raw macAddress before persisting', async () => {
+    (prismaMock.device.create as any).mockResolvedValue({ id: 'device-id' });
+
+    await service.create({
+      ...createDto,
+      macAddress: 'aa-bb-cc-dd-ee-ff',
+    });
+
+    expect(prismaMock.device.create).toHaveBeenCalledWith({
+      data: {
+        name: createDto.name,
+        fingerprint: createDto.fingerprint,
+        ecosystemId: createDto.ecosystemId,
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+        vendor: null,
+        status: DeviceStatus.PENDING,
+        did: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        fingerprint: true,
+        macAddress: true,
+        vendor: true,
+        status: true,
+        did: true,
+        ecosystemId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  });
+
   it('existsByMacAddress returns true when device exists', async () => {
     (prismaMock.device.findUnique as any).mockResolvedValue({ id: 'device-id' });
 
-    const result = await service.existsByMacAddress('eco-id', 'AA:BB:CC:DD:EE:FF');
+    const result = await service.existsByMacAddress('eco-id', 'aa-bb-cc-dd-ee-ff');
 
     expect(prismaMock.device.findUnique).toHaveBeenCalledWith({
       where: {
@@ -99,7 +132,7 @@ describe('DevicesService', () => {
     (prismaMock.device.findUnique as any).mockResolvedValue(null);
     (prismaMock.device.create as any).mockResolvedValue({ id: 'device-id' });
 
-    await service.registerFromDiscovery('eco-id', 'AA:BB:CC:DD:EE:FF', 'Cisco', 'sensor-humedad-01');
+    await service.registerFromDiscovery('eco-id', 'aa-bb-cc-dd-ee-ff', 'Cisco', 'sensor-humedad-01');
 
     expect(prismaMock.device.findUnique).toHaveBeenCalledWith({
       where: {
