@@ -4,6 +4,9 @@
   "devices": [
     {
       "mac_addr": "00:EF:01:1C:62:77"
+    },
+    {
+      "mac_addr": "FC-A1-3E-2A-1C-33"
     }
   ]
 }

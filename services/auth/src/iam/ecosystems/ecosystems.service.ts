@@ -367,7 +367,8 @@ export class EcosystemsService {
       data: {
         status: EcosystemStatus.REVOKED,
         name: `REVOKED_${id}`,
-        did: null,
+        latitude: null,
+        longitude: null,
         certificateFingerprint: null,
         apiKey: null,
         apiKeyIv: null,

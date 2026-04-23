@@ -33,6 +33,7 @@ export default function EcosystemDevicesModal({
   const [isEditingEcosystemName, setIsEditingEcosystemName] = useState(false)
   const [isSavingEcosystemName, setIsSavingEcosystemName] = useState(false)
   const [isConfirmingRevoke, setIsConfirmingRevoke] = useState(false)
+  const [isRevoking, setIsRevoking] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [ecosystemError, setEcosystemError] = useState<string | null>(null)
@@ -192,10 +193,20 @@ export default function EcosystemDevicesModal({
     }
   }
 
-  const handleConfirmRevoke = () => {
-    onEcosystemRevoked(ecosystem.id)
-    setIsConfirmingRevoke(false)
-    onClose()
+  const handleConfirmRevoke = async () => {
+    setIsRevoking(true)
+    setModalError(null)
+
+    try {
+      await apiClient.post(`/ecosystems/${ecosystem.id}/revoke`)
+      onEcosystemRevoked(ecosystem.id)
+      setIsConfirmingRevoke(false)
+      onClose()
+    } catch {
+      setModalError('No se pudo dar de baja el ecosistema. Inténtalo de nuevo.')
+    } finally {
+      setIsRevoking(false)
+    }
   }
 
   const deviceStatusLabel = isDeviceStatusLoading
@@ -431,9 +442,10 @@ export default function EcosystemDevicesModal({
                 <button
                   type="button"
                   onClick={handleConfirmRevoke}
-                  className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                  disabled={isRevoking}
+                  className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Confirmar baja
+                  {isRevoking ? 'Dando de baja...' : 'Confirmar baja'}
                 </button>
               </div>
             </div>
