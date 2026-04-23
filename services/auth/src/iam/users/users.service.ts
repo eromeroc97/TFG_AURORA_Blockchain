@@ -732,7 +732,6 @@ export class UsersService {
 
     const userDid = await this.blockchainService.createIdentity({
       name: user.email,
-      uuid: user.id,
       parent: adminDid,
     });
 
