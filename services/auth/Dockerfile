@@ -21,9 +21,12 @@ COPY prisma.config.ts ./prisma.config.ts
 RUN npx prisma generate --schema=./prisma/schema.prisma
 
 COPY --from=build /app/dist ./dist
+COPY docker-entrypoint.sh ./
+
+RUN chmod +x docker-entrypoint.sh
 
 USER node
 
 EXPOSE 3001
 
-CMD ["node", "dist/src/main"]
+CMD ["sh", "docker-entrypoint.sh"]
