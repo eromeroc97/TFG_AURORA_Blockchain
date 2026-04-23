@@ -1,0 +1,71 @@
+# ==========================================
+# AURORA - Comandos de Setup Inicial
+# ==========================================
+# Ejecutar tras `docker-compose up`
+#
+# PASOS RECOMENDADOS:
+#   1. Verificar que auth-service está corriendo
+#   2. Ejecutar migraciones
+#   3. Generate Prisma Client
+#   4. Verificar en Seq (opcional)
+
+# -----------------------------------------------------------------------------
+# NOTA: Nombre del contenedor
+# -----------------------------------------------------------------------------
+# El nombre del contenedor es el nombre del servicio de docker-compose
+# Por defecto: aurora-blockchain_auth-service_1 (o similar)
+# Lista los contenedores con: docker ps
+
+# -----------------------------------------------------------------------------
+# 1. VERIFICAR QUE AUTH-SERVICE ESTÁ CORRIENDO
+# -----------------------------------------------------------------------------
+docker ps | findstr auth
+
+# Si no aparece, esperar y reintentar:
+docker compose up -d auth-service
+
+# Ver logs del servicio:
+docker compose logs auth-service
+
+# -----------------------------------------------------------------------------
+# 2. EJECUTAR MIGRACIONES DE BASE DE DATOS
+# -----------------------------------------------------------------------------
+# Opción A: Con prisma migrate deploy (recomendado)
+docker compose exec auth-service npx prisma migrate deploy
+
+# Opción B: Con prisma db push (más simple)
+docker compose exec auth-service npx prisma db push
+
+# -----------------------------------------------------------------------------
+# 3. GENERATE PRISMA CLIENT
+# -----------------------------------------------------------------------------
+docker compose exec auth-service npx prisma generate
+
+# -----------------------------------------------------------------------------
+# 4. VERIFICAR QUE TODO HA IDO BIEN
+# -----------------------------------------------------------------------------
+# Verificar health del servicio:
+curl http://localhost:3001/health
+
+# Ver logs en consola Seq (http://localhost:5341)
+# Credenciales: admin / admin
+
+# -----------------------------------------------------------------------------
+# NOTAS ADICIONALES
+# -----------------------------------------------------------------------------
+# - Puerto de auth-service en Docker: 3001
+# - Seq disponible en: http://localhost:5341
+# - Mailpit (correos de prueba): http://localhost:8025
+
+# ============================================================================
+# COMANDOS RÁPIDOS (copiar y pegar)
+# ============================================================================
+
+# Ejecutar todo de una vez (desde la raíz del proyecto):
+docker compose exec auth-service npx prisma migrate deploy && docker compose exec auth-service npx prisma generate
+
+# Ver estado:
+docker compose ps
+
+# Ver logs:
+docker compose logs -f auth-service
