@@ -6,6 +6,7 @@ export type AppConfig = {
   macVendorApiBaseUrl: string;
   authDeviceLookupUrl?: string;
   authDeviceRegisterUrl?: string;
+  authDeviceUpdateVendorUrl?: string;
   authValidateApiKeyUrl?: string;
   authInternalToken?: string;
   iotApiKeyStaticMap?: string;
@@ -46,6 +47,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     macVendorApiBaseUrl: env.MAC_VENDOR_API_BASE_URL?.trim() || 'https://api.macvendors.com',
     authDeviceLookupUrl: env.AUTH_DEVICE_LOOKUP_URL?.trim() || undefined,
     authDeviceRegisterUrl: env.AUTH_DEVICE_REGISTER_URL?.trim() || undefined,
+    authDeviceUpdateVendorUrl: env.AUTH_DEVICE_UPDATE_VENDOR_URL?.trim() || undefined,
     authValidateApiKeyUrl: env.AUTH_VALIDATE_API_KEY_URL?.trim() || undefined,
     authInternalToken: env.AUTH_INTERNAL_TOKEN?.trim() || undefined,
     iotApiKeyStaticMap: env.IOT_API_KEY_STATIC_MAP,

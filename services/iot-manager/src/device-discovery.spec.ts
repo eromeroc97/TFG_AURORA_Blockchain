@@ -1,4 +1,4 @@
-import { DeviceDiscoveryService } from './device-discovery';
+import { DeviceDiscoveryService, resolveMacVendor } from './device-discovery';
 import type { AppConfig } from './config';
 
 type MockResponse = {
@@ -28,6 +28,7 @@ describe('DeviceDiscoveryService', () => {
     macVendorApiBaseUrl: 'https://api.macvendors.com',
     authDeviceLookupUrl: 'http://auth-service:3001/internal/auth/devices/exists',
     authDeviceRegisterUrl: 'http://auth-service:3001/internal/auth/devices/register',
+    authDeviceUpdateVendorUrl: 'http://auth-service:3001/internal/auth/devices/vendor',
     authInternalToken: 'internal-token',
     iotApiKeyPositiveTtlMs: 600_000,
     iotApiKeyNegativeTtlMs: 15_000,
@@ -127,7 +128,8 @@ describe('DeviceDiscoveryService', () => {
   it('does not register when auth says device already exists', async () => {
     const fetchMock = jest
       .fn<Promise<MockResponse>, [RequestInfo | URL, RequestInit | undefined]>()
-      .mockResolvedValue(createResponse({ ok: true, json: { exists: true } }));
+      .mockResolvedValueOnce(createResponse({ ok: true, json: { exists: true } }))
+      .mockResolvedValueOnce(createResponse({ ok: true, status: 200 }));
 
     const service = new DeviceDiscoveryService(baseConfig, fetchMock as unknown as typeof fetch);
 
@@ -139,8 +141,61 @@ describe('DeviceDiscoveryService', () => {
       logger,
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      baseConfig.authDeviceUpdateVendorUrl,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          ecosystemId: 'eco-1',
+          macAddress: 'AA:BB:CC:DD:EE:02',
+          vendor: 'KnownVendor',
+        }),
+      }),
+    );
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('updates vendor for existing device using the dedicated vendor endpoint', async () => {
+    const fetchMock = jest
+      .fn<Promise<MockResponse>, [RequestInfo | URL, RequestInit | undefined]>()
+      .mockResolvedValueOnce(createResponse({ ok: true, json: { exists: true } }))
+      .mockResolvedValueOnce(createResponse({ ok: true, text: 'Espressif' }))
+      .mockResolvedValueOnce(createResponse({ ok: true, status: 200 }));
+
+    const service = new DeviceDiscoveryService(baseConfig, fetchMock as unknown as typeof fetch);
+
+    await service.discoverAndSync(
+      {
+        ecosystemId: 'eco-1',
+        devices: [{ mac_addr: 'aa:bb:cc:dd:ee:01', model: 'ESP32-WROOM-32' }],
+      },
+      logger,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      baseConfig.authDeviceLookupUrl,
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://api.macvendors.com/AA%3ABB%3ACC%3ADD%3AEE%3A01',
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      baseConfig.authDeviceUpdateVendorUrl,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          ecosystemId: 'eco-1',
+          macAddress: 'AA:BB:CC:DD:EE:01',
+          vendor: 'Espressif',
+        }),
+      }),
+    );
   });
 
   it('deduplicates repeated mac addresses in the same payload', async () => {
@@ -163,5 +218,16 @@ describe('DeviceDiscoveryService', () => {
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns Generic Device when mac vendor API returns 404 or fails', async () => {
+    const fetchMock = jest
+      .fn<Promise<MockResponse>, [RequestInfo | URL, RequestInit | undefined]>()
+      .mockResolvedValueOnce(createResponse({ ok: false, status: 404 }));
+
+    const result = await resolveMacVendor('00:EF:01:1C:62:77', fetchMock as unknown as typeof fetch);
+
+    expect(result).toBe('Generic Device');
+    expect(fetchMock).toHaveBeenCalledWith('https://api.macvendors.com/00%3AEF%3A01%3A1C%3A62%3A77');
   });
 });

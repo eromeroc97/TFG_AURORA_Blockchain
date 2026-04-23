@@ -93,12 +93,24 @@ export class DevicesService {
       },
       select: {
         id: true,
+        vendor: true,
       },
     });
 
-    // Preserve the existing device record and its name if the device was previously registered.
-    // This avoids overwriting any name the user may have changed later from the webapp.
+    const normalizedVendor = vendor?.trim();
+
     if (existingDevice) {
+      const shouldUpdateVendor =
+        typeof normalizedVendor === 'string' && normalizedVendor.length > 0 && normalizedVendor !== existingDevice.vendor;
+
+      if (shouldUpdateVendor) {
+        return this.prisma.device.update({
+          where: { id: existingDevice.id },
+          data: { vendor: normalizedVendor },
+          select: this.deviceSelect,
+        });
+      }
+
       return existingDevice;
     }
 
@@ -111,6 +123,42 @@ export class DevicesService {
         macAddress: normalizedMac,
         vendor: vendor ?? null,
       },
+      select: this.deviceSelect,
+    });
+  }
+
+  async updateVendorIfMissing(ecosystemId: string, macAddress: string, vendor: string) {
+    const normalizedMac = this.normalizeMacAddressRequired(macAddress);
+    const normalizedVendor = vendor.trim();
+
+    if (!normalizedVendor) {
+      return null;
+    }
+
+    const existingDevice = await this.prisma.device.findUnique({
+      where: {
+        ecosystemId_macAddress: {
+          ecosystemId,
+          macAddress: normalizedMac,
+        },
+      },
+      select: {
+        id: true,
+        vendor: true,
+      },
+    });
+
+    if (!existingDevice) {
+      throw new NotFoundException('Device not found');
+    }
+
+    if (existingDevice.vendor) {
+      return existingDevice;
+    }
+
+    return this.prisma.device.update({
+      where: { id: existingDevice.id },
+      data: { vendor: normalizedVendor },
       select: this.deviceSelect,
     });
   }

@@ -10,6 +10,7 @@ describe('InternalDevicesController', () => {
   const devicesServiceMock = {
     existsByMacAddress: jest.fn(),
     registerFromDiscovery: jest.fn(),
+    updateVendorIfMissing: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -77,6 +78,33 @@ describe('InternalDevicesController', () => {
       controller.register('Bearer internal-token', {
         ecosystemId: '11111111-1111-1111-1111-111111111111',
         macAddress: '',
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('updates vendor through the internal vendor endpoint when the internal token matches', async () => {
+    (devicesServiceMock.updateVendorIfMissing as any).mockResolvedValue({ id: 'device-id' });
+
+    const result = await controller.updateVendor('Bearer internal-token', {
+      ecosystemId: '11111111-1111-1111-1111-111111111111',
+      macAddress: 'AA:BB:CC:DD:EE:FF',
+      vendor: 'Cisco',
+    });
+
+    expect(devicesServiceMock.updateVendorIfMissing).toHaveBeenCalledWith(
+      '11111111-1111-1111-1111-111111111111',
+      'AA:BB:CC:DD:EE:FF',
+      'Cisco',
+    );
+    expect(result).toEqual({ success: true });
+  });
+
+  it('rejects vendor update requests with missing vendor', async () => {
+    await expect(
+      controller.updateVendor('Bearer internal-token', {
+        ecosystemId: '11111111-1111-1111-1111-111111111111',
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+        vendor: '',
       } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

@@ -51,6 +51,27 @@ const extractPreferredName = (device: DevicePayload): string | undefined => {
   return undefined;
 };
 
+export async function resolveMacVendor(
+  macAddress: string,
+  fetchImpl: typeof fetch = fetch,
+  macVendorApiBaseUrl = 'https://api.macvendors.com',
+): Promise<string> {
+  const normalizedMac = macAddress.trim();
+
+  try {
+    const response = await fetchImpl(`${macVendorApiBaseUrl}/${encodeURIComponent(normalizedMac)}`);
+
+    if (!response.ok) {
+      return 'Generic Device';
+    }
+
+    const vendor = (await response.text()).trim();
+    return vendor.length > 0 ? vendor : 'Generic Device';
+  } catch {
+    return 'Generic Device';
+  }
+}
+
 export class DeviceDiscoveryService {
   constructor(
     private readonly config: AppConfig,
@@ -69,20 +90,14 @@ export class DeviceDiscoveryService {
     return headers;
   }
 
-  private async resolveVendor(macAddress: string): Promise<string | undefined> {
+  private async resolveVendor(macAddress: string): Promise<string> {
     const macVendorApiBaseUrl = this.config.macVendorApiBaseUrl;
 
     if (!macVendorApiBaseUrl) {
-      return undefined;
+      return 'Generic Device';
     }
 
-    const response = await this.fetchImpl(`${macVendorApiBaseUrl}/${encodeURIComponent(macAddress)}`);
-    if (!response.ok) {
-      return undefined;
-    }
-
-    const vendor = (await response.text()).trim();
-    return vendor.length > 0 ? vendor : undefined;
+    return resolveMacVendor(macAddress, this.fetchImpl, macVendorApiBaseUrl);
   }
 
   private async deviceExistsInAuth(ecosystemId: string, macAddress: string): Promise<boolean> {
@@ -133,6 +148,30 @@ export class DeviceDiscoveryService {
     }
   }
 
+  private async updateDeviceVendorInAuth(
+    ecosystemId: string,
+    macAddress: string,
+    vendor: string,
+  ): Promise<void> {
+    if (!this.config.authDeviceUpdateVendorUrl) {
+      return;
+    }
+
+    const response = await this.fetchImpl(this.config.authDeviceUpdateVendorUrl, {
+      method: 'POST',
+      headers: this.getInternalAuthHeaders(),
+      body: JSON.stringify({
+        ecosystemId,
+        macAddress,
+        vendor,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Auth device vendor update failed with status ${response.status}`);
+    }
+  }
+
   async discoverAndSync(input: DeviceDiscoveryInput, logger: LoggerLike): Promise<void> {
     if (!this.config.authDeviceLookupUrl || !this.config.authDeviceRegisterUrl) {
       return;
@@ -150,12 +189,13 @@ export class DeviceDiscoveryService {
 
       try {
         const exists = await this.deviceExistsInAuth(input.ecosystemId, macAddress);
-        if (exists) {
-          continue;
-        }
-
         const vendor = extractVendor(device) ?? (await this.resolveVendor(macAddress));
         const preferredName = extractPreferredName(device);
+
+        if (exists) {
+          await this.updateDeviceVendorInAuth(input.ecosystemId, macAddress, vendor);
+          continue;
+        }
 
         await this.registerDeviceInAuth(input.ecosystemId, macAddress, vendor, preferredName);
       } catch (error) {

@@ -128,7 +128,7 @@ describe('DevicesService', () => {
           macAddress: 'AA:BB:CC:DD:EE:FF',
         },
       },
-      select: { id: true },
+      select: { id: true, vendor: true },
     });
     expect(prismaMock.device.create).toHaveBeenCalledWith({
       data: {
@@ -175,13 +175,38 @@ describe('DevicesService', () => {
   });
 
   it('registerFromDiscovery returns existing device and preserves user-assigned name when it already exists', async () => {
-    const existingDevice = { id: 'existing-device-id', name: 'Nombre personalizado' };
+    const existingDevice = { id: 'existing-device-id', name: 'Nombre personalizado', vendor: 'Cisco' };
     (prismaMock.device.findUnique as any).mockResolvedValue(existingDevice);
 
     const result = await service.registerFromDiscovery('eco-id', 'AA:BB:CC:DD:EE:FF', 'Cisco', 'sensor-humedad-01');
 
     expect(prismaMock.device.create).not.toHaveBeenCalled();
+    expect(prismaMock.device.update).not.toHaveBeenCalled();
     expect(result).toEqual(existingDevice);
+  });
+
+  it('registerFromDiscovery updates vendor for existing device when vendor is discovered later', async () => {
+    const existingDevice = { id: 'existing-device-id', vendor: null };
+    const updatedDevice = { id: 'existing-device-id', vendor: 'Cisco', name: 'Nombre personalizado' };
+    (prismaMock.device.findUnique as any).mockResolvedValue(existingDevice);
+    (prismaMock.device.update as any).mockResolvedValue(updatedDevice);
+
+    const result = await service.registerFromDiscovery('eco-id', 'AA:BB:CC:DD:EE:FF', 'Cisco', 'sensor-humedad-01');
+
+    expect(prismaMock.device.update).toHaveBeenCalledWith({
+      where: { id: existingDevice.id },
+      data: { vendor: 'Cisco' },
+      select: {
+        id: true,
+        name: true,
+        macAddress: true,
+        vendor: true,
+        ecosystemId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    expect(result).toEqual(updatedDevice);
   });
 
   it('delegates findAll to prisma', async () => {
