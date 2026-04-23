@@ -5,20 +5,10 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./services/auth/.env
-    environment:
-      DB_HOST: postgres-db
-      DB_PORT: 5432
-      DB_USER: admin
-      DB_PASSWORD: secret_password_tfg
-      DB_NAME: identity_vault
-      INIT_ON_STARTUP: "${INIT_ON_STARTUP:-true}"
     depends_on:
-      postgres-db:
-        condition: service_healthy
-      mailpit:
-        condition: service_started
-      seq:
-        condition: service_started
+      - postgres-db
+      - mailpit
+      - seq
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`) || PathPrefix(`/api/devices`)"
@@ -191,12 +181,6 @@ services:
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - aurora-secure-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d identity_vault"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
   mongo-db:
     image: mongo:7.0
