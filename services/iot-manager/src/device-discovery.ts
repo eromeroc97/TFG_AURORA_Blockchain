@@ -56,10 +56,12 @@ export async function resolveMacVendor(
   fetchImpl: typeof fetch = fetch,
   macVendorApiBaseUrl = 'https://api.macvendors.com',
 ): Promise<string> {
-  const normalizedMac = macAddress.trim();
+  const normalizedMac = macAddress.trim().replace(/:/g, '-');
 
   try {
-    const response = await fetchImpl(`${macVendorApiBaseUrl}/${encodeURIComponent(normalizedMac)}`);
+    const response = await fetchImpl(`${macVendorApiBaseUrl}/${encodeURIComponent(normalizedMac)}`, {
+      signal: AbortSignal.timeout(5000), // Evita que se quede colgado esperando a MacVendors
+    });
 
     if (!response.ok) {
       return 'Generic Device';
@@ -180,14 +182,14 @@ export class DeviceDiscoveryService {
     const seenMacAddresses = new Set<string>();
 
     for (const device of input.devices) {
-      const macAddress = normalizeMacAddress(device.mac_addr);
-
-      if (seenMacAddresses.has(macAddress)) {
-        continue;
-      }
-      seenMacAddresses.add(macAddress);
-
       try {
+        const macAddress = normalizeMacAddress(device.mac_addr);
+
+        if (seenMacAddresses.has(macAddress)) {
+          continue;
+        }
+        seenMacAddresses.add(macAddress);
+
         const exists = await this.deviceExistsInAuth(input.ecosystemId, macAddress);
         const vendor = extractVendor(device) ?? (await this.resolveVendor(macAddress));
         const preferredName = extractPreferredName(device);
@@ -203,7 +205,7 @@ export class DeviceDiscoveryService {
           {
             error,
             ecosystemId: input.ecosystemId,
-            macAddress,
+            macAddress: device.mac_addr,
           },
           'Device discovery sync failed for one device',
         );
