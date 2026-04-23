@@ -15,6 +15,7 @@ ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
 
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install dotenv
 
 COPY prisma ./prisma
 COPY prisma.config.ts ./prisma.config.ts
