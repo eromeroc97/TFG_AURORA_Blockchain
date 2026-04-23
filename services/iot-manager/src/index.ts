@@ -213,6 +213,29 @@ export const buildApp = (options: AppOptions = {}) => {
     };
   });
 
+  app.get(
+    '/iot/devices/last-interaction',
+    async (
+      request: FastifyRequest<{ Querystring: { macAddress?: string; ecosystemId?: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const macAddress = request.query.macAddress?.trim();
+      const ecosystemId = request.query.ecosystemId?.trim();
+
+      if (!macAddress || !ecosystemId) {
+        return reply.code(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'macAddress and ecosystemId query parameters are required',
+        });
+      }
+
+      const lastInteractionAt = await telemetryStore.findLastInteraction(macAddress, ecosystemId);
+      return reply.code(200).send({
+        lastInteractionAt: lastInteractionAt ? lastInteractionAt.toISOString() : null,
+      });
+    },
+  );
+
   app.get('/iot/devices/:deviceId/last-interaction', async (request: FastifyRequest<{ Params: { deviceId: string } }>, reply: FastifyReply) => {
     const deviceId = request.params.deviceId?.trim();
 

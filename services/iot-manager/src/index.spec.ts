@@ -419,6 +419,56 @@ describe('IoT manager smoke tests', () => {
     await app.close();
   });
 
+  it('/iot/devices/last-interaction (GET) should return the last interaction timestamp for a MAC + ecosystem', async () => {
+    const savedInputs: SaveTelemetryInput[] = [
+      {
+        ecosystemId: 'eco-123',
+        latitude: 39.0,
+        longitude: -4.0,
+        payload: {
+          devices: [
+            {
+              mac_addr: 'AA:BB:CC:DD:EE:FF',
+            },
+          ],
+        },
+        hash: 'hash-1',
+        timestamp: new Date('2026-04-21T10:00:00.000Z'),
+      },
+      {
+        ecosystemId: 'eco-123',
+        latitude: 39.0,
+        longitude: -4.0,
+        payload: {
+          devices: [
+            {
+              mac_addr: 'AA:BB:CC:DD:EE:FF',
+            },
+          ],
+        },
+        hash: 'hash-2',
+        timestamp: new Date('2026-04-21T10:05:00.000Z'),
+      },
+    ];
+
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore(savedInputs),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/iot/devices/last-interaction?macAddress=AA:BB:CC:DD:EE:FF&ecosystemId=eco-123',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      lastInteractionAt: '2026-04-21T10:05:00.000Z',
+    });
+
+    await app.close();
+  });
+
   it('/iot/devices/:deviceId/last-interaction (GET) should return null when no interaction exists', async () => {
     const app = buildApp({
       config: testConfig,

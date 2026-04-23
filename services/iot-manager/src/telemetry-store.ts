@@ -28,7 +28,7 @@ export type SaveTelemetryResult = {
 
 export interface TelemetryStore {
   save(input: SaveTelemetryInput): Promise<SaveTelemetryResult>;
-  findLastInteraction(deviceId: string): Promise<Date | null>;
+  findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null>;
   close(): Promise<void>;
 }
 
@@ -102,7 +102,7 @@ export class MongoTelemetryStore implements TelemetryStore {
     };
   }
 
-  async findLastInteraction(deviceId: string): Promise<Date | null> {
+  async findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null> {
     const collection = await this.ensureCollection();
 
     const normalizedDeviceId = deviceId.trim();
@@ -123,8 +123,13 @@ export class MongoTelemetryStore implements TelemetryStore {
       searchClauses.push({ 'payload.devices.mac_addr': { $in: macVariants } });
     }
 
+    const query: Record<string, unknown> = { $or: searchClauses };
+    if (ecosystemId?.trim()) {
+      query['metadata.ecosystemId'] = ecosystemId.trim();
+    }
+
     const document = await collection
-      .find({ $or: searchClauses })
+      .find(query)
       .sort({ timestamp: -1 })
       .limit(1)
       .project({ timestamp: 1 })

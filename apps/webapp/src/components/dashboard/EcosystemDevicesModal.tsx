@@ -79,11 +79,22 @@ export default function EcosystemDevicesModal({
     void loadDeviceDetails()
   }, [selectedDeviceId, ecosystem.devices])
 
+  const displayedDevice = useMemo(() => {
+    return selectedDevice ?? ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
+  }, [ecosystem.devices, selectedDevice, selectedDeviceId])
+
   useEffect(() => {
     if (!selectedDeviceId) {
       setLastInteractionAt(null)
       setIsDeviceOnline(null)
       setDeviceStatusError(null)
+      return
+    }
+
+    if (!displayedDevice?.macAddress) {
+      setLastInteractionAt(null)
+      setIsDeviceOnline(null)
+      setDeviceStatusError('No se encontró la MAC del dispositivo para consultar el estado.')
       return
     }
 
@@ -93,7 +104,13 @@ export default function EcosystemDevicesModal({
 
       try {
         const response = await apiClient.get<{ lastInteractionAt: string }>(
-          `/iot/devices/${selectedDeviceId}/last-interaction`,
+          '/iot/devices/last-interaction',
+          {
+            params: {
+              macAddress: displayedDevice.macAddress,
+              ecosystemId: ecosystem.id,
+            },
+          },
         )
         const interactionAt = response.data.lastInteractionAt
         setLastInteractionAt(interactionAt)
@@ -111,11 +128,7 @@ export default function EcosystemDevicesModal({
     }
 
     void loadDeviceStatus()
-  }, [selectedDeviceId])
-
-  const displayedDevice = useMemo(() => {
-    return selectedDevice ?? ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
-  }, [ecosystem.devices, selectedDevice, selectedDeviceId])
+  }, [selectedDeviceId, displayedDevice?.macAddress, ecosystem.id])
 
   const handleSelectDevice = (device: AccessMapDevice) => {
     setSelectedDeviceId(device.id)
@@ -151,7 +164,7 @@ export default function EcosystemDevicesModal({
     }
   }
 
-  const handleSaveEcosystemName = () => {
+  const handleSaveEcosystemName = async () => {
     const trimmedName = editedEcosystemName.trim()
     if (trimmedName.length === 0 || trimmedName === ecosystem.name) {
       return
@@ -161,12 +174,15 @@ export default function EcosystemDevicesModal({
     setEcosystemError(null)
 
     try {
-      const updatedEcosystem = {
-        ...ecosystem,
+      const response = await apiClient.patch<Partial<AccessMapEcosystem>>(`/ecosystems/${ecosystem.id}`, {
         name: trimmedName,
-      }
+      })
 
-      onEcosystemUpdated(updatedEcosystem)
+      onEcosystemUpdated({
+        ...ecosystem,
+        ...response.data,
+        devices: ecosystem.devices,
+      })
       setEcosystemSaveMessage('Nombre del ecosistema actualizado correctamente.')
       setIsEditingEcosystemName(false)
     } catch {
