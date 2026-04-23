@@ -213,30 +213,40 @@ export const buildApp = (options: AppOptions = {}) => {
     };
   });
 
-  app.get(
-    '/iot/devices/last-interaction',
-    async (
-      request: FastifyRequest<{ Querystring: { macAddress?: string; ecosystemId?: string } }>,
-      reply: FastifyReply,
-    ) => {
-      const macAddress = request.query.macAddress?.trim();
-      const ecosystemId = request.query.ecosystemId?.trim();
+  const sendLastInteractionResponse = async (
+    reply: FastifyReply,
+    lastInteractionAt: Date | null,
+  ) => {
+    return reply.code(200).send({
+      lastInteractionAt: lastInteractionAt ? lastInteractionAt.toISOString() : null,
+    });
+  };
 
-      if (!macAddress || !ecosystemId) {
-        return reply.code(400).send({
-          error: 'INVALID_REQUEST',
-          message: 'macAddress and ecosystemId query parameters are required',
-        });
-      }
+  const readQueryLastInteraction = async (
+    request: FastifyRequest<{ Querystring: { macAddress?: string; ecosystemId?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const macAddress = request.query.macAddress?.trim();
+    const ecosystemId = request.query.ecosystemId?.trim();
 
-      const lastInteractionAt = await telemetryStore.findLastInteraction(macAddress, ecosystemId);
-      return reply.code(200).send({
-        lastInteractionAt: lastInteractionAt ? lastInteractionAt.toISOString() : null,
+    if (!macAddress || !ecosystemId) {
+      return reply.code(400).send({
+        error: 'INVALID_REQUEST',
+        message: 'macAddress and ecosystemId query parameters are required',
       });
-    },
-  );
+    }
 
-  app.get('/iot/devices/:deviceId/last-interaction', async (request: FastifyRequest<{ Params: { deviceId: string } }>, reply: FastifyReply) => {
+    const lastInteractionAt = await telemetryStore.findLastInteraction(macAddress, ecosystemId);
+    return sendLastInteractionResponse(reply, lastInteractionAt);
+  };
+
+  app.get('/iot/devices/last-interaction', readQueryLastInteraction);
+  app.get('/devices/last-interaction', readQueryLastInteraction);
+
+  const readParamLastInteraction = async (
+    request: FastifyRequest<{ Params: { deviceId: string } }>,
+    reply: FastifyReply,
+  ) => {
     const deviceId = request.params.deviceId?.trim();
 
     if (!deviceId) {
@@ -247,10 +257,11 @@ export const buildApp = (options: AppOptions = {}) => {
     }
 
     const lastInteractionAt = await telemetryStore.findLastInteraction(deviceId);
-    return reply.code(200).send({
-      lastInteractionAt: lastInteractionAt ? lastInteractionAt.toISOString() : null,
-    });
-  });
+    return sendLastInteractionResponse(reply, lastInteractionAt);
+  };
+
+  app.get('/iot/devices/:deviceId/last-interaction', readParamLastInteraction);
+  app.get('/devices/:deviceId/last-interaction', readParamLastInteraction);
 
   const authenticateApiKey = async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply: FastifyReply) => {
     const apiKey = getApiKeyFromHeader(request);

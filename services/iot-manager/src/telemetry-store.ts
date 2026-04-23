@@ -32,7 +32,7 @@ export interface TelemetryStore {
   close(): Promise<void>;
 }
 
-const DEFAULT_DB_NAME = 'aurora_telemetry';
+const DEFAULT_DB_NAME = 'iot_data';
 const TELEMETRY_COLLECTION = 'telemetry_events';
 
 export class MongoTelemetryStore implements TelemetryStore {
