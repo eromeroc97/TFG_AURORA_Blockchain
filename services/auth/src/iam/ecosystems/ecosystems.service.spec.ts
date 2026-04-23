@@ -105,7 +105,7 @@ describe('EcosystemsService', () => {
       select: { id: true, role: true, status: true, isActive: true, did: true },
     });
     expect(fireflyMock.createChildIdentity).toHaveBeenCalledWith({
-      name: 'eco-gateway',
+      name: actorId,
       parentDid: 'did:firefly:custom/user@test.test',
     });
 
@@ -418,7 +418,8 @@ describe('EcosystemsService', () => {
       data: {
         status: EcosystemStatus.REVOKED,
         name: 'REVOKED_eco-id',
-        did: null,
+        latitude: null,
+        longitude: null,
         certificateFingerprint: null,
         apiKey: null,
         apiKeyIv: null,
@@ -537,7 +538,8 @@ describe('EcosystemsService', () => {
       data: {
         status: EcosystemStatus.REVOKED,
         name: 'REVOKED_4',
-        did: null,
+        latitude: null,
+        longitude: null,
         certificateFingerprint: null,
         apiKey: null,
         apiKeyIv: null,

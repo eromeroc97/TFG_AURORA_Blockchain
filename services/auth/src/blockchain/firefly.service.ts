@@ -1,5 +1,6 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 
 interface FireflyIdentity {
   id: string;
@@ -63,7 +64,7 @@ export class FireflyService {
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return `did:firefly:custom/${payload.name}`;
+      return `did:firefly:custom/${randomUUID()}`;
     }
   }
 }

@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role, UserStatus } from '@prisma/client';
 import axios from 'axios';
 import * as argon2 from 'argon2';
+import { randomUUID } from 'crypto';
 
 async function main() {
 	const databaseUrl = process.env.DATABASE_URL;
@@ -18,7 +19,7 @@ async function main() {
 	});
 
 	async function getAdminDid() {
-		const fallbackDid = 'did:firefly:offline-generated-admin';
+		const fallbackDid = `did:firefly:offline-generated-${randomUUID()}`;
 		const baseUrl = process.env.FIREFLY_API_URL;
 
 		if (!baseUrl) {

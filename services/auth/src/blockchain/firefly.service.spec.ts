@@ -99,7 +99,7 @@ describe('FireflyService', () => {
 
       const did = await service.createIdentity(payload);
 
-      expect(did).toBe('did:firefly:custom/user@aurora.local');
+      expect(did).toMatch(/^did:firefly:custom\/[a-f0-9-]+$/);
     });
   });
 });

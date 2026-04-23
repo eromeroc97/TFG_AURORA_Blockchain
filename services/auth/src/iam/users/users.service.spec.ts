@@ -560,7 +560,7 @@ describe('UsersService', () => {
   describe('approveUser', () => {
     it('should approve user in PENDING, assign DID from FireFly and send verify email', async () => {
       const adminDid = 'did:firefly:custom/admin@aurora.local';
-      const issuedDid = `did:firefly:custom/${createdUserRecord.email}`;
+      const issuedDid = `did:firefly:custom/${createdUserRecord.id}`;
 
       prismaServiceMock.user.findUnique
         .mockResolvedValueOnce({
@@ -607,7 +607,7 @@ describe('UsersService', () => {
         },
       });
       expect(fireflyServiceMock.createIdentity).toHaveBeenCalledWith({
-        name: createdUserRecord.email,
+        name: createdUserRecord.id,
         parent: adminDid,
       });
       expect(prismaServiceMock.user.update).toHaveBeenCalledWith({

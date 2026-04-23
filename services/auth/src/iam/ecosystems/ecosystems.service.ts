@@ -145,7 +145,7 @@ export class EcosystemsService {
       }
 
       const ecosystemDid = await this.fireflyService.createChildIdentity({
-        name: createEcosystemDto.name,
+        name: user.id,
         parentDid: user.did,
       });
 
