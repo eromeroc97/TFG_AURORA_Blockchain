@@ -140,26 +140,39 @@ export class EcosystemsService {
         throw new ForbiddenException('Solo usuarios activos pueden registrar ecosistemas');
       }
 
-      if (!user.did?.trim()) {
+if (!user.did?.trim()) {
         throw new ForbiddenException('El usuario debe estar validado en la blockchain (tener un DID) antes de registrar ecosistemas');
       }
 
+      const createdEcosystem = await this.prisma.ecosystem.create({
+        data: {
+          name: createEcosystemDto.name,
+          ownerId: user.id,
+          did: null,
+          status: EcosystemStatus.PENDING,
+          latitude: createEcosystemDto.latitude,
+          longitude: createEcosystemDto.longitude,
+          apiKey: null,
+          apiKeyIv: null,
+          apiKeyAuthTag: null,
+        },
+        select: this.ecosystemSelect,
+      });
+
       const ecosystemDid = await this.fireflyService.createChildIdentity({
         name: createEcosystemDto.name,
+        uuid: createdEcosystem.id,
         parentDid: user.did,
       });
 
       const apiKey = this.generateApiKey();
       const encryptedApiKey = this.encryptApiKey(apiKey);
 
-      const createdEcosystem = await this.prisma.ecosystem.create({
+      const updatedEcosystem = await this.prisma.ecosystem.update({
+        where: { id: createdEcosystem.id },
         data: {
-          name: createEcosystemDto.name,
-          ownerId: user.id,
           did: ecosystemDid,
           status: EcosystemStatus.ACTIVE,
-          latitude: createEcosystemDto.latitude,
-          longitude: createEcosystemDto.longitude,
           apiKey: encryptedApiKey.apiKeyCiphertext,
           apiKeyIv: encryptedApiKey.apiKeyIv,
           apiKeyAuthTag: encryptedApiKey.apiKeyAuthTag,
@@ -168,7 +181,7 @@ export class EcosystemsService {
       });
 
       return {
-        ...createdEcosystem,
+        ...updatedEcosystem,
         apiKey,
       };
     } catch (error) {

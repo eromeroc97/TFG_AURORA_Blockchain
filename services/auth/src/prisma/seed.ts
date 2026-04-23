@@ -4,6 +4,9 @@ import { PrismaClient, Role, UserStatus } from '@prisma/client';
 import axios from 'axios';
 import * as argon2 from 'argon2';
 
+const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@uclm.es';
+const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
+
 async function main() {
 	const databaseUrl = process.env.DATABASE_URL;
 
@@ -17,8 +20,8 @@ async function main() {
 		adapter,
 	});
 
-	async function getAdminDid() {
-		const fallbackDid = 'did:firefly:offline-generated-admin';
+	async function getAdminDid(adminId: string) {
+		const fallbackDid = `did:firefly:${adminId}`;
 		const baseUrl = process.env.FIREFLY_API_URL;
 
 		if (!baseUrl) {
@@ -26,17 +29,15 @@ async function main() {
 		}
 
 		try {
-			const statusRes = await axios.get(`${baseUrl}/status`);
-			const orgId = statusRes.data.org.id;
-			const defaultKey = statusRes.data?.org?.verifiers?.[0]?.value;
+			const orgRes = await axios.get(`${baseUrl}/identities?type=org`);
+			const orgId = orgRes.data?.[0]?.id;
+			const defaultKey = orgRes.data?.[0]?.verifiers?.[0]?.value;
 
-			const key =
-				defaultKey ??
-				((await axios.get(`${baseUrl}/verifiers`)).data?.[0]?.value);
+			const verifierRes = await axios.get(`${baseUrl}/verifiers`);
+			const key = defaultKey ?? verifierRes.data?.[0]?.value;
 
 			const identityRes = await axios.post(`${baseUrl}/identities`, {
-				name: 'admin_global',
-				type: 'custom',
+				name: adminId,
 				parent: orgId,
 				key,
 			});
@@ -56,24 +57,15 @@ async function main() {
 	}
 
 	try {
-		const passwordHash = await argon2.hash('Admin123!');
-		const did = await getAdminDid();
+		const passwordHash = await argon2.hash(SEED_ADMIN_PASSWORD);
 
-		const createdAdmin = await prisma.user.upsert({
-			where: { email: 'admin@uclm.es' },
-			update: {
+		const createdAdmin = await prisma.user.create({
+			data: {
+				email: SEED_ADMIN_EMAIL,
 				passwordHash,
 				role: Role.GLOBAL_ADMIN,
 				status: UserStatus.ACTIVE,
-				did,
-				isActive: true,
-			},
-			create: {
-				email: 'admin@uclm.es',
-				passwordHash,
-				role: Role.GLOBAL_ADMIN,
-				status: UserStatus.ACTIVE,
-				did,
+				did: null,
 				isActive: true,
 			},
 			select: {
@@ -84,7 +76,14 @@ async function main() {
 			},
 		});
 
-		console.log(`[seed] GLOBAL_ADMIN upserted successfully: ${createdAdmin.email} (${createdAdmin.id})`);
+		const did = await getAdminDid(createdAdmin.id);
+
+		await prisma.user.update({
+			where: { id: createdAdmin.id },
+			data: { did },
+		});
+
+		console.log(`[seed] GLOBAL_ADMIN created: ${createdAdmin.email} (${createdAdmin.id}) DID: ${did}`);
 	} catch (error) {
 		console.error('[seed] Error while running database seed', error);
 	} finally {

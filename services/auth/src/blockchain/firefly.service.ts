@@ -9,6 +9,7 @@ interface FireflyIdentity {
 
 interface FireflyCreateIdentityRequest {
   name: string;
+  uuid?: string;
   parent: string;
 }
 
@@ -40,10 +41,13 @@ export class FireflyService {
   }
 
   async createIdentity(payload: FireflyCreateIdentityRequest): Promise<string> {
-    return this.createChildIdentity({ name: payload.name, parentDid: payload.parent });
+    return this.createChildIdentity({
+      name: payload.uuid ?? payload.name,
+      parentDid: payload.parent,
+    });
   }
 
-  async createChildIdentity(payload: { name: string; parentDid: string }): Promise<string> {
+  async createChildIdentity(payload: { name: string; uuid?: string; parentDid: string }): Promise<string> {
     try {
       const response = await this.httpService.axiosRef.post<FireflyIdentity>(
         '/identities',

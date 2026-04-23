@@ -1,22 +1,33 @@
-# Comandos para ejecutar localmente (desde el host, NO desde contenedor)
+# ==========================================
+# COMANDOS LOCALES (Desde tu PC, NO desde contenedor)
+# ==========================================
 
 ## Requisitos
-- PostgreSQL debe estar corriendo en `localhost:5432`
-- Credenciales: `admin:secret_password_tfg`
-- Para seed: establecer variable DATABASE_URL con localhost
+- PostgreSQL corriendo en localhost:5432
+- Credenciales: admin / secret_password_tfg
 
-## Cuenta creada por seed
-- Email: `admin@uclm.es`
-- PasswordTemporal: `Admin123!` (NO cumple política - requiere cambio obligatorio)
+## Configuración del admin (opcional)
+# En services/auth/.env:
+SEED_ADMIN_EMAIL=admin@uclm.es      # Email del admin global
+SEED_ADMIN_PASSWORD=Admin123!        # Password inicial (luego debe cambiarla)
 
 ## Migraciones
-```powershell
+# Opción A) Con .env configurado para localhost:
+npx prisma migrate deploy --schema=./prisma/schema.prisma
+
+# Opción B)-forzando DATABASE_URL por línea de comandos:
 $env:DATABASE_URL = "postgresql://admin:secret_password_tfg@localhost:5432/identity_vault"
 npx prisma migrate deploy --schema=./prisma/schema.prisma
-```
 
-## Seed
-```powershell
+# Opción C) Con .env original (postgres-db):
+# Cambiar temporalmente en .env: postgres-db -> localhost
+# O ejecutar en contenedor:
+docker exec auth-service npx prisma migrate deploy --schema=./prisma/schema.prisma
+
+## Seed (crear admin global)
+# Ejecutar DESDE el proyecto (no desde contenedor):
 $env:DATABASE_URL = "postgresql://admin:secret_password_tfg@localhost:5432/identity_vault"
 npx tsx src/prisma/seed.ts
-```
+
+# Alternativa: ejecutar en contenedor Docker (ya tiene acceso a Firefly):
+docker exec auth-service npx tsx src/prisma/seed.ts
