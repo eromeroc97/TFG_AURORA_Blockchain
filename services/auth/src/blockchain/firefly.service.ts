@@ -1,70 +1,125 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { firstValueFrom } from 'rxjs';
+
+interface FireflyStatus {
+  org: {
+    id: string;
+    did: string;
+    verifiers?: Array<{ type: string; value: string }>;
+  };
+}
 
 interface FireflyIdentity {
   id: string;
   did: string;
-  parent?: string;
-}
-
-interface FireflyCreateIdentityRequest {
   name: string;
+  type: string;
   parent: string;
 }
 
 @Injectable()
 export class FireflyService {
   private readonly logger = new Logger(FireflyService.name);
+  private baseUrl!: string;
+  private orgId?: string;
+  private verifierKey?: string;
+  private initialized = false;
 
   constructor(private readonly httpService: HttpService) {}
 
-  async getOrganizationDid(): Promise<string> {
-    const baseUrl = process.env.FIREFLY_API_URL;
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
 
-    if (!baseUrl) {
-      return 'did:firefly:offline-generated-org';
+    this.baseUrl = process.env.FIREFLY_API_URL!;
+    if (!this.baseUrl) {
+      throw new Error('FIREFLY_API_URL is not defined');
     }
 
-    try {
-      const orgRes = await this.httpService.axiosRef.get(`${process.env.FIREFLY_API_URL}/identities?type=org`);
-
-      if (Array.isArray(orgRes.data) && orgRes.data.length > 0 && typeof orgRes.data[0]?.did === 'string') {
-        return orgRes.data[0].did;
-      }
-
-      return 'did:firefly:offline-generated-org';
-    } catch (error) {
-      this.logger.warn('FireFly organization DID lookup failed. Using fallback DID.', error as Error);
-      return 'did:firefly:offline-generated-org';
-    }
+    await this.fetchOrganizationKeys();
+    this.initialized = true;
   }
 
-  async createIdentity(payload: FireflyCreateIdentityRequest): Promise<string> {
-    return this.createChildIdentity({ name: payload.name, parentDid: payload.parent });
+  private async fetchOrganizationKeys(): Promise<void> {
+    const statusRes = await firstValueFrom(
+      this.httpService.get<FireflyStatus>(`${this.baseUrl}/status`),
+    );
+
+    this.orgId = statusRes.data.org.id;
+
+    const verifier = statusRes.data.org.verifiers?.[0]?.value;
+    if (!verifier) {
+      const verifiersRes = await firstValueFrom(
+        this.httpService.get(`${this.baseUrl}/verifiers`),
+      );
+      this.verifierKey = verifiersRes.data?.[0]?.value;
+    } else {
+      this.verifierKey = verifier;
+    }
+
+    if (!this.verifierKey) {
+      throw new Error('No blockchain key available from FireFly');
+    }
+
+    this.logger.log(`FireFly org initialized: ${this.orgId}`);
   }
 
-  async createChildIdentity(payload: { name: string; parentDid: string }): Promise<string> {
-    try {
-      const response = await this.httpService.axiosRef.post<FireflyIdentity>(
-        '/identities',
-        {
-          name: payload.name,
-          parent: payload.parentDid,
-        },
-      );
-      const did = response.data?.did;
-      if (!did) {
-        throw new Error('FireFly identity response missing DID');
+  async createIdentity(payload: { name: string; parentDid: string }): Promise<string> {
+    return this.createChildIdentity({ name: payload.name });
+  }
+
+  async createChildIdentity(payload: { name: string }): Promise<string> {
+    await this.ensureInitialized();
+
+    const maxAttempts = 3;
+    const retryDelayMs = 3000;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const postRes = await firstValueFrom(
+          this.httpService.post<{ id: string; did: string }>(
+            `${this.baseUrl}/identities?confirm=true`,
+            {
+              name: payload.name,
+              type: 'custom',
+              parent: this.orgId,
+              key: this.verifierKey,
+            },
+          ),
+        );
+
+        const identity = postRes.data;
+        if (!identity.id) {
+          throw new Error('FireFly POST did not return identity ID');
+        }
+
+        if (!identity.did) {
+          throw new Error('FireFly POST with confirm=true did not return confirmed DID');
+        }
+
+        this.logger.log(`Identity confirmed: ${identity.did}`);
+        return identity.did;
+      } catch (error) {
+        const isLastAttempt = attempt === maxAttempts;
+        this.logger.warn(
+          `Identity creation attempt ${attempt}/${maxAttempts} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+
+        if (isLastAttempt) {
+          throw new Error(
+            `Identity creation failed after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+        }
+
+        this.logger.log(`Retrying in ${retryDelayMs / 1000}s...`);
+        await this.delay(retryDelayMs);
       }
-      return did;
-    } catch (error) {
-      this.logger.warn(
-        `No se pudo crear identidad en FireFly, se genera fallback local: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      return `did:firefly:custom/${randomUUID()}`;
     }
+
+    throw new Error('Identity creation failed: unexpected code path');
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

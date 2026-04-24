@@ -3,8 +3,14 @@ import { Module } from '@nestjs/common';
 import { FireflyService } from './firefly.service';
 
 @Module({
-  imports: [HttpModule],
+  imports: [
+    HttpModule.registerAsync({
+      useFactory: () => ({
+        timeout: 30000,
+      }),
+    }),
+  ],
   providers: [FireflyService],
-  exports: [FireflyService],
+  exports: [FireflyService, HttpModule],
 })
 export class BlockchainModule {}
