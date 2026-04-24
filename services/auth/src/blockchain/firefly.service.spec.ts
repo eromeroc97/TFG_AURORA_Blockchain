@@ -1,16 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { HttpService } from '@nestjs/axios';
+import { of, throwError } from 'rxjs';
 import { FireflyService } from './firefly.service';
 
 describe('FireflyService', () => {
   let service: FireflyService;
 
   const httpServiceMock = {
-    axiosRef: {
-      get: jest.fn(),
-      post: jest.fn(),
-    },
+    get: jest.fn(),
+    post: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -26,80 +25,66 @@ describe('FireflyService', () => {
 
     service = module.get<FireflyService>(FireflyService);
     jest.clearAllMocks();
+    process.env.FIREFLY_API_URL = 'http://firefly.local/api/v1/namespaces/default';
+  });
+
+  it('should throw when FIREFLY_API_URL is missing', async () => {
     delete process.env.FIREFLY_API_URL;
+
+    await expect(
+      service.broadcastAnchor({
+        actionId: 'USER_APPROVE',
+        originalHash: 'abc123',
+        signature: 'sigxyz',
+        signerPublicKey: 'pubkey',
+        timestamp: new Date().toISOString(),
+      }),
+    ).rejects.toThrow('FIREFLY_API_URL is not defined');
   });
 
-  it('returns fallback when FIREFLY_API_URL is missing', async () => {
-    const did = await service.getOrganizationDid();
-
-    expect(did).toBe('did:firefly:offline-generated-org');
-    expect(httpServiceMock.axiosRef.get).not.toHaveBeenCalled();
-  });
-
-  it('returns org did when FireFly responds with an identity list', async () => {
-    process.env.FIREFLY_API_URL = 'http://firefly.local/api/v1/namespaces/default';
-    (httpServiceMock.axiosRef.get as any).mockResolvedValue({
-      data: [{ did: 'did:firefly:org/demo' }],
-    });
-
-    const did = await service.getOrganizationDid();
-
-    expect(httpServiceMock.axiosRef.get).toHaveBeenCalledWith(
-      'http://firefly.local/api/v1/namespaces/default/identities?type=org',
-    );
-    expect(did).toBe('did:firefly:org/demo');
-  });
-
-  it('returns fallback when FireFly response has no did', async () => {
-    process.env.FIREFLY_API_URL = 'http://firefly.local/api/v1/namespaces/default';
-    (httpServiceMock.axiosRef.get as any).mockResolvedValue({ data: [] });
-
-    const did = await service.getOrganizationDid();
-
-    expect(did).toBe('did:firefly:offline-generated-org');
-  });
-
-  it('returns fallback when FireFly throws', async () => {
-    process.env.FIREFLY_API_URL = 'http://firefly.local/api/v1/namespaces/default';
-    (httpServiceMock.axiosRef.get as any).mockRejectedValue(new Error('firefly down'));
-
-    const did = await service.getOrganizationDid();
-
-    expect(did).toBe('did:firefly:offline-generated-org');
-  });
-
-  describe('createIdentity', () => {
-    const payload = {
-      name: 'user@aurora.local',
-      parent: 'did:firefly:custom/admin@aurora.local',
+  describe('broadcastAnchor', () => {
+    const anchorPayload = {
+      actionId: 'USER_APPROVE',
+      originalHash: 'abc123def456',
+      signature: 'MEUCIQDTestSignature',
+      signerPublicKey: '-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----',
+      timestamp: '2026-04-24T10:00:00.000Z',
     };
 
-    it('should return did from FireFly when available', async () => {
-      (httpServiceMock.axiosRef.post as jest.Mock).mockResolvedValue({
-        data: {
-          id: 'identity-001',
-          did: 'did:firefly:custom/user@aurora.local',
-          parent: payload.parent,
-        },
-      } as never);
-
-      const did = await service.createIdentity(payload);
-
-      expect(httpServiceMock.axiosRef.post).toHaveBeenCalledWith(
-        '/identities',
-        payload,
+    it('should broadcast anchor payload successfully', async () => {
+      (httpServiceMock.post as jest.Mock).mockReturnValue(
+        of({ data: { id: 'msg-001', hash: '0xabc123' } }),
       );
-      expect(did).toBe('did:firefly:custom/user@aurora.local');
+
+      const result = await service.broadcastAnchor(anchorPayload);
+
+      expect(httpServiceMock.post).toHaveBeenCalledWith(
+        'http://firefly.local/api/v1/namespaces/default/messages/broadcast',
+        { data: anchorPayload },
+      );
+      expect(result.id).toBe('msg-001');
+      expect(result.hash).toBe('0xabc123');
     });
 
-    it('should fallback to deterministic did when FireFly fails', async () => {
-      (httpServiceMock.axiosRef.post as jest.Mock).mockRejectedValue(
-        new Error('network failure') as never,
+    it('should retry on failure and succeed', async () => {
+      (httpServiceMock.post as jest.Mock)
+        .mockReturnValueOnce(throwError(() => new Error('network error')))
+        .mockReturnValueOnce(of({ data: { id: 'msg-002', hash: '0xdef456' } }));
+
+      const result = await service.broadcastAnchor(anchorPayload);
+
+      expect(httpServiceMock.post).toHaveBeenCalledTimes(2);
+      expect(result.id).toBe('msg-002');
+    });
+
+    it('should throw after max retries', async () => {
+      (httpServiceMock.post as jest.Mock).mockReturnValue(
+        throwError(() => new Error('firefly down')),
       );
 
-      const did = await service.createIdentity(payload);
-
-      expect(did).toMatch(/^did:firefly:custom\/[a-f0-9-]+$/);
+      await expect(service.broadcastAnchor(anchorPayload)).rejects.toThrow(
+        'Anchor broadcast failed after 3 attempts',
+      );
     });
   });
 });

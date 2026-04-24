@@ -8,6 +8,7 @@ import {
 import { EcosystemStatus, Prisma, Role, UserStatus } from '@prisma/client';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { FireflyService } from '../../blockchain/firefly.service';
+import { CryptoService } from '../../crypto/crypto.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
@@ -17,14 +18,13 @@ export class EcosystemsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fireflyService: FireflyService,
+    private readonly cryptoService: CryptoService,
   ) {}
 
   private readonly ecosystemSelect = {
     id: true,
     name: true,
     ownerId: true,
-    did: true,
-    certificateFingerprint: true,
     status: true,
     latitude: true,
     longitude: true,
@@ -46,7 +46,6 @@ export class EcosystemsService {
 
   private readonly ecosystemApiKeySelect = {
     id: true,
-    did: true,
     status: true,
     apiKey: true,
     apiKeyIv: true,
@@ -124,7 +123,11 @@ export class EcosystemsService {
           role: true,
           status: true,
           isActive: true,
-          did: true,
+          identity: {
+            select: {
+              publicKey: true,
+            },
+          },
         },
       });
 
@@ -140,13 +143,21 @@ export class EcosystemsService {
         throw new ForbiddenException('Solo usuarios activos pueden registrar ecosistemas');
       }
 
-      if (!user.did?.trim()) {
-        throw new ForbiddenException('El usuario debe estar validado en la blockchain (tener un DID) antes de registrar ecosistemas');
+      if (!user.identity?.publicKey) {
+        throw new ForbiddenException('El usuario debe tener identidad criptográfica para registrar ecosistemas');
       }
 
-      const ecosystemDid = await this.fireflyService.createChildIdentity({
-        name: user.id,
-        parentDid: user.did,
+      const keyPair = this.cryptoService.generateKeyPair();
+      const encrypted = this.cryptoService.encryptPrivateKey(keyPair.privateKey);
+
+      const identity = await this.prisma.identity.create({
+        data: {
+          type: 'ECOSYSTEM',
+          publicKey: keyPair.publicKey,
+          privateKeyCiphertext: encrypted.ciphertext,
+          privateKeyIv: encrypted.iv,
+          privateKeyAuthTag: encrypted.authTag,
+        },
       });
 
       const apiKey = this.generateApiKey();
@@ -156,7 +167,7 @@ export class EcosystemsService {
         data: {
           name: createEcosystemDto.name,
           ownerId: user.id,
-          did: ecosystemDid,
+          identityId: identity.id,
           status: EcosystemStatus.ACTIVE,
           latitude: createEcosystemDto.latitude,
           longitude: createEcosystemDto.longitude,
@@ -262,7 +273,6 @@ export class EcosystemsService {
         return {
           valid: true,
           ecosystemId: ecosystem.id,
-          did: ecosystem.did,
           status: ecosystem.status,
         };
       } catch (error) {
@@ -369,7 +379,6 @@ export class EcosystemsService {
         name: `REVOKED_${id}`,
         latitude: null,
         longitude: null,
-        certificateFingerprint: null,
         apiKey: null,
         apiKeyIv: null,
         apiKeyAuthTag: null,

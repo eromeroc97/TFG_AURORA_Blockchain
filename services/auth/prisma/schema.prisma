@@ -20,64 +20,88 @@ enum UserStatus {
   REVOKED
 }
 
+enum IdentityType {
+  USER
+  ECOSYSTEM
+}
+
 enum EcosystemStatus {
   PENDING
   ACTIVE
   REVOKED
 }
 
-model User {
-  id                 String     @id @default(uuid()) @db.Uuid
-  email              String     @unique
-  passwordHash       String
-  passwordChangedAt  DateTime   @default(now())
-  hashedRefreshToken String?
-  role               Role       @default(USER)
-  status             UserStatus @default(PENDING)
-  isActive           Boolean    @default(true)
+model Identity {
+  id String @id @default(uuid()) @db.Uuid
+  type IdentityType
 
-  // DID para no repudio: identidad humana para firmar/atribuir acciones en la red DLT.
-  did String? @unique
+  publicKey String
+  privateKeyCiphertext String @map("private_key_ciphertext")
+  privateKeyIv String @map("private_key_iv")
+  privateKeyAuthTag String @map("private_key_auth_tag")
+  keyRotationTimestamp DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User?
+  ecosystem Ecosystem?
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  identityId String? @unique @db.Uuid
+  identity Identity? @relation(fields: [identityId], references: [id])
+
+  email String @unique
+  passwordHash String
+  passwordChangedAt DateTime @default(now())
+  hashedRefreshToken String?
+  role Role @default(USER)
+  status UserStatus @default(PENDING)
+  isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   ecosystems Ecosystem[]
   passwordResetTokens PasswordResetToken[]
+
+  @@index([identityId])
 }
 
 model PasswordResetToken {
-  id               String   @id @default(uuid()) @db.Uuid
-  userId           String   @db.Uuid
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash        String
-  tokenFingerprint String   @unique
-  createdAt        DateTime @default(now())
-  usedAt           DateTime?
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  tokenFingerprint String @unique
+  createdAt DateTime @default(now())
+  usedAt DateTime?
 
   @@index([userId])
   @@index([createdAt])
 }
 
 model Ecosystem {
-  id   String @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
+  identityId String @unique @db.Uuid
+  identity Identity @relation(fields: [identityId], references: [id])
+
   name String
 
   ownerId String @db.Uuid
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
-  did                    String?         @unique
-  certificateFingerprint String?         @unique
-  apiKey                 String?         @map("api_key")
-  apiKeyIv               String?         @map("api_key_iv")
-  apiKeyAuthTag          String?         @map("api_key_auth_tag")
-  status                 EcosystemStatus @default(PENDING)
+  apiKey String? @map("api_key")
+  apiKeyIv String? @map("api_key_iv")
+  apiKeyAuthTag String? @map("api_key_auth_tag")
+  status EcosystemStatus @default(PENDING)
 
-  latitude  Float?
+  latitude Float?
   longitude Float?
 
-  // Estado en tiempo real (El histórico pertenece al microservicio de Auditoría)
-  isOnline Boolean   @default(false)
+  isOnline Boolean @default(false)
   lastSeen DateTime?
 
   createdAt DateTime @default(now())
@@ -91,12 +115,12 @@ model Ecosystem {
 model Device {
   id String @id @default(uuid()) @db.Uuid
 
-  ecosystemId String    @db.Uuid
-  ecosystem   Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
+  ecosystemId String @db.Uuid
+  ecosystem Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
 
-  name       String
+  name String
   macAddress String? @db.VarChar(255)
-  vendor     String?
+  vendor String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

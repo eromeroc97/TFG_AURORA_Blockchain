@@ -2,6 +2,20 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 
+export interface AnchorPayload {
+  actionId: string;
+  originalHash: string;
+  signature: string;
+  signerPublicKey: string;
+  timestamp: string;
+}
+
+export interface AnchorResponse {
+  id: string;
+  hash: string;
+  blockNumber?: number;
+}
+
 interface FireflyStatus {
   org: {
     id: string;
@@ -121,5 +135,52 @@ export class FireflyService {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async broadcastAnchor(payload: AnchorPayload): Promise<AnchorResponse> {
+    await this.ensureInitialized();
+
+    const maxAttempts = 3;
+    const retryDelayMs = 3000;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const postRes = await firstValueFrom(
+          this.httpService.post<{ id: string; hash: string }>(
+            `${this.baseUrl}/messages/broadcast`,
+            {
+              data: payload,
+            },
+          ),
+        );
+
+        const response = postRes.data;
+        if (!response.id) {
+          throw new Error('FireFly broadcast did not return message ID');
+        }
+
+        this.logger.log(`Anchor broadcast: ${response.id}`);
+        return {
+          id: response.id,
+          hash: response.hash,
+        };
+      } catch (error) {
+        const isLastAttempt = attempt === maxAttempts;
+        this.logger.warn(
+          `Anchor broadcast attempt ${attempt}/${maxAttempts} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+
+        if (isLastAttempt) {
+          throw new Error(
+            `Anchor broadcast failed after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+        }
+
+        this.logger.log(`Retrying in ${retryDelayMs / 1000}s...`);
+        await this.delay(retryDelayMs);
+      }
+    }
+
+    throw new Error('Anchor broadcast failed: unexpected code path');
   }
 }

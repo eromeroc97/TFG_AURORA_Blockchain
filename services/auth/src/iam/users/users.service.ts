@@ -14,8 +14,15 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../shared/mail/mail.service';
-import { FireflyService } from '../../blockchain/firefly.service';
+import { FireflyService, AnchorPayload } from '../../blockchain/firefly.service';
+import { CryptoService } from '../../crypto/crypto.service';
 import { RedisService } from '../redis/redis.service';
+
+export enum AuditAction {
+  USER_APPROVE = 'USER_APPROVE',
+  USER_REVOKE = 'USER_REVOKE',
+  ROLE_CHANGE = 'ROLE_CHANGE',
+}
 
 @Injectable()
 export class UsersService {
@@ -23,6 +30,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly blockchainService: FireflyService,
+    private readonly cryptoService: CryptoService,
     private readonly redisService: RedisService,
   ) {}
 
@@ -44,7 +52,14 @@ export class UsersService {
     role: true,
     status: true,
     isActive: true,
-    did: true,
+    identity: {
+      select: {
+        publicKey: true,
+        privateKeyCiphertext: true,
+        privateKeyIv: true,
+        privateKeyAuthTag: true,
+      },
+    },
     createdAt: true,
     updatedAt: true,
   } as const;
@@ -101,11 +116,15 @@ export class UsersService {
     }
   }
 
-  private async resolveActorDid(actorId: string): Promise<string> {
+  private async resolveActorPublicKey(actorId: string): Promise<string> {
     const actor = await this.prisma.user.findUnique({
       where: { id: actorId },
       select: {
-        did: true,
+        identity: {
+          select: {
+            publicKey: true,
+          },
+        },
       },
     });
 
@@ -113,11 +132,83 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    if (!actor.did?.trim()) {
-      throw new BadRequestException('El usuario administrador debe tener DID para aprobar altas');
+    if (!actor.identity?.publicKey) {
+      throw new BadRequestException('El usuario aprobador debe tener claves criptográficas');
     }
 
-    return actor.did.trim();
+    return actor.identity.publicKey;
+  }
+
+  private async getActorPrivateKey(actorId: string): Promise<string> {
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorId },
+      select: {
+        identity: {
+          select: {
+            privateKeyCiphertext: true,
+            privateKeyIv: true,
+            privateKeyAuthTag: true,
+          },
+        },
+      },
+    });
+
+    if (!actor?.identity) {
+      throw new BadRequestException('El usuario aprobador no tiene identidad criptográfica');
+    }
+
+    const { privateKeyCiphertext, privateKeyIv, privateKeyAuthTag } = actor.identity;
+    if (!privateKeyCiphertext || !privateKeyIv || !privateKeyAuthTag) {
+      throw new BadRequestException('El usuario aprobador no tiene claves privadas');
+    }
+
+    const encryptedPayload = {
+      ciphertext: privateKeyCiphertext,
+      iv: privateKeyIv,
+      authTag: privateKeyAuthTag,
+    };
+    return this.cryptoService.decryptPrivateKey(encryptedPayload);
+  }
+
+  private async buildAnchorPayload(
+    action: AuditAction,
+    targetUserId: string,
+    actorId: string,
+    additionalData?: Record<string, unknown>,
+  ): Promise<AnchorPayload> {
+    const timestamp = new Date().toISOString();
+    const targetData = JSON.stringify({
+      action,
+      targetUserId,
+      timestamp,
+      ...additionalData,
+    });
+    const originalHash = this.cryptoService.hashSha256(targetData);
+    const publicKey = await this.resolveActorPublicKey(actorId);
+    const privateKey = await this.getActorPrivateKey(actorId);
+    const signature = this.cryptoService.sign(targetData, privateKey);
+
+    return {
+      actionId: action,
+      originalHash,
+      signature,
+      signerPublicKey: publicKey,
+      timestamp,
+    };
+  }
+
+  private async anchorAction(
+    action: AuditAction,
+    targetUserId: string,
+    actorId: string,
+    additionalData?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const payload = await this.buildAnchorPayload(action, targetUserId, actorId, additionalData);
+      await this.blockchainService.broadcastAnchor(payload);
+    } catch (error) {
+      console.error(`[UsersService] Anchoring failed for ${action}:`, error);
+    }
   }
 
   private async assertPasswordNotPwned(password: string) {
@@ -431,7 +522,6 @@ export class UsersService {
           passwordHash,
           role: Role.USER,
           status: UserStatus.PENDING,
-          did: null,
           isActive: false,
         },
       });
@@ -600,8 +690,12 @@ export class UsersService {
         id: true,
         email: true,
         status: true,
-        did: true,
         role: true,
+        identity: {
+          select: {
+            publicKey: true,
+          },
+        },
       },
     });
 
@@ -630,6 +724,15 @@ export class UsersService {
       });
 
       await this.redisService.addToBlacklist(id, 300);
+
+      const targetUserPublicKey = user.identity?.publicKey;
+      await this.anchorAction(
+        AuditAction.USER_REVOKE,
+        id,
+        requesterId,
+        { targetUserPublicKey },
+      );
+
       await this.mailService.sendAccountDeletedEmail(user.email, new Date().toISOString());
       return revokedUser;
     } catch (error) {
@@ -679,6 +782,13 @@ export class UsersService {
         select: this.userSelect,
       });
 
+      await this.anchorAction(
+        AuditAction.ROLE_CHANGE,
+        targetUserId,
+        actorId!,
+        { oldRole: currentUser.role, newRole },
+      );
+
       await this.mailService.sendRoleChangedEmail(
         currentUser.email,
         newRole,
@@ -706,8 +816,6 @@ export class UsersService {
       throw new ForbiddenException('No puedes aprobar tu propia cuenta');
     }
 
-    const adminDid = await this.resolveActorDid(actorId);
-
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -730,20 +838,31 @@ export class UsersService {
       throw new ForbiddenException('No puedes aprobar cuentas de administradores');
     }
 
-    const userDid = await this.blockchainService.createIdentity({
-      name: user.id,
-      parent: adminDid,
+    const keyPair = this.cryptoService.generateKeyPair();
+    const encrypted = this.cryptoService.encryptPrivateKey(keyPair.privateKey);
+
+    const identity = await this.prisma.identity.create({
+      data: {
+        type: 'USER',
+        publicKey: keyPair.publicKey,
+        privateKeyCiphertext: encrypted.ciphertext,
+        privateKeyIv: encrypted.iv,
+        privateKeyAuthTag: encrypted.authTag,
+        keyRotationTimestamp: new Date(),
+      },
     });
 
     const approvedUser = await this.prisma.user.update({
       where: { id },
       data: {
+        identityId: identity.id,
         status: UserStatus.ACTIVE,
         isActive: true,
-        did: userDid,
       },
       select: this.userSelect,
     });
+
+    await this.anchorAction(AuditAction.USER_APPROVE, id, actorId);
 
     const actionUrl = await this.issuePasswordResetActionUrl(user.id);
     await this.mailService.sendVerifyEmail(user.email, actionUrl);
