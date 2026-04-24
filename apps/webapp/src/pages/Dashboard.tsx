@@ -916,7 +916,10 @@ export default function Dashboard() {
                     <div className="mt-2 flex items-center gap-2 text-xs">
                       <button
                         type="button"
-                        onClick={() => void toggleApiKeyVisibility(ecosystem.id)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void toggleApiKeyVisibility(ecosystem.id)
+                        }}
                         className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-muted transition-colors hover:text-primary"
                       >
                         {revealedApiKeysByEcosystemId[ecosystem.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -926,7 +929,10 @@ export default function Dashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleCopyEcosystemApiKey(ecosystem.id)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handleCopyEcosystemApiKey(ecosystem.id)
+                        }}
                         className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-muted transition-colors hover:text-primary"
                       >
                         {copiedKeyTag === `list-${ecosystem.id}` ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -938,7 +944,10 @@ export default function Dashboard() {
                       <button
                         type="button"
                         disabled={apiKeyLoadingByEcosystemId[ecosystem.id]}
-                        onClick={() => void fetchEcosystemApiKey(ecosystem.id)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void fetchEcosystemApiKey(ecosystem.id)
+                        }}
                         className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-muted transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {apiKeyLoadingByEcosystemId[ecosystem.id] ? 'Recuperando API key...' : 'Recuperar API key'}
@@ -955,6 +964,7 @@ export default function Dashboard() {
                   </span>
                   <button
                     type="button"
+                    onClick={(event) => event.stopPropagation()}
                     aria-label={`Compartir ecosistema ${ecosystem.name}`}
                     className="text-xs font-medium px-2 py-1 rounded-full border border-border bg-white text-primary/80 transition-colors hover:bg-surface/60"
                   >
@@ -1161,7 +1171,10 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => openEcosystemDevicesModal(ecosystem)}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openEcosystemDevicesModal(ecosystem)
+                }}
                 className="text-xs font-medium px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
               >
                 Ver detalles
