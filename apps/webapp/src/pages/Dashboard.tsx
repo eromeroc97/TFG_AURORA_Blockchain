@@ -623,12 +623,20 @@ export default function Dashboard() {
           return [...preserved, ...ownedEcosystems]
         })
 
-        const usersResponse = await apiClient.get<ApiUser[]>('/users')
-        const newCache: Record<string, string> = {}
-        usersResponse.data.forEach((user) => {
-          newCache[user.id] = user.email
-        })
-        setUserEmailCache((current) => ({ ...current, ...newCache }))
+        const needsUserCache = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
+
+        if (needsUserCache) {
+          try {
+            const usersResponse = await apiClient.get<ApiUser[]>('/users')
+            const newCache: Record<string, string> = {}
+            usersResponse.data.forEach((user) => {
+              newCache[user.id] = user.email
+            })
+            setUserEmailCache((current) => ({ ...current, ...newCache }))
+          } catch (error) {
+            console.error('No se pudo cargar la caché de emails de usuarios.', error)
+          }
+        }
       } catch {
         if (!isMounted) {
           return
