@@ -56,20 +56,30 @@ export async function resolveMacVendor(
   fetchImpl: typeof fetch = fetch,
   macVendorApiBaseUrl = 'https://api.macvendors.com',
 ): Promise<string> {
-  const normalizedMac = macAddress.trim().replace(/:/g, '-');
+  const normalizedMac = macAddress.trim();
 
   try {
     const response = await fetchImpl(`${macVendorApiBaseUrl}/${encodeURIComponent(normalizedMac)}`, {
-      signal: AbortSignal.timeout(5000), // Evita que se quede colgado esperando a MacVendors
+      signal: AbortSignal.timeout(5000),
+      headers: {
+        // Camuflamos la petición para que no la bloqueen por ser un bot/script
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/plain'
+      }
     });
 
     if (!response.ok) {
+      // ESTO ES CLAVE: Te chivará en consola si te están bloqueando por el límite (429) o si la MAC no existe (404)
+      console.warn(`[MacVendor API] Fallo al resolver ${normalizedMac}. Código HTTP: ${response.status}`);
       return 'Generic Device';
     }
 
     const vendor = (await response.text()).trim();
     return vendor.length > 0 ? vendor : 'Generic Device';
-  } catch {
+    
+  } catch (error) {
+    // Si salta el timeout de 5000ms o hay un corte de red, lo verás aquí
+    console.error(`[MacVendor API] Excepción con la MAC ${normalizedMac}:`, error);
     return 'Generic Device';
   }
 }

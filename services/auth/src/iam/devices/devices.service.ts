@@ -100,8 +100,11 @@ export class DevicesService {
     const normalizedVendor = vendor?.trim();
 
     if (existingDevice) {
+      const currentVendor = existingDevice.vendor?.trim() || '';
       const shouldUpdateVendor =
-        typeof normalizedVendor === 'string' && normalizedVendor.length > 0 && normalizedVendor !== existingDevice.vendor;
+        typeof normalizedVendor === 'string' &&
+        normalizedVendor.length > 0 &&
+        (currentVendor === '' || currentVendor === 'Generic Device');
 
       if (shouldUpdateVendor) {
         return this.prisma.device.update({
@@ -152,7 +155,8 @@ export class DevicesService {
       throw new NotFoundException('Device not found');
     }
 
-    if (existingDevice.vendor) {
+    const currentVendor = existingDevice.vendor?.trim() || '';
+    if (currentVendor !== '' && currentVendor !== 'Generic Device') {
       return existingDevice;
     }
 
