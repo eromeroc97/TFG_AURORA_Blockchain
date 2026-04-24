@@ -13,7 +13,6 @@ import AccessMap from '../components/dashboard/AccessMap'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { type AccessMapDevice, type AccessMapEcosystem } from '../components/dashboard/access-map.data'
 import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
-import { USERS_MOCK } from '../components/dashboard/users.data'
 import { useAuth } from '../context/auth-context'
 
 type DashboardMetric = {
@@ -117,7 +116,7 @@ const USER_STATUS_LABELS: Record<UserStatus, string> = {
   REVOKED: 'Revocado',
 }
 
-const mapMockUserToDashboardUser = (user: (typeof USERS_MOCK)[number]): DashboardUser => ({
+const mapMockUserToDashboardUser = (user: ApiUser): DashboardUser => ({
   id: user.id,
   email: user.email,
   role: user.role,
@@ -211,9 +210,8 @@ export default function Dashboard() {
   const isGlobalAdmin = role === 'GLOBAL_ADMIN'
   const canOpenEcosystemDevicesModal = role === 'USER' || role === 'AUDITOR'
   const authenticatedUserId = authClaims?.sub ?? null
-  const [dashboardUsers, setDashboardUsers] = useState<DashboardUser[]>(() =>
-    USERS_MOCK.map(mapMockUserToDashboardUser).filter(isVisibleUser),
-  )
+  const [dashboardUsers, setDashboardUsers] = useState<DashboardUser[]>([])
+  const [userEmailCache, setUserEmailCache] = useState<Record<string, string>>({})
   const [adminError, setAdminError] = useState<string | null>(null)
   const [pendingUserAction, setPendingUserAction] = useState<{
     userId: string
@@ -631,6 +629,13 @@ export default function Dashboard() {
           const preserved = currentEcosystems.filter((ecosystem) => !nextIds.has(ecosystem.id))
           return [...preserved, ...ownedEcosystems]
         })
+
+        const usersResponse = await apiClient.get<ApiUser[]>('/users')
+        const newCache: Record<string, string> = {}
+        usersResponse.data.forEach((user) => {
+          newCache[user.id] = user.email
+        })
+        setUserEmailCache((current) => ({ ...current, ...newCache }))
       } catch {
         if (!isMounted) {
           return
@@ -669,12 +674,18 @@ export default function Dashboard() {
         }
 
         setDashboardUsers(response.data.map(normalizeApiUser).filter(isVisibleUser))
+
+        const newCache: Record<string, string> = {}
+        response.data.forEach((user) => {
+          newCache[user.id] = user.email
+        })
+        setUserEmailCache((current) => ({ ...current, ...newCache }))
       } catch {
         if (!isMounted) {
           return
         }
 
-        setDashboardUsers(USERS_MOCK.map(mapMockUserToDashboardUser).filter(isVisibleUser))
+        setDashboardUsers([])
       }
     }
 
@@ -1144,7 +1155,7 @@ export default function Dashboard() {
                 {ecosystem.name}
               </button>
               <p className="text-xs text-muted mt-1">
-                {ecosystem.devices.length} dispositivos • Propietario: {USERS_MOCK.find((u) => u.id === ecosystem.ownerId)?.name}
+                {ecosystem.devices.length} dispositivos • Propietario: {userEmailCache[ecosystem.ownerId] ?? 'Desconocido'}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1491,7 +1502,7 @@ export default function Dashboard() {
                 >
                   {ecosystem.name}
                 </button>
-                <p className="text-xs text-muted mt-1">Propietario: {USERS_MOCK.find((u) => u.id === ecosystem.ownerId)?.name}</p>
+                <p className="text-xs text-muted mt-1">Propietario: {userEmailCache[ecosystem.ownerId] ?? 'Desconocido'}</p>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">

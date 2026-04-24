@@ -8,7 +8,7 @@ describe('FireflyService', () => {
   let service: FireflyService;
 
   const httpServiceMock = {
-    get: jest.fn(),
+    get: jest.fn(() => of({ data: { org: { id: 'org-1', verifiers: [{ type: 'key', value: 'verifier-1' }] } } })),
     post: jest.fn(),
   };
 
