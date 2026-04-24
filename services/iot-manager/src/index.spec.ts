@@ -17,6 +17,9 @@ const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryS
     savedInputs.push(input);
     return { id: `mongo-${savedInputs.length}` };
   },
+  updateAnchorStatus: async () => {
+    return;
+  },
   findLastInteraction: async (deviceId: string) => {
     const found = [...savedInputs]
       .reverse()

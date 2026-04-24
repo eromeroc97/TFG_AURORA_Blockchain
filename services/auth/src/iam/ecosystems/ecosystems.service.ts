@@ -273,7 +273,6 @@ export class EcosystemsService {
         return {
           valid: true,
           ecosystemId: ecosystem.id,
-          status: ecosystem.status,
         };
       } catch (error) {
         if (error instanceof BadRequestException) {
@@ -286,6 +285,40 @@ export class EcosystemsService {
 
     return {
       valid: false,
+    };
+  }
+
+  async signHash(ecosystemId: string, hash: string): Promise<{ signature: string; publicKey: string }> {
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id: ecosystemId },
+      include: { identity: true },
+    });
+
+    if (!ecosystem || !ecosystem.identity) {
+      throw new BadRequestException('Ecosistema no encontrado');
+    }
+
+    if (ecosystem.status !== EcosystemStatus.ACTIVE) {
+      throw new BadRequestException('El ecosistema no está activo');
+    }
+
+    const { privateKeyCiphertext, privateKeyIv, privateKeyAuthTag, publicKey } = ecosystem.identity;
+
+    if (!privateKeyCiphertext || !privateKeyIv || !privateKeyAuthTag || !publicKey) {
+      throw new InternalServerErrorException('El ecosistema no tiene claves criptográficas');
+    }
+
+    const privateKeyPem = this.cryptoService.decryptPrivateKey({
+      ciphertext: privateKeyCiphertext,
+      iv: privateKeyIv,
+      authTag: privateKeyAuthTag,
+    });
+
+    const signature = this.cryptoService.sign(hash, privateKeyPem);
+
+    return {
+      signature,
+      publicKey,
     };
   }
 

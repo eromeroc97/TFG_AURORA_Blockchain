@@ -6,12 +6,14 @@ import {
 import {
   randomBytes,
   createHash,
-  createSign,
-  createVerify,
   createCipheriv,
   createDecipheriv,
   generateKeyPairSync,
-  type KeyPairSyncResult,
+  createPrivateKey,
+  createPublicKey,
+  type KeyObject,
+  sign as cryptoSign,
+  verify as cryptoVerify,
 } from 'crypto';
 
 export interface KeyPair {
@@ -56,15 +58,32 @@ export class CryptoService {
   }
 
   generateKeyPair(): KeyPair {
-    const keyPair = generateKeyPairSync('ed25519');
+    const keyPair = generateKeyPairSync('ed25519', {
+      publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem',
+      },
+      privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem',
+      },
+    });
 
     if (!keyPair.publicKey || !keyPair.privateKey) {
       throw new Error('Failed to generate Ed25519 key pair');
     }
 
+    const publicKeyPem = typeof keyPair.publicKey === 'string' 
+      ? keyPair.publicKey 
+      : (keyPair.publicKey as KeyObject).export({ type: 'spki', format: 'pem' });
+    
+    const privateKeyPem = typeof keyPair.privateKey === 'string'
+      ? keyPair.privateKey
+      : (keyPair.privateKey as KeyObject).export({ type: 'pkcs8', format: 'pem' });
+
     return {
-      publicKey: keyPair.publicKey.toString(),
-      privateKey: keyPair.privateKey.toString(),
+      publicKey: publicKeyPem as string,
+      privateKey: privateKeyPem as string,
     };
   }
 
@@ -109,18 +128,14 @@ export class CryptoService {
   }
 
   sign(data: string, privateKeyPem: string): string {
-    const signer = createSign('SHA256');
-    signer.update(data, 'utf8');
-    signer.end();
-    const signature = signer.sign(privateKeyPem);
+    const privateKey = createPrivateKey(privateKeyPem);
+    const signature = cryptoSign(null, Buffer.from(data, 'utf8'), privateKey);
     return signature.toString('base64');
   }
 
   verify(data: string, signatureBase64: string, publicKeyPem: string): boolean {
-    const verifier = createVerify('SHA256');
-    verifier.update(data, 'utf8');
-    verifier.end();
-    return verifier.verify(publicKeyPem, Buffer.from(signatureBase64, 'base64'));
+    const publicKey = createPublicKey(publicKeyPem);
+    return cryptoVerify(null, Buffer.from(data, 'utf8'), publicKey, Buffer.from(signatureBase64, 'base64'));
   }
 
   hashSha256(data: string): string {

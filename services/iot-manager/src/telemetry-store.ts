@@ -1,16 +1,23 @@
 import { MongoClient, type Db, type Collection } from 'mongodb';
 
+export type AnchorStatus = 'PENDING_ANCHOR' | 'ANCHORED' | 'FAILED';
+
+export type TelemetryMetadata = {
+  telemetryId: string;
+  ecosystemId: string;
+  latitude: number;
+  longitude: number;
+  anchorStatus: AnchorStatus;
+  signature: string | null;
+  publicKey: string | null;
+  txId: string | null;
+};
+
 export type TelemetryDocument = {
   timestamp: Date;
-  metadata: {
-    ecosystemId: string;
-    latitude: number;
-    longitude: number;
-  };
+  metadata: TelemetryMetadata;
   payload: Record<string, unknown>;
   hash: string;
-  blockchainStatus: 'PENDING' | 'CONFIRMED' | 'FAILED';
-  txId: string | null;
 };
 
 export type SaveTelemetryInput = {
@@ -19,6 +26,8 @@ export type SaveTelemetryInput = {
   longitude: number;
   payload: Record<string, unknown>;
   hash: string;
+  signature?: string;
+  publicKey?: string;
   timestamp: Date;
 };
 
@@ -28,6 +37,7 @@ export type SaveTelemetryResult = {
 
 export interface TelemetryStore {
   save(input: SaveTelemetryInput): Promise<SaveTelemetryResult>;
+  updateAnchorStatus(id: string, anchorStatus: AnchorStatus, signature: string, publicKey: string, txId?: string): Promise<void>;
   findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null>;
   close(): Promise<void>;
 }
@@ -84,22 +94,48 @@ export class MongoTelemetryStore implements TelemetryStore {
 
   async save(input: SaveTelemetryInput): Promise<SaveTelemetryResult> {
     const collection = await this.ensureCollection();
+    const telemetryId = new (await import('mongodb')).ObjectId().toString();
     const result = await collection.insertOne({
       timestamp: input.timestamp,
       metadata: {
+        telemetryId,
         ecosystemId: input.ecosystemId,
         latitude: input.latitude,
         longitude: input.longitude,
+        anchorStatus: 'PENDING_ANCHOR',
+        signature: input.signature ?? null,
+        publicKey: input.publicKey ?? null,
+        txId: null,
       },
       payload: input.payload,
       hash: input.hash,
-      blockchainStatus: 'PENDING',
-      txId: null,
     });
 
     return {
-      id: result.insertedId.toString(),
+      id: telemetryId,
     };
+  }
+
+  async updateAnchorStatus(
+    id: string,
+    anchorStatus: AnchorStatus,
+    signature: string,
+    publicKey: string,
+    txId?: string,
+  ): Promise<void> {
+    const collection = await this.ensureCollection();
+    
+    await collection.updateMany(
+      { 'metadata.telemetryId': id },
+      {
+        $set: {
+          'metadata.anchorStatus': anchorStatus,
+          'metadata.signature': signature,
+          'metadata.publicKey': publicKey,
+          ...(txId && { 'metadata.txId': txId }),
+        },
+      },
+    );
   }
 
   async findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null> {

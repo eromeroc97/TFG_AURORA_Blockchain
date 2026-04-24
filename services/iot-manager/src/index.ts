@@ -9,8 +9,6 @@ import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
 type ApiKeyValidationResult = {
   valid: boolean;
   ecosystemId?: string;
-  did?: string;
-  status?: string;
 };
 
 type ApiKeyValidationInput = {
@@ -31,7 +29,7 @@ type AppOptions = {
 
 type AuthContext = {
   ecosystemId: string;
-  did: string;
+  publicKey: string;
 };
 
 type IngestRequestBody = {
@@ -85,14 +83,22 @@ const stableSortObject = (value: unknown): unknown => {
   return value;
 };
 
-const buildPayloadHash = (payload: Record<string, unknown>): string => {
+const buildPayloadHash = (
+  payload: Record<string, unknown>,
+  latitude: number,
+  longitude: number,
+): string => {
   const normalizedPayload = stableSortObject(payload);
-  return createHash('sha256').update(JSON.stringify(normalizedPayload)).digest('hex');
+  const dataToHash = JSON.stringify({
+    payload: normalizedPayload,
+    gps: { latitude, longitude },
+  });
+  return createHash('sha256').update(dataToHash).digest('hex');
 };
 
 const parseStaticMap = (
   raw: string | undefined,
-): Record<string, { ecosystemId: string; did: string }> => {
+): Record<string, { ecosystemId: string }> => {
 
   if (!raw) {
     return {};
@@ -104,7 +110,7 @@ const parseStaticMap = (
       return {};
     }
 
-    return Object.entries(parsed).reduce<Record<string, { ecosystemId: string; did: string }>>(
+    return Object.entries(parsed).reduce<Record<string, { ecosystemId: string }>>(
       (acc, [key, value]) => {
         if (typeof key !== 'string' || !key.trim()) {
           return acc;
@@ -113,7 +119,6 @@ const parseStaticMap = (
         if (typeof value === 'string' && value.trim()) {
           acc[key] = {
             ecosystemId: value.trim(),
-            did: `did:firefly:custom/${value.trim()}`,
           };
           return acc;
         }
@@ -122,12 +127,10 @@ const parseStaticMap = (
           value &&
           typeof value === 'object' &&
           !Array.isArray(value) &&
-          typeof (value as Record<string, unknown>).ecosystemId === 'string' &&
-          typeof (value as Record<string, unknown>).did === 'string'
+          typeof (value as Record<string, unknown>).ecosystemId === 'string'
         ) {
           acc[key] = {
             ecosystemId: (value as Record<string, string>).ecosystemId.trim(),
-            did: (value as Record<string, string>).did.trim(),
           };
         }
 
@@ -172,8 +175,6 @@ const buildDefaultApiKeyValidator = (config: AppConfig) => {
       return {
         valid: true,
         ecosystemId: mappedEntry.ecosystemId,
-        did: mappedEntry.did,
-        status: 'ACTIVE',
       };
     }
 
@@ -282,7 +283,7 @@ export const buildApp = (options: AppOptions = {}) => {
       if (cachedValidApiKey) {
         (request as AuthenticatedFastifyRequest).authContext = {
           ecosystemId: cachedValidApiKey.ecosystemId,
-          did: cachedValidApiKey.did,
+          publicKey: '',
         };
         return;
       }
@@ -321,7 +322,7 @@ export const buildApp = (options: AppOptions = {}) => {
       return;
     }
 
-    if (!validationResult.valid || !validationResult.ecosystemId || !validationResult.did) {
+    if (!validationResult.valid || !validationResult.ecosystemId) {
       invalidApiKeyCache.set(cacheKey, {
         expiresAt: currentTs + negativeTtlMs,
       });
@@ -332,22 +333,10 @@ export const buildApp = (options: AppOptions = {}) => {
       return;
     }
 
-    if (validationResult.status && validationResult.status.toUpperCase() !== 'ACTIVE') {
-      invalidApiKeyCache.set(cacheKey, {
-        expiresAt: currentTs + negativeTtlMs,
-      });
-      reply.code(403).send({
-        error: 'ECOSYSTEM_NOT_ACTIVE',
-        message: 'Ecosystem is not active',
-      });
-      return;
-    }
-
     invalidApiKeyCache.delete(cacheKey);
     try {
       await apiKeyCache.set(cacheKey, {
         ecosystemId: validationResult.ecosystemId,
-        did: validationResult.did,
       });
     } catch (error) {
       request.log.warn({ error }, 'Redis API key cache unavailable while writing');
@@ -355,21 +344,29 @@ export const buildApp = (options: AppOptions = {}) => {
 
     (request as AuthenticatedFastifyRequest).authContext = {
       ecosystemId: validationResult.ecosystemId,
-      did: validationResult.did,
+      publicKey: '',
     };
   };
 
-  const broadcastToFirefly = (hash: string, mongoId: string, ecosystemDid: string) => {
-    console.log(
-      '[STUB] Simulando envio a FireFly del hash:',
+  const broadcastTelemetryMock = async (
+    hash: string,
+    signature: string,
+    publicKey: string,
+    ecosystemId: string,
+  ): Promise<{ txId: string }> => {
+    // TODO: Replace with actual FireFly communication
+    // This is a temporary mock that simulates network delay and returns success
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const txId = `mock-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    app.log.info({
+      msg: '[MOCK] Broadcast to FireFly',
       hash,
-      'mongoId:',
-      mongoId,
-      'did:',
-      ecosystemDid,
-      'url:',
-      config.fireflyApiUrl,
-    );
+      signature: signature.slice(0, 20) + '...',
+      publicKey: publicKey.slice(0, 20) + '...',
+      ecosystemId,
+      txId,
+    });
+    return { txId };
   };
 
   app.post(
@@ -403,6 +400,7 @@ export const buildApp = (options: AppOptions = {}) => {
     async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply) => {
       const authContext = (request as AuthenticatedFastifyRequest).authContext;
       const ecosystemId = authContext?.ecosystemId;
+      const publicKey = authContext?.publicKey;
 
       if (!ecosystemId) {
         return reply.code(401).send({
@@ -424,7 +422,10 @@ export const buildApp = (options: AppOptions = {}) => {
         devices: request.body.devices,
       };
 
-      const hash = buildPayloadHash(payload);
+      // Step 4: Calculate SHA-256 hash (payload + GPS)
+      const hash = buildPayloadHash(payload, request.body.latitude, request.body.longitude);
+
+      // Step 3: Persist with PENDING_ANCHOR status
       const savedTelemetry = await telemetryStore.save({
         ecosystemId,
         latitude: request.body.latitude,
@@ -434,10 +435,54 @@ export const buildApp = (options: AppOptions = {}) => {
         timestamp: eventTimestamp,
       });
 
-      void Promise.resolve().then(() => {
-        broadcastToFirefly(hash, savedTelemetry.id, authContext.did);
-      });
+      // Step 5: Request signature from auth-service (KMS)
+      let signature: string;
+      let signingPublicKey: string;
 
+      try {
+        const signResponse = await fetch(config.authSignUrl!, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.authInternalToken}`,
+          },
+          body: JSON.stringify({ ecosystemId, hash }),
+        });
+
+        if (!signResponse.ok) {
+          throw new Error(`Sign request failed: ${signResponse.status}`);
+        }
+
+        const signResult = await signResponse.json() as { signature: string; publicKey: string };
+        signature = signResult.signature;
+        signingPublicKey = signResult.publicKey;
+      } catch (signError) {
+        request.log.error({ error: signError }, 'Failed to get signature from auth-service');
+        await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
+        return reply.code(500).send({
+          error: 'SIGNING_FAILED',
+          message: 'Failed to sign telemetry data',
+        });
+      }
+
+      // Step 7: Broadcast to FireFly (mock)
+      let txId: string;
+      try {
+        const broadcastResult = await broadcastTelemetryMock(hash, signature, signingPublicKey, ecosystemId);
+        txId = broadcastResult.txId;
+      } catch (broadcastError) {
+        request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly');
+        await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
+        return reply.code(500).send({
+          error: 'BROADCAST_FAILED',
+          message: 'Failed to broadcast telemetry to blockchain',
+        });
+      }
+
+      // Step 8: Update status to ANCHORED
+      await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'ANCHORED', signature, signingPublicKey, txId);
+
+      // Run device discovery in background (not part of the 8-step flow, but needed)
       void Promise.resolve().then(async () => {
         await deviceDiscovery.discoverAndSync(
           {
@@ -453,6 +498,7 @@ export const buildApp = (options: AppOptions = {}) => {
         status: 'ACCEPTED',
         ecosystemId,
         hash,
+        txId,
         receivedAt: new Date(now()).toISOString(),
       });
     },

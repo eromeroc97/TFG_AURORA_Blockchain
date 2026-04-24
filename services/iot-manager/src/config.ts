@@ -8,6 +8,7 @@ export type AppConfig = {
   authDeviceRegisterUrl?: string;
   authDeviceUpdateVendorUrl?: string;
   authValidateApiKeyUrl?: string;
+  authSignUrl?: string;
   authInternalToken?: string;
   iotApiKeyStaticMap?: string;
   iotApiKeyPositiveTtlMs: number;
@@ -49,6 +50,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     authDeviceRegisterUrl: env.AUTH_DEVICE_REGISTER_URL?.trim() || undefined,
     authDeviceUpdateVendorUrl: env.AUTH_DEVICE_UPDATE_VENDOR_URL?.trim() || undefined,
     authValidateApiKeyUrl: env.AUTH_VALIDATE_API_KEY_URL?.trim() || undefined,
+    authSignUrl: env.AUTH_SIGN_URL?.trim() || undefined,
     authInternalToken: env.AUTH_INTERNAL_TOKEN?.trim() || undefined,
     iotApiKeyStaticMap: env.IOT_API_KEY_STATIC_MAP,
     iotApiKeyPositiveTtlMs: parsePositiveNumber(

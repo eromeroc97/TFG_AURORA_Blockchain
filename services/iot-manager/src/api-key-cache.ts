@@ -3,7 +3,6 @@ import type { AppConfig } from './config';
 
 export type CachedValidApiKey = {
   ecosystemId: string;
-  did: string;
 };
 
 export interface ApiKeyCache {
@@ -72,7 +71,7 @@ class RedisApiKeyCache implements ApiKeyCache {
 
     try {
       const parsed = JSON.parse(raw) as CachedValidApiKey;
-      if (!parsed?.ecosystemId || !parsed?.did) {
+      if (!parsed?.ecosystemId) {
         return null;
       }
 

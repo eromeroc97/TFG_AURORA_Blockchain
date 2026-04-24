@@ -1,17 +1,13 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Headers, Post } from '@nestjs/common';
 import { EcosystemsService } from './ecosystems.service';
 import { ValidateApiKeyDto } from './dto/validate-api-key.dto';
+import { SignHashDto } from './dto/sign-hash.dto';
 
 @Controller('internal/auth')
 export class InternalAuthController {
   constructor(private readonly ecosystemsService: EcosystemsService) {}
 
-  @Post('validate-ecosystem')
-  async validateApiKey(
-    @Headers('authorization') authorization: string | undefined,
-    @Headers('x-api-key') apiKey: string | undefined,
-    @Body() validateApiKeyDto: ValidateApiKeyDto,
-  ) {
+  private validateInternalToken(authorization: string | undefined): void {
     const expectedInternalToken = process.env.AUTH_INTERNAL_TOKEN?.trim();
 
     if (expectedInternalToken) {
@@ -23,6 +19,15 @@ export class InternalAuthController {
         throw new ForbiddenException('No tienes permisos para usar esta ruta');
       }
     }
+  }
+
+  @Post('validate-ecosystem')
+  async validateApiKey(
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('x-api-key') apiKey: string | undefined,
+    @Body() validateApiKeyDto: ValidateApiKeyDto,
+  ) {
+    this.validateInternalToken(authorization);
 
     if (!apiKey?.trim()) {
       throw new BadRequestException('x-api-key header is required');
@@ -32,6 +37,19 @@ export class InternalAuthController {
       apiKey,
       validateApiKeyDto.latitude,
       validateApiKeyDto.longitude,
+    );
+  }
+
+  @Post('sign')
+  async signHash(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() signHashDto: SignHashDto,
+  ) {
+    this.validateInternalToken(authorization);
+
+    return this.ecosystemsService.signHash(
+      signHashDto.ecosystemId,
+      signHashDto.hash,
     );
   }
 }
