@@ -116,13 +116,6 @@ const USER_STATUS_LABELS: Record<UserStatus, string> = {
   REVOKED: 'Revocado',
 }
 
-const mapMockUserToDashboardUser = (user: ApiUser): DashboardUser => ({
-  id: user.id,
-  email: user.email,
-  role: user.role,
-  status: user.status,
-})
-
 const normalizeApiUser = (user: ApiUser): DashboardUser => ({
   id: user.id,
   email: user.email,
