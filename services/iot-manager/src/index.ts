@@ -6,49 +6,92 @@ import { loadConfig, type AppConfig } from './config';
 import { DeviceDiscoveryService } from './device-discovery';
 import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
 
+/**
+ * Resultado de validación de API key.
+ */
 type ApiKeyValidationResult = {
-  valid: boolean;
-  ecosystemId?: string;
+	/** Indica si la API key es válida */
+	valid: boolean;
+	/** ID del ecosistema (si es válida) */
+	ecosystemId?: string;
 };
 
+/**
+ * Datos de entrada para validar una API key.
+ */
 type ApiKeyValidationInput = {
-  apiKey: string;
-  latitude: number;
-  longitude: number;
+	/** API key a validar */
+	apiKey: string;
+	/** Latitud de la lectura */
+	latitude: number;
+	/** Longitud de la lectura */
+	longitude: number;
 };
 
+/**
+ * Opciones para construir la aplicación Fastify.
+ */
 type AppOptions = {
-  config?: AppConfig;
-  telemetryStore?: TelemetryStore;
-  apiKeyValidator?: (input: ApiKeyValidationInput) => Promise<ApiKeyValidationResult>;
-  apiKeyCache?: ApiKeyCache;
-  positiveTtlMs?: number;
-  negativeTtlMs?: number;
-  now?: () => number;
+	/** Configuración de la aplicación */
+	config?: AppConfig;
+	/** Almacenamiento de telemetría */
+	telemetryStore?: TelemetryStore;
+	/** Validador de API key personalizado */
+	apiKeyValidator?: (input: ApiKeyValidationInput) => Promise<ApiKeyValidationResult>;
+	/** Caché de API keys */
+	apiKeyCache?: ApiKeyCache;
+	/** TTL positivo en ms */
+	positiveTtlMs?: number;
+	/** TTL negativo en ms */
+	negativeTtlMs?: number;
+	/** Función para obtener timestamp actual */
+	now?: () => number;
 };
 
+/**
+ * Contexto de autenticación establecido por el middleware.
+ */
 type AuthContext = {
-  ecosystemId: string;
-  publicKey: string;
+	/** ID del ecosistema */
+	ecosystemId: string;
+	/** Clave pública del firmante */
+	publicKey: string;
 };
 
+/**
+ * Cuerpo de la solicitud de ingestión de telemetría.
+ */
 type IngestRequestBody = {
-  latitude: number;
-  longitude: number;
-  devices: Array<{
-    mac_addr: string;
-    [key: string]: unknown;
-  }>;
-  timestamp?: string;
+	/** Latitud de la lectura */
+	latitude: number;
+	/** Longitud de la lectura */
+	longitude: number;
+	/** Lista de dispositivos */
+	devices: Array<{
+		mac_addr: string;
+		[key: string]: unknown;
+	}>;
+	/** Timestamp ISO-8601 (opcional) */
+	timestamp?: string;
 };
 
+/**
+ * Request de Fastify con contexto de autenticación.
+ */
 type AuthenticatedFastifyRequest = FastifyRequest & {
-  authContext?: AuthContext;
+	/** Contexto de autenticación */
+	authContext?: AuthContext;
 };
 
 const DEFAULT_POSITIVE_TTL_MS = 600_000;
 const DEFAULT_NEGATIVE_TTL_MS = 15_000;
 
+/**
+ * Extrae la API key del header de la solicitud.
+ *
+ * @param request - Solicitud de Fastify
+ * @returns API key o null si no existe
+ */
 const getApiKeyFromHeader = (request: FastifyRequest): string | null => {
   const headerValue = request.headers['x-api-key'];
 
@@ -64,25 +107,30 @@ const getApiKeyFromHeader = (request: FastifyRequest): string | null => {
   return null;
 };
 
+/**
+ * Calcula el hash SHA-256 de una API key para usarla como clave de caché.
+ *
+ * @param apiKey - API key en texto plano
+ * @returns Hash hexadecimal
+ */
 const hashApiKey = (apiKey: string): string => createHash('sha256').update(apiKey).digest('hex');
 
+/**
+ * Ordena las claves de un objeto de forma estable para hashing consistente.
+ *
+ * @param value - Valor a ordenar
+ * @returns Valor ordenado
+ */
 const stableSortObject = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map(stableSortObject);
-  }
 
-  if (value && typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .reduce<Record<string, unknown>>((acc, [key, nestedValue]) => {
-        acc[key] = stableSortObject(nestedValue);
-        return acc;
-      }, {});
-  }
-
-  return value;
-};
-
+/**
+ * Construye el hash SHA-256 del payload más coordenadas GPS.
+ *
+ * @param payload - Datos del sensor
+ * @param latitude - Latitud
+ * @param longitude - Longitud
+ * @returns Hash hexadecimal
+ */
 const buildPayloadHash = (
   payload: Record<string, unknown>,
   latitude: number,
@@ -96,92 +144,42 @@ const buildPayloadHash = (
   return createHash('sha256').update(dataToHash).digest('hex');
 };
 
+/**
+ * Parsea el mapa estático de API keys desde una variable de entorno.
+ * Formato: "key1:ecosystemId1,key2:ecosystemId2" o JSON.
+ *
+ * @param raw - Valor de la variable de entorno
+ * @returns Mapa de API keys a ecosistemas
+ */
 const parseStaticMap = (
-  raw: string | undefined,
-): Record<string, { ecosystemId: string }> => {
 
-  if (!raw) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {};
-    }
-
-    return Object.entries(parsed).reduce<Record<string, { ecosystemId: string }>>(
-      (acc, [key, value]) => {
-        if (typeof key !== 'string' || !key.trim()) {
-          return acc;
-        }
-
-        if (typeof value === 'string' && value.trim()) {
-          acc[key] = {
-            ecosystemId: value.trim(),
-          };
-          return acc;
-        }
-
-        if (
-          value &&
-          typeof value === 'object' &&
-          !Array.isArray(value) &&
-          typeof (value as Record<string, unknown>).ecosystemId === 'string'
-        ) {
-          acc[key] = {
-            ecosystemId: (value as Record<string, string>).ecosystemId.trim(),
-          };
-        }
-
-        return acc;
-      }
-    , {});
-  } catch {
-    return {};
-  }
-};
-
+/**
+ * Construye el validador de API key por defecto.
+ * Intenta validación remota primero, luego mapa estático.
+ *
+ * @param config - Configuración de la aplicación
+ * @returns Función validadora de API key
+ */
 const buildDefaultApiKeyValidator = (config: AppConfig) => {
-  const validationUrl = config.authValidateApiKeyUrl;
-  const internalToken = config.authInternalToken;
-  const staticMap = parseStaticMap(config.iotApiKeyStaticMap);
 
-  return async (input: ApiKeyValidationInput): Promise<ApiKeyValidationResult> => {
-    if (validationUrl) {
-      const response = await fetch(validationUrl, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': input.apiKey,
-          ...(internalToken ? { authorization: `Bearer ${internalToken}` } : {}),
-        },
-        body: JSON.stringify({
-          latitude: input.latitude,
-          longitude: input.longitude,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Auth API key validation failed with status ${response.status}`);
-      }
-
-      const payload = (await response.json()) as ApiKeyValidationResult;
-      return payload;
-    }
-
-    const mappedEntry = staticMap[input.apiKey];
-    if (mappedEntry) {
-      return {
-        valid: true,
-        ecosystemId: mappedEntry.ecosystemId,
-      };
-    }
-
-    return { valid: false };
-  };
-};
-
+/**
+ * Construye la aplicación Fastify del IoT Manager.
+ * Expone endpoints para ingestión de telemetría y discovery de dispositivos.
+ *
+ * Endpoints expuestos:
+ * - GET /health - Health check
+ * - GET /iot/devices/:deviceId/last-interaction - Última interacción de dispositivo
+ * - POST /v1/ingest - Ingerir telemetría
+ *
+ * Propósito de seguridad:
+ * - Valida API keys antes de procesar telemetría
+ * - Hashea payloads con SHA-256
+ * - Registra eventos en blockchain
+ * - Usa caché para evitar validaciones repetidas
+ *
+ * @param options - Opciones de configuración
+ * @returns Instancia de Fastify
+ */
 export const buildApp = (options: AppOptions = {}) => {
   const config = options.config ?? loadConfig();
   const app = Fastify({ logger: true });
@@ -507,6 +505,10 @@ export const buildApp = (options: AppOptions = {}) => {
   return app;
 };
 
+/**
+ * Inicia el servidor Fastify.
+ * Lee la configuración desde variables de entorno y escucha en el puerto configurado.
+ */
 const start = async () => {
   const config = loadConfig();
   const app = buildApp({ config });

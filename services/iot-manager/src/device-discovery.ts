@@ -1,25 +1,52 @@
 import type { AppConfig } from './config';
 
+/**
+ * Payload de un dispositivo descubierto.
+ */
 type DevicePayload = {
-  mac_addr: string;
-  model?: string;
-  name?: string;
-  vendor?: string;
+	/** Dirección MAC del dispositivo */
+	mac_addr: string;
+	/** Modelo del dispositivo (opcional) */
+	model?: string;
+	/** Nombre preferido (opcional) */
+	name?: string;
+	/** Vendor/fabricante (opcional) */
+	vendor?: string;
 };
 
+/**
+ * Datos de entrada para el servicio de descubrimiento.
+ */
 type DeviceDiscoveryInput = {
-  ecosystemId: string;
-  devices: DevicePayload[];
+	/** ID del ecosistema */
+	ecosystemId: string;
+	/** Lista de dispositivos descubiertos */
+	devices: DevicePayload[];
 };
 
+/**
+ * Respuesta de verificación de existencia en Auth.
+ */
 type AuthDeviceLookupResponse = {
-  exists: boolean;
+	/** Indica si el dispositivo existe */
+	exists: boolean;
 };
 
+/**
+ * Interfaz mínima de logger.
+ */
 type LoggerLike = {
-  warn(payload: unknown, message: string): void;
+	/** Método de warning */
+	warn(payload: unknown, message: string): void;
 };
 
+/**
+ * Normaliza una dirección MAC a formato canonico XX:XX:XX:XX:XX:XX.
+ *
+ * @param macAddress - MAC en cualquier formato
+ * @returns MAC normalizada con dos puntos
+ * @throws Error si el formato es inválido
+ */
 const normalizeMacAddress = (macAddress: string): string => {
   const cleaned = macAddress.trim().replace(/[^a-fA-F0-9]/g, '').toUpperCase();
 
@@ -30,27 +57,36 @@ const normalizeMacAddress = (macAddress: string): string => {
   return cleaned.match(/.{2}/g)!.join(':');
 };
 
+/**
+ * Extrae el vendor del dispositivo si está definido.
+ *
+ * @param device - Payload del dispositivo
+ * @returns Vendor normalizado o undefined
+ */
 const extractVendor = (device: DevicePayload): string | undefined => {
-  if (typeof device.vendor !== 'string') {
-    return undefined;
-  }
 
-  const vendor = device.vendor.trim();
-  return vendor.length > 0 ? vendor : undefined;
-};
-
+/**
+ * Extrae el nombre preferido del dispositivo.
+ * Prioriza el nombre explícito, luego el modelo.
+ *
+ * @param device - Payload del dispositivo
+ * @returns Nombre preferido o undefined
+ */
 const extractPreferredName = (device: DevicePayload): string | undefined => {
-  if (typeof device.name === 'string' && device.name.trim().length > 0) {
-    return device.name.trim();
-  }
 
-  if (typeof device.model === 'string' && device.model.trim().length > 0) {
-    return device.model.trim();
-  }
-
-  return undefined;
-};
-
+/**
+ * Resuelve el vendor de una MAC usando la API externa.
+ * Realiza lookup para identificar fabricantes de dispositivos.
+ *
+ * Propósito de seguridad:
+ * - Identifica fabricantes de dispositivos未知
+ * - Proporciona metadatos para gestión de activos
+ *
+ * @param macAddress - Dirección MAC a resolver
+ * @param fetchImpl - Implementación de fetch (para testing)
+ * @param macVendorApiBaseUrl - URL base de la API de vendors
+ * @returns Promise con el nombre del vendor
+ */
 export async function resolveMacVendor(
   macAddress: string,
   fetchImpl: typeof fetch = fetch,
@@ -84,6 +120,18 @@ export async function resolveMacVendor(
   }
 }
 
+/**
+ * Servicio de descubrimiento y sincronización de dispositivos.
+ * Se integra con el servicio Auth para registrar y actualizar dispositivos.
+ *
+ * Propósito de seguridad:
+ * - Verifica existencia de dispositivos en Auth
+ * - Registra dispositivos nuevos en el sistema de gestión
+ * - Actualiza vendor de dispositivos conocidos
+ *
+ * @param config - Configuración de la aplicación
+ * @param fetchImpl - Implementación de fetch (para testing)
+ */
 export class DeviceDiscoveryService {
   constructor(
     private readonly config: AppConfig,
