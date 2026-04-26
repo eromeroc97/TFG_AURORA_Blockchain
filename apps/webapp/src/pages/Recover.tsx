@@ -5,6 +5,14 @@ import { Link, useLocation } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
 
+/**
+ * Página de recuperación de contraseña.
+ * Solicita el email para enviar el token de recuperación.
+ *
+ * Puede recibir estado forzado desde Login (PASSBLOCK).
+ *
+ * @returns Componente React
+ */
 export default function Recover() {
   const location = useLocation()
   const [email, setEmail] = useState('')

@@ -5,74 +5,90 @@ import {
   setAuthAccessToken,
 } from '../context/auth-session'
 
+/**
+ * Extensión global para la base de la API.
+ */
 declare global {
   interface Window {
+    /** Ruta base de la API (injectada en build) */
     __WEBAPP_API_BASE_PATH__?: string
   }
 }
 
-const authApiBasePath =
-  (globalThis as typeof globalThis & { __WEBAPP_API_BASE_PATH__?: string }).__WEBAPP_API_BASE_PATH__ ??
-  ''
-
+/**
+ * Interfaz extendida de AxiosRequestConfig para el cliente.
+ */
 declare module 'axios' {
   export interface AxiosRequestConfig {
+    /** Omite el refresh automático de token */
     skipAuthRefresh?: boolean
+    /** Indica si ya se intentó refresh */
     _retry?: boolean
   }
 }
 
+/**
+ * Cliente de Axios para llamadas a la API del Auth Service.
+ * Configurado con:
+ * - withCredentials: true (cookies HttpOnly)
+ * - Interceptores para JWT
+ * - Refresh automático en 401
+ *
+ * Propósito de seguridad:
+ * - Adjunta Bearer token en header Authorization
+ * - Maneja refresh de tokens automáticamente
+ * - Limpia sesión en errores de autenticación
+ */
 export const apiClient = axios.create({
   baseURL: authApiBasePath,
   withCredentials: true,
 })
 
+/**
+ * Cliente para llamadas de refresh (sin interceptores de auth).
+ */
 const refreshClient = axios.create({
   baseURL: authApiBasePath,
   withCredentials: true,
 })
 
+/**
+ * Verifica si una URL es de autenticación.
+ *
+ * @param url - URL a verificar
+ * @returns true si es ruta de auth
+ */
 const isAuthRoute = (url?: string) => {
-  if (!url) {
-    return false
-  }
 
-  return ['/auth/login', '/auth/refresh', '/auth/logout'].some((route) => url.includes(route))
-}
-
+/**
+ * Handler para errores 401 (no autorizado).
+ */
 let unauthorizedHandler: ((error: AxiosError) => void) | null = null
 
+/**
+ * Establece el handler para errores 401.
+ *
+ * @param handler - Función a llamar en unauthorized
+ */
 export function setUnauthorizedHandler(handler: ((error: AxiosError) => void) | null) {
   unauthorizedHandler = handler
 }
 
+/**
+ * Interceptor que adjunta el Bearer token a cada solicitud.
+ */
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const { accessToken } = getAuthSession()
 
-  if (accessToken) {
-    config.headers = config.headers ?? {}
-    config.headers.Authorization = `Bearer ${accessToken}`
-  }
-
-  return config
-})
-
+/**
+ * Realiza refresh del token de acceso.
+ *
+ * @returns Promise con el nuevo token
+ */
 const refreshAccessToken = async () => {
-  const response = await refreshClient.post('/auth/refresh', undefined, {
-    skipAuthRefresh: true,
-  })
 
-  const nextAccessToken = response.data?.accessToken as string | undefined
-
-  if (!nextAccessToken) {
-    throw new Error('Refresh response missing accessToken')
-  }
-
-  setAuthAccessToken(nextAccessToken)
-
-  return nextAccessToken
-}
-
+/**
+ * Interceptor de respuesta para manejo de 401 y refresh automático.
+ */
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {

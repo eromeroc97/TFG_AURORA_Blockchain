@@ -1,73 +1,89 @@
+/**
+ * claims (payload) del token JWT de acceso.
+ */
 export type AuthClaims = {
-  sub: string
-  email: string
-  role: string
-}
+	/** ID único del usuario */
+	sub: string;
+	/** Correo electrónico */
+	email: string;
+	/** Rol del usuario */
+	role: string;
+};
 
+/**
+ * Snapshot del estado de sesión actual.
+ */
 export type AuthSessionSnapshot = {
-  accessToken: string | null
-  claims: AuthClaims | null
-}
+	/** Token de acceso JWT */
+	accessToken: string | null;
+	/** claims decodificados */
+	claims: AuthClaims | null;
+};
 
-type SessionListener = (snapshot: AuthSessionSnapshot) => void
+/**
+ * Listener para cambios en la sesión.
+ */
+type SessionListener = (snapshot: AuthSessionSnapshot) => void;
 
-let accessToken: string | null = null
-const listeners = new Set<SessionListener>()
+/**
+ * Token de acceso en memoria (no persiste en localStorage por seguridad).
+ */
+let accessToken: string | null = null;
 
+/**
+ * Conjunto de listeners suscritos.
+ */
+const listeners = new Set<SessionListener>();
+
+/**
+ * Decodifica una cadena Base64URL a texto.
+ *
+ * @param value - Cadena codificada
+ * @returns Texto decodificado
+ */
 const base64UrlDecode = (value: string) => {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4)
+	const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+	const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4);
 
-  return atob(padded)
-}
+	return atob(padded);
+};
 
+/**
+ * Decodifica los claims desde un token JWT.
+ *
+ * @param token - Token de acceso
+ * @returns Claims o null si es inválido
+ */
 export const decodeAccessTokenClaims = (token: string): AuthClaims | null => {
-  try {
-    const [, payload] = token.split('.')
-    if (!payload) {
-      return null
-    }
 
-    const parsed = JSON.parse(base64UrlDecode(payload)) as Partial<AuthClaims>
-    if (!parsed.sub || !parsed.email || !parsed.role) {
-      return null
-    }
-
-    return {
-      sub: parsed.sub,
-      email: parsed.email,
-      role: parsed.role,
-    }
-  } catch {
-    return null
-  }
-}
-
+/**
+ * Obtiene el snapshot de sesión actual.
+ *
+ * @returns Snapshot con token y claims
+ */
 export const getAuthSession = (): AuthSessionSnapshot => ({
-  accessToken,
-  claims: accessToken ? decodeAccessTokenClaims(accessToken) : null,
-})
 
+/**
+ * Notifica a todos los listeners del cambio.
+ */
 const notifyListeners = () => {
-  const snapshot = getAuthSession()
 
-  listeners.forEach((listener) => listener(snapshot))
-}
-
+/**
+ * Establece el token de acceso en memoria.
+ *
+ * @param nextAccessToken - Token JWT o null
+ */
 export const setAuthAccessToken = (nextAccessToken: string | null) => {
-  accessToken = nextAccessToken
-  notifyListeners()
-}
 
+/**
+ * Limpia el token de acceso (logout).
+ */
 export const clearAuthAccessToken = () => {
-  accessToken = null
-  notifyListeners()
-}
 
+/**
+ * Suscribe un listener a cambios de sesión.
+ *
+ * @param listener - Función a llamar en cambios
+ * @returns Función para cancelar la suscripción
+ */
 export const subscribeAuthSession = (listener: SessionListener) => {
-  listeners.add(listener)
-
-  return () => {
-    listeners.delete(listener)
-  }
-}

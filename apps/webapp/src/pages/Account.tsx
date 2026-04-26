@@ -3,11 +3,22 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/auth-context'
 
+/**
+ * Datos de la cuenta de usuario.
+ */
 type UserAccount = {
-  email: string
-  role: string
+	/** Email del usuario */
+	email: string;
+	/** Rol del usuario */
+	role: string;
 }
 
+/**
+ * Página de gestión de cuenta de usuario.
+ * Muestra información del perfil y permite cambios.
+ *
+ * @returns Componente React
+ */
 export default function AccountPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()

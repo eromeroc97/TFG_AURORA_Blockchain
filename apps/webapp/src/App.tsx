@@ -10,6 +10,23 @@ import Reset from './pages/Reset'
 import MainLayout from './layouts/MainLayout'
 import RequireAuth from './components/routes/RequireAuth'
 
+/**
+ * Componente raíz de la aplicación web.
+ * Configura el routing y el proveedor de autenticación.
+ *
+ * Rutas públicas:
+ * - /login - Inicio de sesión
+ * - /register - Registro de usuario
+ * - /recover - Recuperación de contraseña
+ * - /reset - Restablecimiento de contraseña
+ * - /error - Página de error
+ *
+ * Rutas protegidas (requieren autenticación):
+ * - /dashboard - Panel principal
+ * - /account - Gestión de cuenta
+ *
+ * @returns Componente React
+ */
 function App() {
   return (
     <AuthProvider>

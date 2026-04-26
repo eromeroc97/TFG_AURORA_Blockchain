@@ -8,6 +8,21 @@ import {
 } from './auth-session'
 import { AuthContext } from './auth-context'
 
+/**
+ * Proveedor de autenticación de React Context.
+ * Maneja el ciclo de vida de la sesión JWT:
+ * - Inicialización/hidratación desde cookies
+ * - Refresh automático de tokens
+ * - Limpieza de sesión en logout
+ *
+ * Propósito de seguridad:
+ * - No almacena tokens en localStorage (XSS)
+ * - Usa cookies HttpOnly para refresh tokens
+ * - Decodifica claims del JWT para RBAC
+ *
+ * @param children - Componentes hijos
+ * @returns Proveedor de contexto
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(() => getAuthSession().accessToken)
   const [authClaims, setAuthClaims] = useState(() => getAuthSession().claims)

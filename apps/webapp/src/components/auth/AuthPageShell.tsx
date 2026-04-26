@@ -7,6 +7,13 @@ import mHaciendaLogo from '../../assets/MHacienda.png'
 import federLogo from '../../assets/FEDER.png'
 import clmLogo from '../../assets/CLM.png'
 
+/**
+ * Shell (contenedor) para páginas de autenticación.
+ * Muestra el branding del proyecto AURORA y logotipos de financiación.
+ *
+ * @param children - Contenido de la página
+ * @returns Componente React
+ */
 export default function AuthPageShell({ children }: { children: ReactNode }) {
   return (
     <main className="aurora-pattern-bg min-h-screen px-6 py-10 text-primary">

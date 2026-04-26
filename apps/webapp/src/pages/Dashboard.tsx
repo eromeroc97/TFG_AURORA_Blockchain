@@ -15,37 +15,69 @@ import { type AccessMapDevice, type AccessMapEcosystem } from '../components/das
 import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
 import { useAuth } from '../context/auth-context'
 
+/**
+ * Métrica a mostrar en el dashboard.
+ */
 type DashboardMetric = {
-  label: string
-  value: string
-  icon: typeof House
-  emphasizeValue?: boolean
-  valueClassName?: string
+	/** Etiqueta de la métrica */
+	label: string;
+	/** Valor formateado */
+	value: string;
+	/** Icono a mostrar */
+	icon: typeof House;
+	/** Indica si el valor debe enfatizarse */
+	emphasizeValue?: boolean;
+	/** Clase CSS adicional para el valor */
+	valueClassName?: string;
 }
 
+/**
+ * Elemento de navegación rápida.
+ */
 type QuickNavItem = {
-  id: string
-  label: string
+	/** ID único */
+	id: string;
+	/** Etiqueta */
+	label: string;
 }
 
-type UserAction = 'approve' | 'revoke'
-type AdminRole = 'ADMIN' | 'GLOBAL_ADMIN'
-type UserRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
-type UserStatus = 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED'
-type CreateEcosystemStep = 'form' | 'confirm' | 'result'
+/** Acción deadminstración sobre usuario */
+type UserAction = 'approve' | 'revoke';
 
+/** Rol de administrador */
+type AdminRole = 'ADMIN' | 'GLOBAL_ADMIN';
+
+/** Rol de usuario */
+type UserRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN';
+
+/** Estado de usuario */
+type UserStatus = 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED';
+
+/** Paso del formulario de creación de ecosistema */
+type CreateEcosystemStep = 'form' | 'confirm' | 'result';
+
+/** Usuario del dashboard */
 type DashboardUser = {
-  id: string
-  email: string
-  role: UserRole
-  status: UserStatus
+	/** ID único */
+	id: string;
+	/** Email */
+	email: string;
+	/** Rol */
+	role: UserRole;
+	/** Estado */
+	status: UserStatus;
 }
 
+/** Usuario desde la API */
 type ApiUser = {
-  id: string
-  email: string
-  role: UserRole
-  status: UserStatus
+	/** ID único */
+	id: string;
+	/** Email */
+	email: string;
+	/** Rol */
+	role: UserRole;
+	/** Estado */
+	status: UserStatus;
 }
 
 type ApiEcosystem = {

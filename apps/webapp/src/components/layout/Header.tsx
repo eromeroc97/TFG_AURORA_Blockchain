@@ -3,17 +3,35 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import auroraLogo from '../../assets/aurora-logo.png'
 
+/**
+ * Props del componente Header.
+ */
 type HeaderProps = {
-  onSignOut: () => Promise<void> | void
-  userEmail?: string | null
-  userRole?: string | null
+	/** Función para cerrar sesión */
+	onSignOut: () => Promise<void> | void;
+	/** Email del usuario */
+	userEmail?: string | null;
+	/** Rol del usuario */
+	userRole?: string | null;
 }
 
+/**
+ * Elementos de navegación.
+ */
 const navigationItems = [
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Auditoría', to: '/dashboard#auditoria' },
+	{ label: 'Dashboard', to: '/dashboard' },
+	{ label: 'Auditoría', to: '/dashboard#auditoria' },
 ] as const
 
+/**
+ * Componente de cabecera de la aplicación.
+ * Muestra el logo, navegación y menú de perfil.
+ *
+ * @param onSignOut - Función para cerrar sesión
+ * @param userEmail - Email del usuario
+ * @param userRole - Rol del usuario
+ * @returns Componente React
+ */
 export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) {
   const location = useLocation()
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)

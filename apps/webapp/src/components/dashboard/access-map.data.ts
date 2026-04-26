@@ -1,23 +1,46 @@
+/**
+ * Dispositivo en el mapa de acceso.
+ */
 export type AccessMapDevice = {
-  id: string
-  name: string
-  macAddress: string | null
-  vendor: string | null
-  ecosystemId: string
-  createdAt: string
-  updatedAt: string
+	/** ID único del dispositivo */
+	id: string;
+	/** Nombre legible */
+	name: string;
+	/** Dirección MAC */
+	macAddress: string | null;
+	/** Vendor/fabricante */
+	vendor: string | null;
+	/** ID del ecosistema */
+	ecosystemId: string;
+	/** Timestamp de creación */
+	createdAt: string;
+	/** Timestamp de última actualización */
+	updatedAt: string;
 }
 
+/**
+ * Ecosistema en el mapa de acceso.
+ */
 export type AccessMapEcosystem = {
-  id: string
-  name: string
-  ownerId: string
-  lat: number | null
-  lng: number | null
-  isShared: boolean
-  devices: AccessMapDevice[]
+	/** ID único */
+	id: string;
+	/** Nombre del ecosistema */
+	name: string;
+	/** ID del propietario */
+	ownerId: string;
+	/** Latitud */
+	lat: number | null;
+	/** Longitud */
+	lng: number | null;
+	/** Indica si está compartido */
+	isShared: boolean;
+	/** Lista de dispositivos */
+	devices: AccessMapDevice[];
 }
 
+/**
+ * Datos de ecosistemas (mock para desarrollo).
+ */
 export const ACCESS_MAP_ECOSYSTEMS_MOCK: AccessMapEcosystem[] = [
   {
     id: 'eco-001',

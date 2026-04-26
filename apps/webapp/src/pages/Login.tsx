@@ -7,6 +7,15 @@ import PasswordInput from '../components/PasswordInput'
 import AuthPageShell from '../components/auth/AuthPageShell'
 import { useAuth } from '../context/auth-context'
 
+/**
+ * Página de inicio de sesión.
+ * Valida credenciales y establece la sesión JWT.
+ *
+ * Maneja casos especiales:
+ * - PASSBLOCK: Redirige a recuperación forzada
+ *
+ * @returns Componente React
+ */
 export default function Login() {
   const navigate = useNavigate()
   const { setSession } = useAuth()
