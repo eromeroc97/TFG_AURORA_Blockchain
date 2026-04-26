@@ -1,24 +1,12 @@
-/**
- * Usuario del dashboard.
- */
 export type User = {
-	/** ID único */
-	id: string;
-	/** Email */
-	email: string;
-	/** Nombre */
-	name: string;
-	/** Rol */
-	role: 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN';
-	/** Estado */
-	status: 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED';
-	/** Fecha de creación */
-	createdAt: string;
+  id: string
+  email: string
+  name: string
+  role: 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
+  status: 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED'
+  createdAt: string
 }
 
-/**
- * Datos de usuarios (mock para desarrollo).
- */
 export const USERS_MOCK: User[] = [
   {
     id: '123e4567-e89b-12d3-a456-426614174000',

@@ -26,16 +26,6 @@ const getTestRsaKeys = () => {
   return cachedTestKeys;
 };
 
-/**
- * Decodifica una clave RSA (pública o privada) desde una variable de entorno.
- * Soporta claves en formato PEM o codificadas en base64.
- * En entorno de test, genera claves RSA de forma automática.
- *
- * @param rawValue - Valor de la variable de entorno
- * @param keyName - Nombre de la variable de entorno (para mensajes de error)
- * @returns La clave decodificada en formato PEM
- * @throws Error si la clave no está configurada (excepto en test)
- */
 const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => {
   if (!rawValue) {
     if (process.env.NODE_ENV === 'test') {
@@ -53,20 +43,6 @@ const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => 
   return Buffer.from(rawValue, 'base64').toString('utf8');
 };
 
-/**
- * Módulo de autenticación del sistema.
- * Configura e importa:
- * - **JwtModule**: Para generación y validación de tokens JWT (RS256)
- * - **UsersModule**: Para acceso a datos de usuarios
- * - **RedisModule**: Para blacklist de sesiones
- *
- * Proveedores exportados:
- * - AuthService: Servicio principal de autenticación
- * - JwtAuthGuard: Guard para autenticación JWT
- * - RolesGuard: Guard para control de acceso basado en roles (RBAC)
- *
- * @Module - Define el módulo de NestJS
- */
 @Module({
   imports: [
     forwardRef(() => UsersModule),

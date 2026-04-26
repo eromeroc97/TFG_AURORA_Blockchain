@@ -3,12 +3,6 @@ import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth-context'
 
-/**
- * Página de errores genéricos.
- * Muestra mensajes de error cuando no se puede completar una acción.
- *
- * @returns Componente React
- */
 export default function ErrorPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()

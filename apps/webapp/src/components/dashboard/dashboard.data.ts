@@ -1,20 +1,10 @@
-/**
- * Alerta de seguridad del dashboard.
- */
 export type SecurityAlert = {
-	/** ID único de la alerta */
-	id: string;
-	/** ID del ecosistema afectado */
-	ecosystemId: string;
-	/** Título de la alerta */
-	title: string;
-	/** Nivel de severidad */
-	level: 'low' | 'medium' | 'high' | 'critical';
+  id: string
+  ecosystemId: string
+  title: string
+  level: 'low' | 'medium' | 'high' | 'critical'
 }
 
-/**
- * Datos de alertas de seguridad (mock para desarrollo).
- */
 export const SECURITY_ALERTS_MOCK: SecurityAlert[] = [
   {
     id: 'alert-001',

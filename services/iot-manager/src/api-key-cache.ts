@@ -41,17 +41,14 @@ const CACHE_KEY_PREFIX = 'iot:api-key:valid:';
 /**
  * Implementación en memoria de ApiKeyCache.
  * Útil para desarrollo o cuando Redis no está disponible.
- *
- * @param ttlMs - Tiempo de vida en milisegundos
  */
 class InMemoryApiKeyCache implements ApiKeyCache {
-  private readonly values = new Map<string, { value: CachedValidApiKey; expiresAt: number }>();
+	private readonly values = new Map<string, { value: CachedValidApiKey; expiresAt: number }>();
 
-  /**
-   *
-   * @param ttlMs - Tiempo de vida en milisegundos
-   */
-  constructor(private readonly ttlMs: number) {}
+	/**
+	 * @param ttlMs - Tiempo de vida en milisegundos
+	 */
+	constructor(private readonly ttlMs: number) {}
 
   /**
    * Obtiene los datos de una clave desde memoria.
@@ -60,37 +57,50 @@ class InMemoryApiKeyCache implements ApiKeyCache {
    * @returns Promise con los datos o null si no existe/expiró
    */
   async get(cacheKey: string): Promise<CachedValidApiKey | null> {
+    const cached = this.values.get(cacheKey);
+
+    if (!cached) {
+      return null;
+    }
+
+    if (cached.expiresAt <= Date.now()) {
+      this.values.delete(cacheKey);
+      return null;
+    }
+
+    return cached.value;
+  }
 
   /**
    * Almacena los datos con TTL.
    *
    * @param cacheKey - Clave
    * @param value - Datos a almacenar
-   * @returns Promise<void>
    */
   async set(cacheKey: string, value: CachedValidApiKey): Promise<void> {
+    this.values.set(cacheKey, {
+      value,
+      expiresAt: Date.now() + this.ttlMs,
+    });
+  }
 
   /**
    * Limpia el mapa de memoria.
-   *
-   * @returns Promise<void>
    */
   async close(): Promise<void> {
+    this.values.clear();
+  }
 }
 
 /**
  * Implementación de ApiKeyCache usando Redis.
  * Almacena claves en Redis con TTL automático.
- *
- * @param redisUrl - URL de conexión a Redis
- * @param ttlMs - Tiempo de vida en milisegundos
  */
 class RedisApiKeyCache implements ApiKeyCache {
   private readonly redis: Redis;
   private readonly ttlSeconds: number;
 
   /**
-   *
    * @param redisUrl - URL de conexión a Redis
    * @param ttlMs - Tiempo de vida en milisegundos
    */
@@ -143,7 +153,6 @@ class RedisApiKeyCache implements ApiKeyCache {
    *
    * @param cacheKey - Clave
    * @param value - Datos a almacenar
-   * @returns Promise<void>
    */
   async set(cacheKey: string, value: CachedValidApiKey): Promise<void> {
     await this.redis.set(this.buildKey(cacheKey), JSON.stringify(value), 'EX', this.ttlSeconds);
@@ -151,8 +160,6 @@ class RedisApiKeyCache implements ApiKeyCache {
 
   /**
    * Cierra la conexión a Redis.
-   *
-   * @returns Promise<void>
    */
   async close(): Promise<void> {
     await this.redis.quit();
@@ -160,7 +167,7 @@ class RedisApiKeyCache implements ApiKeyCache {
 }
 
 /**
- * Fabrica para crearApiKeyCache.
+ * Fábrica para crear ApiKeyCache.
  * Elige implementación según la configuración.
  *
  * @param config - Configuración de la aplicación

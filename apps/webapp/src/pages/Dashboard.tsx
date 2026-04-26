@@ -16,68 +16,49 @@ import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
 import { useAuth } from '../context/auth-context'
 
 /**
- * Métrica a mostrar en el dashboard.
+ * Métrica visual del dashboard.
  */
 type DashboardMetric = {
-	/** Etiqueta de la métrica */
-	label: string;
-	/** Valor formateado */
-	value: string;
-	/** Icono a mostrar */
-	icon: typeof House;
-	/** Indica si el valor debe enfatizarse */
-	emphasizeValue?: boolean;
-	/** Clase CSS adicional para el valor */
-	valueClassName?: string;
+  /** Etiqueta de la métrica */
+  label: string
+  /** Valor de la métrica */
+  value: string
+  /** Icono a mostrar */
+  icon: typeof House
+  /** Indica si el valor debe resaltarse */
+  emphasizeValue?: boolean
+  /** Clase CSS adicional para el valor */
+  valueClassName?: string
 }
 
 /**
  * Elemento de navegación rápida.
  */
 type QuickNavItem = {
-	/** ID único */
-	id: string;
-	/** Etiqueta */
-	label: string;
+  /** ID único */
+  id: string
+  /** Etiqueta a mostrar */
+  label: string
 }
 
-/** Acción deadminstración sobre usuario */
-type UserAction = 'approve' | 'revoke';
+type UserAction = 'approve' | 'revoke'
+type AdminRole = 'ADMIN' | 'GLOBAL_ADMIN'
+type UserRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
+type UserStatus = 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED'
+type CreateEcosystemStep = 'form' | 'confirm' | 'result'
 
-/** Rol de administrador */
-type AdminRole = 'ADMIN' | 'GLOBAL_ADMIN';
-
-/** Rol de usuario */
-type UserRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN';
-
-/** Estado de usuario */
-type UserStatus = 'ACTIVE' | 'PENDING' | 'PASSBLOCK' | 'REVOKED';
-
-/** Paso del formulario de creación de ecosistema */
-type CreateEcosystemStep = 'form' | 'confirm' | 'result';
-
-/** Usuario del dashboard */
 type DashboardUser = {
-	/** ID único */
-	id: string;
-	/** Email */
-	email: string;
-	/** Rol */
-	role: UserRole;
-	/** Estado */
-	status: UserStatus;
+  id: string
+  email: string
+  role: UserRole
+  status: UserStatus
 }
 
-/** Usuario desde la API */
 type ApiUser = {
-	/** ID único */
-	id: string;
-	/** Email */
-	email: string;
-	/** Rol */
-	role: UserRole;
-	/** Estado */
-	status: UserStatus;
+  id: string
+  email: string
+  role: UserRole
+  status: UserStatus
 }
 
 type ApiEcosystem = {

@@ -5,12 +5,6 @@ import { Link } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
 
-/**
- * Página de registro de nuevo usuario.
- * Envía solicitud de registro al Auth Service.
- *
- * @returns Componente React
- */
 export default function Register() {
   const [email, setEmail] = useState('')
   const [errorMessage, setErrorMessage] = useState('')

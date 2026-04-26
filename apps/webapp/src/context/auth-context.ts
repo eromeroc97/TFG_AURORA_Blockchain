@@ -5,18 +5,18 @@ import type { AuthClaims } from './auth-session'
  * Valor del contexto de autenticación.
  */
 export type AuthContextValue = {
-	/** Token de acceso JWT */
-	accessToken: string | null;
-	/** claims del usuario */
-	authClaims: AuthClaims | null;
-	/** Indica si hay sesión activa */
-	isAuthenticated: boolean;
-	/** Indica si está hidratando la sesión */
-	isHydrating: boolean;
-	/** Función para establecer sesión */
-	setSession: (accessToken: string) => void;
-	/** Función para cerrar sesión */
-	clearSession: () => void;
+  /** Token de acceso actual */
+  accessToken: string | null
+  /** Claims decodificados del JWT */
+  authClaims: AuthClaims | null
+  /** Indica si el usuario está autenticado */
+  isAuthenticated: boolean
+  /** Indica si está hidratando la sesión */
+  isHydrating: boolean
+  /** Función para establecer sesión */
+  setSession: (accessToken: string) => void
+  /** Función para limpiar sesión */
+  clearSession: () => void
 }
 
 /**

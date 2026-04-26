@@ -1,18 +1,8 @@
 import { useState, type InputHTMLAttributes } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 
-/**
- * Props heredadas de input de React.
- */
 type PasswordInputProps = InputHTMLAttributes<HTMLInputElement>
 
-/**
- * Componente de input de contraseña con toggle de visibilidad.
- * Permite mostrar/ocultar la contraseña escrita.
- *
- * @param props - Props de input estándar
- * @returns Componente React
- */
 export default function PasswordInput({
   type: _type,
   className = '',

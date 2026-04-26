@@ -9,12 +9,9 @@ import { useAuth } from '../context/auth-context'
 
 /**
  * Página de inicio de sesión.
- * Valida credenciales y establece la sesión JWT.
+ * Permite autenticarse con email y contraseña.
  *
- * Maneja casos especiales:
- * - PASSBLOCK: Redirige a recuperación forzada
- *
- * @returns Componente React
+ * @returns Componente de página de login
  */
 export default function Login() {
   const navigate = useNavigate()

@@ -8,7 +8,7 @@ import { useAuth } from '../../context/auth-context'
 import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem } from './access-map.data'
 
 /**
- * Roles de acceso al mapa.
+ * Rol de acceso a ecosistema.
  */
 type AccessRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
 
@@ -16,23 +16,14 @@ type AccessRole = 'USER' | 'AUDITOR' | 'ADMIN' | 'GLOBAL_ADMIN'
  * Props del componente AccessMap.
  */
 type AccessMapProps = {
-	/** Lista de ecosistemas a mostrar */
-	ecosystems?: AccessMapEcosystem[];
+  /** Lista de ecosistemas a mostrar en el mapa */
+  ecosystems?: AccessMapEcosystem[]
 }
 
-/**
- * Coordenadas centrales (Castilla-La Mancha).
- */
 const CENTRAL_BRAIN_COORDS: [number, number] = [38.99009855762482, -3.920457433978659]
 
-/**
- * Crea un icono de casa para el marcador.
- *
- * @param isOwned - Indica si el ecosistema es propio
- * @returns Icono de Leaflet
- */
 const createHouseIcon = (isOwned: boolean) =>
-	L.divIcon({
+  L.divIcon({
     className: 'ecosystem-house-marker',
     html: renderToStaticMarkup(
       <div
@@ -82,13 +73,6 @@ const centralShieldIcon = L.divIcon({
   popupAnchor: [0, -20],
 })
 
-/**
- * Componente de mapa de acceso a ecosistemas.
- * Muestra la ubicación de los ecosistemas en un mapa interactivo.
- *
- * @param ecosystems - Lista de ecosistemas (usa mock por defecto)
- * @returns Componente React
- */
 export default function AccessMap({ ecosystems }: AccessMapProps) {
   const { authClaims } = useAuth()
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole

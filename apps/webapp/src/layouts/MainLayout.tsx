@@ -3,12 +3,6 @@ import { apiClient } from '../api/axios'
 import Header from '../components/layout/Header'
 import { useAuth } from '../context/auth-context'
 
-/**
- * Layout principal de la aplicación autenticada.
- * Incluye la cabecera y maneja el cierre de sesión.
- *
- * @returns Componente React
- */
 export default function MainLayout() {
   const navigate = useNavigate()
   const { authClaims, clearSession } = useAuth()

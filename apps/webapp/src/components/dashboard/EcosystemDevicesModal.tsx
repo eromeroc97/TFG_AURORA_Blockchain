@@ -3,36 +3,15 @@ import { Pencil, X } from 'lucide-react'
 import { apiClient } from '../../api/axios'
 import type { AccessMapDevice, AccessMapEcosystem } from './access-map.data'
 
-/**
- * Props del modal de dispositivos de ecosistema.
- */
 type EcosystemDevicesModalProps = {
-	/** Ecosistema a mostrar */
-	ecosystem: AccessMapEcosystem;
-	/** Función para cerrar el modal */
-	onClose: () => void;
-	/** Función tras actualizar un dispositivo */
-	onDeviceUpdated: (device: AccessMapDevice) => void;
-	/** Función tras actualizar el ecosistema */
-	onEcosystemUpdated: (ecosystem: AccessMapEcosystem) => void;
-	/** Función tras revocar el ecosistema */
-	onEcosystemRevoked: (ecosystemId: string) => void;
-	/** Indica si puede gestionar el ecosistema */
-	canManageEcosystem: boolean;
+  ecosystem: AccessMapEcosystem
+  onClose: () => void
+  onDeviceUpdated: (device: AccessMapDevice) => void
+  onEcosystemUpdated: (ecosystem: AccessMapEcosystem) => void
+  onEcosystemRevoked: (ecosystemId: string) => void
+  canManageEcosystem: boolean
 }
 
-/**
- * Modal que muestra los dispositivos de un ecosistema.
- * Permite ver, editar y gestionar dispositivos.
- *
- * @param ecosystem - Ecosistema a mostrar
- * @param onClose - Callback de cierre
- * @param onDeviceUpdated - Callback al actualizar dispositivo
- * @param onEcosystemUpdated - Callback al actualizar ecosistema
- * @param onEcosystemRevoked - Callback al revocar ecosistema
- * @param canManageEcosystem - Permiso de gestión
- * @returns Componente React
- */
 export default function EcosystemDevicesModal({
   ecosystem,
   onClose,

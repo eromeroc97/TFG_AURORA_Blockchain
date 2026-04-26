@@ -2,15 +2,20 @@ import { Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
 /**
- * Servicio Redis para gestión de blacklist de sesiones.
- * Almacena tokens revocados para invalidar sesiones cerradas.
+ * Servicio de caché Redis.
+ * Maneja blacklist de tokens y sesiones.
  *
- * @Injectable() - Proveído a nivel de módulo
+ * Propósito de seguridad:
+ * - Almacena tokens revocados
+ * - Gestiona sesiones activas
  */
 @Injectable()
 export class RedisService {
 	private readonly redis: Redis;
 
+	/**
+	 * @throws Error si Redis no está disponible
+	 */
 	constructor() {
 		this.redis = new Redis({
 			host: process.env.REDIS_HOST ?? 'redis',
@@ -19,33 +24,30 @@ export class RedisService {
 	}
 
 	/**
-	 * Genera la key de blacklist para un usuario.
+	 * Genera la clave de blacklist para un usuario.
 	 *
 	 * @param userId - ID del usuario
-	 * @returns La clave de Redis
+	 * @returns Clave formateada
 	 */
 	private getBlacklistKey(userId: string): string {
 		return `blacklist:user:${userId}`;
 	}
 
 	/**
-	 * Añade un usuario a la blacklist.
+	 * Añade un token a la blacklist.
 	 *
 	 * @param userId - ID del usuario
 	 * @param ttlSeconds - Tiempo de vida en segundos
-	 * @returns Promise<void>
-	 * @async
 	 */
 	async addToBlacklist(userId: string, ttlSeconds: number): Promise<void> {
 		await this.redis.set(this.getBlacklistKey(userId), 'revoked', 'EX', ttlSeconds);
 	}
 
 	/**
-	 * Verifica si un usuario está en la blacklist.
+	 * Verifica si un token está en blacklist.
 	 *
 	 * @param userId - ID del usuario
-	 * @returns true si está en blacklist
-	 * @async
+	 * @returns Promise con true si está en blacklist
 	 */
 	async isBlacklisted(userId: string): Promise<boolean> {
 		const exists = await this.redis.exists(this.getBlacklistKey(userId));

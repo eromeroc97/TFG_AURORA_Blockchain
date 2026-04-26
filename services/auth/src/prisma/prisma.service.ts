@@ -3,36 +3,32 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
 /**
- * Servicio de base de datos Prisma.
- * Extiende PrismaClient para integración con NestJS.
+ * Servicio de acceso a la base de datos via Prisma ORM.
+ * Proporciona cliente de Prisma con conexión a PostgreSQL.
  *
- * Propósito de seguridad:
- * - Gestiona la conexión a la base de datos PostgreSQL
- * - Proporciona типобезопасный acceso a los datos
- *
- * @Injectable() - Proveído a nivel de módulo
+ * @throws Error si DATABASE_URL no está definida
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
-	constructor() {
-		const databaseUrl = process.env.DATABASE_URL;
+  /**
+   * @throws Error si DATABASE_URL no está definida
+   */
+  constructor() {
+    const databaseUrl = process.env.DATABASE_URL;
 
-		if (!databaseUrl) {
-			throw new Error('DATABASE_URL is not defined in environment variables.');
-		}
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL is not defined in environment variables.');
+    }
 
-		const adapter = new PrismaPg({ connectionString: databaseUrl });
+    const adapter = new PrismaPg({ connectionString: databaseUrl });
 
-		super({ adapter });
-	}
+    super({ adapter });
+  }
 
-	/**
-	 * Se ejecuta al inicial el módulo.
-	 * Establece la conexión a la base de datos.
-	 *
-	 * @async
-	 */
-	async onModuleInit() {
-		await this.$connect();
-	}
+  /**
+   * Conecta a la base de datos al iniciar el módulo.
+   */
+  async onModuleInit() {
+    await this.$connect();
+  }
 }

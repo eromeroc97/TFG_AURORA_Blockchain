@@ -2,10 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
-/**
- * DTO para crear un nuevo usuario.
- * Requiere email único que será normalizado a minúsculas.
- */
 export class CreateUserDto {
 	@ApiProperty({
 		description: 'Correo electronico unico del usuario en el sistema IAM.',

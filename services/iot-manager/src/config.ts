@@ -41,6 +41,12 @@ export type AppConfig = {
  * @throws Error si está vacía
  */
 const parseRequiredString = (value: string | undefined, envName: string): string => {
+  if (!value || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable: ${envName}`);
+  }
+
+  return value.trim();
+};
 
 /**
  * Parsea un número positivo con fallback.
@@ -52,6 +58,17 @@ const parseRequiredString = (value: string | undefined, envName: string): string
  * @throws Error si es inválido
  */
 const parsePositiveNumber = (value: string | undefined, fallback: number, envName: string): number => {
+  if (!value || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`Environment variable ${envName} must be a positive number`);
+  }
+
+  return parsed;
+};
 
 /**
  * Carga la configuración desde variables de entorno.

@@ -1,113 +1,113 @@
 import { MongoClient, type Db, type Collection } from 'mongodb';
 
 /**
- * Estado del anclaje en blockchain de la telemetría.
+ * Estado del anclaje en blockchain.
  */
 export type AnchorStatus = 'PENDING_ANCHOR' | 'ANCHORED' | 'FAILED';
 
 /**
- * Metadatos asociados a un evento de telemetría.
+ * Metadatos de telemetría almacenada.
  */
 export type TelemetryMetadata = {
-	/** ID único del documento de telemetría */
-	telemetryId: string;
-	/** ID del ecosistema */
-	ecosystemId: string;
-	/** Latitud de la lectura */
-	latitude: number;
-	/** Longitud de la lectura */
-	longitude: number;
-	/** Estado del anclaje en blockchain */
-	anchorStatus: AnchorStatus;
-	/** Firma digital Ed25519 del evento */
-	signature: string | null;
-	/** Clave pública del firmante */
-	publicKey: string | null;
-	/** ID de la transacción en blockchain */
-	txId: string | null;
+  /** ID único de telemetría */
+  telemetryId: string;
+  /** ID del ecosistema */
+  ecosystemId: string;
+  /** Latitud de la lectura */
+  latitude: number;
+  /** Longitud de la lectura */
+  longitude: number;
+  /** Estado del anclaje blockchain */
+  anchorStatus: AnchorStatus;
+  /** Firma digital (opcional) */
+  signature: string | null;
+  /** Clave pública del firmante (opcional) */
+  publicKey: string | null;
+  /** ID de transacción en blockchain (opcional) */
+  txId: string | null;
 };
 
 /**
- * Documento completo de telemetría almacenado en MongoDB.
+ * Documento de telemetría en MongoDB.
  */
 export type TelemetryDocument = {
-	/** Timestamp de la lectura */
-	timestamp: Date;
-	/** Metadatos del evento */
-	metadata: TelemetryMetadata;
-	/** Datos del sensor */
-	payload: Record<string, unknown>;
-	/** Hash SHA-256 del payload */
-	hash: string;
+  /** Timestamp de la lectura */
+  timestamp: Date;
+  /** Metadatos del evento */
+  metadata: TelemetryMetadata;
+  /** Payload del sensor */
+  payload: Record<string, unknown>;
+  /** Hash SHA-256 del payload */
+  hash: string;
 };
 
 /**
  * Datos de entrada para guardar telemetría.
  */
 export type SaveTelemetryInput = {
-	/** ID del ecosistema */
-	ecosystemId: string;
-	/** Latitud de la lectura */
-	latitude: number;
-	/** Longitud de la lectura */
-	longitude: number;
-	/** Datos del sensor */
-	payload: Record<string, unknown>;
-	/** Hash SHA-256 del payload */
-	hash: string;
-	/** Firma digital (opcional) */
-	signature?: string;
-	/** Clave pública del firmante (opcional) */
-	publicKey?: string;
-	/** Timestamp de la lectura */
-	timestamp: Date;
+  /** ID del ecosistema */
+  ecosystemId: string;
+  /** Latitud de la lectura */
+  latitude: number;
+  /** Longitud de la lectura */
+  longitude: number;
+  /** Payload del sensor */
+  payload: Record<string, unknown>;
+  /** Hash SHA-256 */
+  hash: string;
+  /** Firma digital (opcional) */
+  signature?: string;
+  /** Clave pública (opcional) */
+  publicKey?: string;
+  /** Timestamp de la lectura */
+  timestamp: Date;
 };
 
 /**
  * Resultado de guardar telemetría.
  */
 export type SaveTelemetryResult = {
-	/** ID del documento creado */
-	id: string;
+  /** ID generado del documento */
+  id: string;
 };
 
 /**
- * Interfaz para el almacenamiento de telemetría.
- * Abstrae el backend de almacenamiento (MongoDB).
+ * Interfaz para almacenamiento de telemetría.
+ * Abstrae el backend (MongoDB).
  */
 export interface TelemetryStore {
-	/**
-	 * Guarda un nuevo evento de telemetría.
-	 *
-	 * @param input - Datos del evento
-	 * @returns Promise con el ID generado
-	 */
-	save(input: SaveTelemetryInput): Promise<SaveTelemetryResult>;
+  /**
+   * Guarda telemetría en el almacenamiento.
+   *
+   * @param input - Datos a guardar
+   * @returns Promise con el ID generado
+   */
+  save(input: SaveTelemetryInput): Promise<SaveTelemetryResult>;
 
-	/**
-	 * Actualiza el estado de anclaje de un evento.
-	 *
-	 * @param id - ID del documento
-	 * @param anchorStatus - Nuevo estado
-	 * @param signature - Firma digital
-	 * @param publicKey - Clave pública
-	 * @param txId - ID de transacción (opcional)
-	 */
-	updateAnchorStatus(id: string, anchorStatus: AnchorStatus, signature: string, publicKey: string, txId?: string): Promise<void>;
+  /**
+   * Actualiza el estado de anclaje.
+   *
+   * @param id - ID del documento
+   * @param anchorStatus - Nuevo estado
+   * @param signature - Firma digital
+   * @param publicKey - Clave pública
+   * @param txId - ID de transacción (opcional)
+   */
+  updateAnchorStatus(id: string, anchorStatus: AnchorStatus, signature: string, publicKey: string, txId?: string): Promise<void>;
 
-	/**
-	 * Busca la última interacción de un dispositivo.
-	 *
-	 * @param deviceId - ID o MAC del dispositivo
-	 * @param ecosystemId - ID del ecosistema (opcional)
-	 * @returns Promise con el timestamp o null
-	 */
-	findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null>;
+  /**
+   * Busca la última interacción de un dispositivo.
+   *
+   * @param deviceId - ID o MAC del dispositivo
+   * @param ecosystemId - ID del ecosistema (opcional)
+   * @returns Promise con la fecha o null
+   */
+  findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null>;
 
-	/**
-	 * Cierra la conexión al almacenamiento.
-	 */
-	close(): Promise<void>;
+  /**
+   * Cierra la conexión al armazenamento.
+   */
+  close(): Promise<void>;
 }
 
 const DEFAULT_DB_NAME = 'iot_data';
@@ -115,30 +115,26 @@ const TELEMETRY_COLLECTION = 'telemetry_events';
 
 /**
  * Implementación de TelemetryStore usando MongoDB.
- * Utiliza MongoDB Timeseries para optimizar almacenamiento de series temporales.
- *
- * Propósito de seguridad:
- * - Almacena eventos con hashes para verificación de integridad
- * - Registra estado de anclaje en blockchain
- * - Permite auditoría de datos IoT
- *
- * @param mongoUri - URI de conexión a MongoDB
+ * Almacena eventos de telemetría con metadatos de anclaje blockchain.
  */
 export class MongoTelemetryStore implements TelemetryStore {
   private readonly client: MongoClient;
   private db: Db | null = null;
   private collection: Collection<TelemetryDocument> | null = null;
 
+  /**
+   * @param mongoUri - URI de conexión a MongoDB
+   */
   constructor(private readonly mongoUri: string) {
     this.client = new MongoClient(this.mongoUri);
   }
 
   /**
-	 * Extrae el nombre de la base de datos desde la URI.
-	 *
-	 * @returns Nombre de la base de datos
-	 */
-	private getDbNameFromUri(): string {
+   * Extrae el nombre de la base de datos desde la URI.
+   *
+   * @returns Nombre de la base de datos
+   */
+  private getDbNameFromUri(): string {
     try {
       const parsed = new URL(this.mongoUri);
       const dbName = parsed.pathname.replace(/^\//, '').trim();
@@ -149,13 +145,11 @@ export class MongoTelemetryStore implements TelemetryStore {
   }
 
   /**
-	 * Garantiza que la colección existe y está indexada.
-	 * Crea una colección Timeseries si no existe.
-	 *
-	 * @returns La colección de MongoDB
-	 * @async
-	 */
-	private async ensureCollection(): Promise<Collection<TelemetryDocument>> {
+   * Obtiene o crea la colección de telemetría.
+   *
+   * @returns Promise con la colección
+   */
+  private async ensureCollection(): Promise<Collection<TelemetryDocument>> {
     if (this.collection) {
       return this.collection;
     }
@@ -184,14 +178,12 @@ export class MongoTelemetryStore implements TelemetryStore {
   }
 
   /**
-	 * Guarda un nuevo evento de telemetría.
-	 * Genera un ID único y almacena el documento en la colección Timeseries.
-	 *
-	 * @param input - Datos del evento de telemetría
-	 * @returns Promise con el ID generado
-	 * @async
-	 */
-	async save(input: SaveTelemetryInput): Promise<SaveTelemetryResult> {
+   * Guarda un documento de telemetría.
+   *
+   * @param input - Datos a guardar
+   * @returns Promise con el ID generado
+   */
+  async save(input: SaveTelemetryInput): Promise<SaveTelemetryResult> {
     const collection = await this.ensureCollection();
     const telemetryId = new (await import('mongodb')).ObjectId().toString();
     const result = await collection.insertOne({
@@ -216,18 +208,15 @@ export class MongoTelemetryStore implements TelemetryStore {
   }
 
   /**
-	 * Actualiza el estado de anclaje de un documento.
-	 * Utilizado después deAnclar en blockchain.
-	 *
-	 * @param id - ID del documento
-	 * @param anchorStatus - Nuevo estado (PENDING_ANCHOR, ANCHORED, FAILED)
-	 * @param signature - Firma digital
-	 * @param publicKey - Clave pública
-	 * @param txId - ID de transacción (opcional)
-	 * @returns Promise<void>
-	 * @async
-	 */
-	async updateAnchorStatus(
+   * Actualiza el estado de anclaje de un documento.
+   *
+   * @param id - ID del documento
+   * @param anchorStatus - Nuevo estado
+   * @param signature - Firma digital
+   * @param publicKey - Clave pública
+   * @param txId - ID de transacción (opcional)
+   */
+  async updateAnchorStatus(
     id: string,
     anchorStatus: AnchorStatus,
     signature: string,
@@ -250,15 +239,13 @@ export class MongoTelemetryStore implements TelemetryStore {
   }
 
   /**
-	 * Busca la última interacción de un dispositivo.
-	 * Soporta búsqueda por ID, deviceId o dirección MAC.
-	 *
-	 * @param deviceId - ID, deviceId o MAC del dispositivo
-	 * @param ecosystemId - ID del ecosistema (opcional)
-	 * @returns Promise con el timestamp o null
-	 * @async
-	 */
-	async findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null> {
+   * Busca la última interacción de un dispositivo.
+   *
+   * @param deviceId - ID o MAC del dispositivo
+   * @param ecosystemId - ID del ecosistema (opcional)
+   * @returns Promise con la fecha o null
+   */
+  async findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null> {
     const collection = await this.ensureCollection();
 
     const normalizedDeviceId = deviceId.trim();
@@ -295,12 +282,9 @@ export class MongoTelemetryStore implements TelemetryStore {
   }
 
   /**
-	 * Cierra la conexión a MongoDB.
-	 *
-	 * @returns Promise<void>
-	 * @async
-	 */
-	async close(): Promise<void> {
+   * Cierra la conexión a MongoDB.
+   */
+  async close(): Promise<void> {
     await this.client.close();
   }
 }

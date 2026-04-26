@@ -64,6 +64,13 @@ const normalizeMacAddress = (macAddress: string): string => {
  * @returns Vendor normalizado o undefined
  */
 const extractVendor = (device: DevicePayload): string | undefined => {
+  if (typeof device.vendor !== 'string') {
+    return undefined;
+  }
+
+  const vendor = device.vendor.trim();
+  return vendor.length > 0 ? vendor : undefined;
+};
 
 /**
  * Extrae el nombre preferido del dispositivo.
@@ -73,13 +80,23 @@ const extractVendor = (device: DevicePayload): string | undefined => {
  * @returns Nombre preferido o undefined
  */
 const extractPreferredName = (device: DevicePayload): string | undefined => {
+  if (typeof device.name === 'string' && device.name.trim().length > 0) {
+    return device.name.trim();
+  }
+
+  if (typeof device.model === 'string' && device.model.trim().length > 0) {
+    return device.model.trim();
+  }
+
+  return undefined;
+};
 
 /**
  * Resuelve el vendor de una MAC usando la API externa.
  * Realiza lookup para identificar fabricantes de dispositivos.
  *
  * Propósito de seguridad:
- * - Identifica fabricantes de dispositivos未知
+ * - Identifica fabricantes de dispositivos
  * - Proporciona metadatos para gestión de activos
  *
  * @param macAddress - Dirección MAC a resolver
@@ -138,6 +155,11 @@ export class DeviceDiscoveryService {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
+  /**
+   * Construye los headers para llamadas internas a Auth.
+   *
+   * @returns Headers con content-type y bearer token
+   */
   private getInternalAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -150,6 +172,12 @@ export class DeviceDiscoveryService {
     return headers;
   }
 
+  /**
+   * Resuelve el vendor de una MAC usando la API externa.
+   *
+   * @param macAddress - Dirección MAC a resolver
+   * @returns Promise con el nombre del vendor
+   */
   private async resolveVendor(macAddress: string): Promise<string> {
     const macVendorApiBaseUrl = this.config.macVendorApiBaseUrl;
 
@@ -160,6 +188,13 @@ export class DeviceDiscoveryService {
     return resolveMacVendor(macAddress, this.fetchImpl, macVendorApiBaseUrl);
   }
 
+  /**
+   * Verifica si un dispositivo existe en Auth.
+   *
+   * @param ecosystemId - ID del ecosistema
+   * @param macAddress - Dirección MAC del dispositivo
+   * @returns Promise con true si existe
+   */
   private async deviceExistsInAuth(ecosystemId: string, macAddress: string): Promise<boolean> {
     if (!this.config.authDeviceLookupUrl) {
       return false;
@@ -182,6 +217,14 @@ export class DeviceDiscoveryService {
     return payload.exists === true;
   }
 
+  /**
+   * Registra un dispositivo nuevo en Auth.
+   *
+   * @param ecosystemId - ID del ecosistema
+   * @param macAddress - Dirección MAC del dispositivo
+   * @param vendor - Vendor del dispositivo
+   * @param preferredName - Nombre preferido del dispositivo
+   */
   private async registerDeviceInAuth(
     ecosystemId: string,
     macAddress: string,
@@ -208,6 +251,13 @@ export class DeviceDiscoveryService {
     }
   }
 
+  /**
+   * Actualiza el vendor de un dispositivo existente en Auth.
+   *
+   * @param ecosystemId - ID del ecosistema
+   * @param macAddress - Dirección MAC del dispositivo
+   * @param vendor - Vendor actualizado
+   */
   private async updateDeviceVendorInAuth(
     ecosystemId: string,
     macAddress: string,

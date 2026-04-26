@@ -18,14 +18,8 @@ import { FireflyService, AnchorPayload } from '../../blockchain/firefly.service'
 import { CryptoService } from '../../crypto/crypto.service';
 import { RedisService } from '../redis/redis.service';
 
-export enum AuditAction {
-  USER_APPROVE = 'USER_APPROVE',
-  USER_REVOKE = 'USER_REVOKE',
-  ROLE_CHANGE = 'ROLE_CHANGE',
-}
-
 /**
- * Enum de acciones de auditoría registrables en la blockchain.
+ * Acciones de auditoría para gestión de usuarios.
  */
 export enum AuditAction {
   /** Aprobación de usuario */
@@ -37,22 +31,15 @@ export enum AuditAction {
 }
 
 /**
- * Servicio de gestión de usuarios (IAM).
- * Maneja el ciclo de vida completo de usuarios:
- * - Creación, actualización, eliminación
- * - Aprobación y revocación
- * - Gestión de roles y contraseñas
- * - Recuperación de contraseñas
- * - Generación de claves criptográficas Ed25519
- * - Registro de auditorías en blockchain
+ * Servicio de gestión de usuarios.
+ * Maneja CRUD de usuarios, roles, aprobación y auditoría.
  *
- * Utiliza:
- * - **Argon2** para hasheo de contraseñas
- * - **CryptoService** para generación de claves Ed25519
- * - **FireflyService** para registro en blockchain
- * - **RedisService** para blacklist
+ * Propósito de seguridad:
+ * - Hashes Argon2 para contraseñas
+ * - Aprobación manual de usuarios
+ * - Auditoría en blockchain
  *
- * @Injectable() - Proveído a nivel de módulo
+ * @Roles ADMIN
  */
 @Injectable()
 export class UsersService {
@@ -384,13 +371,6 @@ export class UsersService {
     return resetToken;
   }
 
-  /**
-   * Valida un token de reset de contraseña.
-   *
-   * @param rawToken - Token a validar
-   * @returns Objeto con indicador de validez
-   * @async
-   */
   async validatePasswordResetToken(rawToken: string): Promise<{ valid: boolean }> {
     try {
       await this.resolveValidPasswordResetToken(rawToken);
@@ -404,19 +384,6 @@ export class UsersService {
     }
   }
 
-  /**
-   * Solicita un token de recuperación de contraseña.
-   * Envía un email con el enlace de recuperación si el usuario existe.
-   *
-   * Propósito de seguridad:
-   * - Previene enumeración de cuentas (no revela si el email existe)
-   * - El token tiene TTL de 10 minutos
-   * - Bloquea el acceso hasta que se restablezca la contraseña
-   *
-   * @param email - Email del usuario
-   * @returns Promise<void>
-   * @async
-   */
   async createPasswordResetToken(email: string): Promise<void> {
     const user = await this.prisma.user.findFirst({
       where: {
@@ -489,23 +456,6 @@ export class UsersService {
     return this.createResetActionUrl(rawToken);
   }
 
-  /**
-   * Consume un token de recuperación y establece nueva contraseña.
-   * Verifica que el token sea válido, no expire y actualiza la contraseña.
-   *
-   * Propósito de seguridad:
-   * - Verifica el token con Argon2
-   * - Invalida todos los tokens de recuperación anteriores
-   * - Verifica que la contraseña no esté en filtraciones públicas (HIBP)
-   * - Hashea la nueva contraseña con Argon2
-   *
-   * @param rawToken - Token de recuperación
-   * @param newPassword - Nueva contraseña
-   * @returns Promise<void>
-   * @throws BadRequestException - Si el token es inválido o expirado
-   * @throws ForbiddenException - Si la cuenta no está activa
-   * @async
-   */
   async consumePasswordResetToken(rawToken: string, newPassword: string): Promise<void> {
     const now = new Date();
     const validSince = this.getResetTokenValidSince(now);
@@ -570,15 +520,6 @@ export class UsersService {
     });
   }
 
-  /**
-   * Crea un nuevo usuario en el sistema.
-   * Genera una contraseña aleatoria, hashea con Argon2 y envía email de bienvenida.
-   *
-   * @param createUserDto - DTO con los datos del nuevo usuario
-   * @returns El usuario creado sin el hash de la contraseña
-   * @throws ConflictException - Si ya existe un usuario con ese email
-   * @async
-   */
   async create(createUserDto: CreateUserDto) {
     try {
       const existingUser = await this.prisma.user.findUnique({
@@ -620,14 +561,6 @@ export class UsersService {
     }
   }
 
-  /**
-   * Obtiene todos los usuarios activos.
-   * Solo accesible para administradores.
-   *
-   * @param actorRole - Rol del usuario solicitante
-   * @param actorId - ID del usuario solicitante
-   * @returns Lista de usuarios
-   */
   findAll(actorRole?: Role, actorId?: string) {
     this.assertPrivilegedRole(actorRole);
 
@@ -655,17 +588,6 @@ export class UsersService {
     });
   }
 
-  /**
-   * Obtiene un usuario por su ID.
-   *
-   * @param id - ID del usuario
-   * @param actorRole - Rol del solicitante
-   * @param actorId - ID del solicitante
-   * @returns Los datos del usuario
-   * @throws ForbiddenException - Si no tiene permisos
-   * @throws NotFoundException - Si el usuario no existe
-   * @async
-   */
   async findOne(id: string, actorRole?: Role, actorId?: string) {
     this.assertPrivilegedRole(actorRole);
 
@@ -690,15 +612,6 @@ export class UsersService {
     return user;
   }
 
-/**
-   * Busca un usuario por su email.
-   * Utilizado para autenticación.
-   *
-   * @param email - Email del usuario
-   * @returns El usuario con datos de autenticación
-   * @throws NotFoundException - Si el usuario no existe
-   * @async
-   */
   async findByEmail(email: string) {
     const user = await this.prisma.user.findFirst({
       where: {
@@ -717,15 +630,6 @@ export class UsersService {
     return user;
   }
 
-  /**
-   * Busca un usuario por ID con datos de autenticación.
-   * Utilizado para refresh tokens.
-   *
-   * @param id - ID del usuario
-   * @returns El usuario con hash de refresh token
-   * @throws NotFoundException - Si el usuario no existe
-   * @async
-   */
   async findAuthUserById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -739,15 +643,6 @@ export class UsersService {
     return user;
   }
 
-  /**
-   * Actualiza el hash del refresh token para un usuario.
-   *
-   * @param userId - ID del usuario
-   * @param hashedRefreshToken - Hash del refresh token o null para invalidar
-   * @returns Promise<void>
-   * @throws NotFoundException - Si el usuario no existe
-   * @async
-   */
   async updateRefreshTokenHash(userId: string, hashedRefreshToken: string | null) {
     try {
       await this.prisma.user.update({
@@ -763,16 +658,6 @@ export class UsersService {
     }
   }
 
-  /**
-   * Actualiza los datos de un usuario.
-   * Permite actualizar contraseña (verificada contra HIBP y hasheada con Argon2).
-   *
-   * @param id - ID del usuario
-   * @param updateUserDto - Datos a actualizar
-   * @returns El usuario actualizado
-   * @throws NotFoundException - Si el usuario no existe
-   * @async
-   */
   async update(id: string, updateUserDto: UpdateUserDto) {
     try {
       const { password, ...rest } = updateUserDto;
@@ -803,23 +688,6 @@ export class UsersService {
     }
   }
 
-  /**
-   * Revoca un usuario (eliminación lógica).
-   * Cambia el estado a REVOKED, invalida la sesión y registra en blockchain.
-   *
-   * Propósito de seguridad:
-   * - Añade el usuario a la blacklist de Redis
-   * - Registra la acción en blockchain mediante Firefly
-   * - Envía email de notificación
-   *
-   * @param id - ID del usuario a revocar
-   * @param requesterId - ID del usuario que realiza la acción
-   * @param requesterRole - Rol del solicitante
-   * @returns El usuario revocado
-   * @throws ForbiddenException - Si no tiene permisos
-   * @throws ConflictException - Si ya está revocado
-   * @async
-   */
   async remove(id: string, requesterId: string = id, requesterRole?: Role) {
     const isAdminRequester =
       requesterRole === Role.ADMIN || requesterRole === Role.GLOBAL_ADMIN;
@@ -893,19 +761,6 @@ export class UsersService {
     }
   }
 
-  /**
-   * Cambia el rol de un usuario.
-   * Verifica permisos y registra el cambio en blockchain.
-   *
-   * @param targetUserId - ID del usuario cuyo rol se cambiará
-   * @param newRole - Nuevo rol a asignar
-   * @param actorId - ID del solicitante
-   * @param actorRole - Rol del solicitante
-   * @returns El usuario con el nuevo rol
-   * @throws ForbiddenException - Si no tiene permisos
-   * @throws ConflictException - Si el usuario está revocado
-   * @async
-   */
   async changeRole(targetUserId: string, newRole: Role, actorId?: string, actorRole?: Role) {
     this.assertPrivilegedRole(actorRole);
 
@@ -967,23 +822,6 @@ export class UsersService {
     }
   }
 
-  /**
-   * Aprueba un usuario pendiente.
-   * Genera claves criptográficas Ed25519 y envía email de verificación.
-   *
-   * Propósito de seguridad:
-   * - Genera par de claves Ed25519 para el usuario
-   * - Cifra la clave privada con AES-256-GCM antes de almacenarla
-   * - Registra la aprobación en blockchain
-   *
-   * @param id - ID del usuario a aprobar
-   * @param actorId - ID del aprobador
-   * @param actorRole - Rol del aprobador
-   * @returns El usuario aprobado
-   * @throws ForbiddenException - Si no tiene permisos
-   * @throws ConflictException - Si el usuario no está en PENDING
-   * @async
-   */
   async approveUser(id: string, actorId?: string, actorRole?: Role) {
     this.assertPrivilegedRole(actorRole);
 

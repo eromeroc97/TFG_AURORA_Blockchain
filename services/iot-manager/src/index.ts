@@ -122,6 +122,21 @@ const hashApiKey = (apiKey: string): string => createHash('sha256').update(apiKe
  * @returns Valor ordenado
  */
 const stableSortObject = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(stableSortObject);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .reduce<Record<string, unknown>>((acc, [key, nestedValue]) => {
+        acc[key] = stableSortObject(nestedValue);
+        return acc;
+      }, {});
+  }
+
+  return value;
+};
 
 /**
  * Construye el hash SHA-256 del payload más coordenadas GPS.
@@ -152,6 +167,50 @@ const buildPayloadHash = (
  * @returns Mapa de API keys a ecosistemas
  */
 const parseStaticMap = (
+  raw: string | undefined,
+): Record<string, { ecosystemId: string }> => {
+
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.entries(parsed).reduce<Record<string, { ecosystemId: string }>>(
+      (acc, [key, value]) => {
+        if (typeof key !== 'string' || !key.trim()) {
+          return acc;
+        }
+
+        if (typeof value === 'string' && value.trim()) {
+          acc[key] = {
+            ecosystemId: value.trim(),
+          };
+          return acc;
+        }
+
+        if (
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          typeof (value as Record<string, unknown>).ecosystemId === 'string'
+        ) {
+          acc[key] = {
+            ecosystemId: (value as Record<string, string>).ecosystemId.trim(),
+          };
+        }
+
+        return acc;
+      }
+    , {});
+  } catch {
+    return {};
+  }
+};
 
 /**
  * Construye el validador de API key por defecto.
@@ -161,6 +220,44 @@ const parseStaticMap = (
  * @returns Función validadora de API key
  */
 const buildDefaultApiKeyValidator = (config: AppConfig) => {
+  const validationUrl = config.authValidateApiKeyUrl;
+  const internalToken = config.authInternalToken;
+  const staticMap = parseStaticMap(config.iotApiKeyStaticMap);
+
+  return async (input: ApiKeyValidationInput): Promise<ApiKeyValidationResult> => {
+    if (validationUrl) {
+      const response = await fetch(validationUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': input.apiKey,
+          ...(internalToken ? { authorization: `Bearer ${internalToken}` } : {}),
+        },
+        body: JSON.stringify({
+          latitude: input.latitude,
+          longitude: input.longitude,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Auth API key validation failed with status ${response.status}`);
+      }
+
+      const payload = (await response.json()) as ApiKeyValidationResult;
+      return payload;
+    }
+
+    const mappedEntry = staticMap[input.apiKey];
+    if (mappedEntry) {
+      return {
+        valid: true,
+        ecosystemId: mappedEntry.ecosystemId,
+      };
+    }
+
+    return { valid: false };
+  };
+};
 
 /**
  * Construye la aplicación Fastify del IoT Manager.
@@ -507,7 +604,6 @@ export const buildApp = (options: AppOptions = {}) => {
 
 /**
  * Inicia el servidor Fastify.
- * Lee la configuración desde variables de entorno y escucha en el puerto configurado.
  */
 const start = async () => {
   const config = loadConfig();

@@ -15,10 +15,14 @@ import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
 
 /**
  * Servicio de gestión de ecosistemas.
- * Maneja el ciclo de vida de ecosistemas IoT y sus API keys.
- * Utiliza cifrado AES para almacenar API keys de forma segura.
+ * Maneja CRUD de ecosistemas y API keys.
  *
- * @Injectable() - Proveído a nivel de módulo
+ * Propósito de seguridad:
+ * - cifrado AES-256-GCM para API keys
+ * - Asociación con usuarios y dispositivos
+ * - Auditoría en blockchain
+ *
+ * @Roles ADMIN, USER
  */
 @Injectable()
 export class EcosystemsService {

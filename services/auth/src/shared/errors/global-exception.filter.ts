@@ -9,54 +9,28 @@ import {
 import type { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 
-/**
- * Tipo para el cuerpo de respuesta de error.
- */
 type ErrorResponseBody = {
-	statusCode: number;
-	errorCode: string;
-	message: string;
-	timestamp: string;
-	path: string;
-	requestId: string;
+  statusCode: number;
+  errorCode: string;
+  message: string;
+  timestamp: string;
+  path: string;
+  requestId: string;
 };
 
-/**
- * Tipo para errores similares a Prisma.
- */
 type PrismaLikeError = {
-	name?: string;
-	code?: string;
-	stack?: string;
+  name?: string;
+  code?: string;
+  stack?: string;
 };
 
-/**
- * Mensaje genérico de error interno.
- */
 const GENERIC_INTERNAL_ERROR_MESSAGE = 'Se ha producido un error interno. Intentalo de nuevo mas tarde.';
 
-/**
- * Filtro global de excepciones para el servicio de autenticación.
- * Maneja todos los errores no manejados y devuelve respuestas JSON consistentes.
- *
- * Propósito de seguridad:
- * - Normaliza mensajes de error para no exponer detalles internos
- * - Registra errores con requestId para auditoría
- * - Mapea errores de Prisma a códigos HTTP apropiados
- *
- * @Catch() - Captura todas las excepciones
- */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
-  /**
-	 * Maneja una excepción y genera la respuesta de error.
-	 *
-	 * @param exception - La excepción capturada
-	 * @param host - Contexto del host de NestJS
-	 */
-	catch(exception: unknown, host: ArgumentsHost): void {
+  catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();

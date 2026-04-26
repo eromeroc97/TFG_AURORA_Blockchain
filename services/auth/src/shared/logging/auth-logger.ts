@@ -13,23 +13,22 @@ const attachServiceMetadata = winston.format((info) => ({
   environment: process.env.NODE_ENV ?? 'development',
 }));
 
-/**
- * Crea el transporte para Seq (Logging centralizado).
- *
- * @param seqUrl - URL del servidor Seq
- * @param seqApiKey - Clave API de Seq (opcional)
- * @returns Transporte de Winston
- */
 export const createSeqTransport = (seqUrl: string, seqApiKey?: string) =>
+  new SeqTransportCtor({
+    serverUrl: seqUrl,
+    apiKey: seqApiKey,
+    onError: (error: unknown) => {
+      // Fallback log so Seq transport issues are still visible locally.
+      console.error('Seq transport error:', error);
+    },
+    format: winston.format.combine(
+      attachServiceMetadata(),
+      winston.format.errors({ stack: true }),
+      winston.format.timestamp(),
+      winston.format.json(),
+    ),
+  });
 
-/**
- * Crea el logger de Winston para el servicio de autenticación.
- * Configura transportes de consola y Seq (si está habilitado).
- *
- * @param seqUrl - URL del servidor Seq (opcional)
- * @param seqApiKey - Clave API de Seq (opcional)
- * @returns Instancia de logger de Winston
- */
 export const createAuthLogger = (
   seqUrl = process.env.SEQ_URL,
   seqApiKey = process.env.SEQ_API_KEY_AUTH,

@@ -1,9 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
-/**
- * DTO para crear un nuevo dispositivo.
- */
 export class CreateDeviceDto {
   @ApiProperty({
     description: 'Nombre legible del dispositivo.',

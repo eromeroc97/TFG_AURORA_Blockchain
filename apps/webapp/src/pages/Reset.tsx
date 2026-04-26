@@ -6,17 +6,6 @@ import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
 import PasswordInput from '../components/PasswordInput'
 
-/**
- * Página de restablecimiento de contraseña.
- * Valida el token y permite establecer nueva contraseña.
- *
- * Características:
- * - Validación de token vía API
- * - Verificación de contraseña contra HIBP (Have I Been Pwned)
- * - Validación de requisitos de contraseña
- *
- * @returns Componente React
- */
 export default function Reset() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
