@@ -2,36 +2,70 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 
+/**
+ * Interfaz para el payload de anclaje (anchor) en la blockchain.
+ * Representa una acción de auditoría que se registrará inmutablemente.
+ */
 export interface AnchorPayload {
-  actionId: string;
-  originalHash: string;
-  signature: string;
-  signerPublicKey: string;
-  timestamp: string;
+	/** Identificador de la acción */
+	actionId: string;
+	/** Hash SHA-256 de los datos originales */
+	originalHash: string;
+	/** Firma digital Ed25519 */
+	signature: string;
+	/** Clave pública del firmante */
+	signerPublicKey: string;
+	/** Timestamp ISO 8601 */
+	timestamp: string;
 }
 
+/**
+ * Interfaz para la respuesta después deAnclar datos en la blockchain.
+ */
 export interface AnchorResponse {
-  id: string;
-  hash: string;
-  blockNumber?: number;
+	/** ID del mensaje en la blockchain */
+	id: string;
+	/** Hash del bloque */
+	hash: string;
+	/** Número del bloque (opcional) */
+	blockNumber?: number;
 }
 
+/**
+ * Estado de la organización en FireFly.
+ */
 interface FireflyStatus {
-  org: {
-    id: string;
-    did: string;
-    verifiers?: Array<{ type: string; value: string }>;
-  };
+	org: {
+		id: string;
+		did: string;
+		verifiers?: Array<{ type: string; value: string }>;
+	};
 }
 
+/**
+ * Identidad creada en FireFly.
+ */
 interface FireflyIdentity {
-  id: string;
-  did: string;
-  name: string;
-  type: string;
-  parent: string;
+	id: string;
+	did: string;
+	name: string;
+	type: string;
+	parent: string;
 }
 
+/**
+ * Servicio de integración con FireFly (blockchain Hyperledger).
+ * Proporciona:
+ * - Creación de identidades en la blockchain
+ * - Anclaje de acciones de auditoría (immutables)
+ *
+ * Propósito de seguridad:
+ * - Registra acciones de usuario de forma inmutable
+ * - Permite auditoría de cambios en usuarios y roles
+ * - Utiliza DID (Decentralized Identifiers) para identidad
+ *
+ * @Injectable() - Proveído a nivel de módulo
+ */
 @Injectable()
 export class FireflyService {
   private readonly logger = new Logger(FireflyService.name);
@@ -42,7 +76,14 @@ export class FireflyService {
 
   constructor(private readonly httpService: HttpService) {}
 
-  private async ensureInitialized(): Promise<void> {
+  /**
+	 * Asegura que el servicio esté inicializado.
+	 * Obtiene el orgId y verifierKey de FireFly al primer uso.
+	 *
+	 * @throws Error - Si FIREFLY_API_URL no está definida
+	 * @async
+	 */
+	private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
 
     this.baseUrl = process.env.FIREFLY_API_URL!;
@@ -54,7 +95,12 @@ export class FireflyService {
     this.initialized = true;
   }
 
-  private async fetchOrganizationKeys(): Promise<void> {
+  /**
+	 * Obtiene las claves de la organización desde FireFly.
+	 *
+	 * @async
+	 */
+	private async fetchOrganizationKeys(): Promise<void> {
     const statusRes = await firstValueFrom(
       this.httpService.get<FireflyStatus>(`${this.baseUrl}/status`),
     );
@@ -78,11 +124,26 @@ export class FireflyService {
     this.logger.log(`FireFly org initialized: ${this.orgId}`);
   }
 
-  async createIdentity(payload: { name: string; parentDid: string }): Promise<string> {
-    return this.createChildIdentity({ name: payload.name });
-  }
+/**
+	 * Crea una nueva identidad en la blockchain.
+	 *
+	 * @param payload - Datos para crear la identidad
+	 * @returns El DID de la identidad creada
+	 * @async
+	 */
+	async createIdentity(payload: { name: string; parentDid: string }): Promise<string> {
+		return this.createChildIdentity({ name: payload.name });
+	}
 
-  async createChildIdentity(payload: { name: string }): Promise<string> {
+	/**
+	 * Crea una identidad hijo bajo la organización.
+	 *
+	 * @param payload - Nombre de la identidad
+	 * @returns El DID de la identidad creada
+	 * @throws Error - Si la creación falla después de 3 intentos
+	 * @async
+	 */
+	async createChildIdentity(payload: { name: string }): Promise<string> {
     await this.ensureInitialized();
 
     const maxAttempts = 3;
@@ -133,11 +194,30 @@ export class FireflyService {
     throw new Error('Identity creation failed: unexpected code path');
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
+  /**
+	 * Función de retardo para reintentos.
+	 *
+	 * @param ms - Milisegundos a esperar
+	 * @returns Promise que se resuelve después del retardo
+	 */
+	private delay(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
 
-  async broadcastAnchor(payload: AnchorPayload): Promise<AnchorResponse> {
+	/**
+	 * Ancla un payload en la blockchain.
+	 * Registra una acción de auditoría de forma inmutable.
+	 *
+	 * Propósito de seguridad:
+	 * - Registra acciones como aprobación, revocación, cambio de rol
+	 * - Almacena hash, firma y timestamp
+	 *
+	 * @param payload - Datos aAnclar
+	 * @returns Respuesta con ID y hash del mensaje
+	 * @throws Error - Si el broadcast falla después de 3 intentos
+	 * @async
+	 */
+	async broadcastAnchor(payload: AnchorPayload): Promise<AnchorResponse> {
     await this.ensureInitialized();
 
     const maxAttempts = 3;

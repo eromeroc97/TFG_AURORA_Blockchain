@@ -13,6 +13,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
 
+/**
+ * Servicio de gestión de ecosistemas.
+ * Maneja el ciclo de vida de ecosistemas IoT y sus API keys.
+ * Utiliza cifrado AES para almacenar API keys de forma segura.
+ *
+ * @Injectable() - Proveído a nivel de módulo
+ */
 @Injectable()
 export class EcosystemsService {
   constructor(

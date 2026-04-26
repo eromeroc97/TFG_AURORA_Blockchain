@@ -1,10 +1,16 @@
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
+/**
+ * DTO para el endpoint de inicio de sesión (login).
+ * Valida las credenciales del usuario.
+ */
 export class LoginDto {
-  @IsEmail()
-  email!: string;
+	/** Dirección de correo electrónico válida */
+	@IsEmail()
+	email!: string;
 
-  @IsString()
-  @IsNotEmpty()
-  password!: string;
+	/** Contraseña del usuario (mínimo 1 carácter) */
+	@IsString()
+	@IsNotEmpty()
+	password!: string;
 }

@@ -5,6 +5,10 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsOptional, IsString, IsStrongPassword } from 'class-validator';
 import { CreateUserDto } from './create-user.dto';
 
+/**
+ * DTO para actualizar un usuario.
+ * Extiende CreateUserDto con campos opcionales.
+ */
 export class UpdateUserDto extends PartialType(CreateUserDto) {
 	@ApiPropertyOptional({
 		description: 'Nueva contraseña del usuario. Se hashea antes de guardarse.',

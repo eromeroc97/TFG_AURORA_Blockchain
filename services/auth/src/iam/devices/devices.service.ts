@@ -9,6 +9,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
+/**
+ * Servicio de gestión de dispositivos Zero-Trust.
+ * Maneja el registro y gestión de dispositivos IoT.
+ *
+ * @Injectable() - Proveído a nivel de módulo
+ */
 @Injectable()
 export class DevicesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -48,6 +54,12 @@ export class DevicesService {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
   }
 
+  /**
+   * Crea un nuevo dispositivo.
+   *
+   * @param createDeviceDto - Datos del dispositivo
+   * @returns El dispositivo creado
+   */
   create(createDeviceDto: CreateDeviceDto) {
     return this.prisma.device.create({
       data: {
@@ -60,6 +72,14 @@ export class DevicesService {
     });
   }
 
+  /**
+   * Verifica si existe un dispositivo por su dirección MAC.
+   *
+   * @param ecosystemId - ID del ecosistema
+   * @param macAddress - Dirección MAC
+   * @returns true si existe
+   * @async
+   */
   async existsByMacAddress(ecosystemId: string, macAddress: string): Promise<boolean> {
     const normalizedMac = this.normalizeMacAddressRequired(macAddress);
     const device = await this.prisma.device.findUnique({
@@ -77,6 +97,17 @@ export class DevicesService {
     return device !== null;
   }
 
+  /**
+   * Registra o actualiza un dispositivo desde el proceso de descubrimiento.
+   * Utilizado por el agente Zero-Trust.
+   *
+   * @param ecosystemId - ID del ecosistema
+   * @param macAddress - Dirección MAC del dispositivo
+   * @param vendor - Fabricante (opcional)
+   * @param preferredName - Nombre preferido (opcional)
+   * @returns El dispositivo
+   * @async
+   */
   async registerFromDiscovery(
     ecosystemId: string,
     macAddress: string,
@@ -130,6 +161,16 @@ export class DevicesService {
     });
   }
 
+  /**
+   * Actualiza el vendor de un dispositivo si falta.
+   *
+   * @param ecosystemId - ID del ecosistema
+   * @param macAddress - Dirección MAC
+   * @param vendor - Nuevo vendor
+   * @returns El dispositivo actualizado o null
+   * @throws NotFoundException - Si el dispositivo no existe
+   * @async
+   */
   async updateVendorIfMissing(ecosystemId: string, macAddress: string, vendor: string) {
     const normalizedMac = this.normalizeMacAddressRequired(macAddress);
     const normalizedVendor = vendor.trim();
@@ -167,13 +208,21 @@ export class DevicesService {
     });
   }
 
+/**
+   * Obtiene todos los dispositivos.
+   *
+   * @returns Lista de dispositivos
+   */
   findAll() {
-    return this.prisma.device.findMany({
-      orderBy: { createdAt: 'desc' },
-      select: this.deviceSelect,
-    });
-  }
 
+/**
+   * Obtiene un dispositivo por ID.
+   *
+   * @param id - ID del dispositivo
+   * @returns El dispositivo
+   * @throws NotFoundException - Si no existe
+   * @async
+   */
   async findOne(id: string) {
     const device = await this.prisma.device.findUnique({
       where: { id },
@@ -187,6 +236,15 @@ export class DevicesService {
     return device;
   }
 
+  /**
+   * Actualiza un dispositivo.
+   *
+   * @param id - ID del dispositivo
+   * @param updateDeviceDto - Datos a actualizar
+   * @returns El dispositivo actualizado
+   * @throws NotFoundException - Si no existe
+   * @async
+   */
   async update(id: string, updateDeviceDto: UpdateDeviceDto) {
     const normalizedMacAddress = updateDeviceDto.macAddress
       ? this.normalizeMacAddress(updateDeviceDto.macAddress)
@@ -210,6 +268,14 @@ export class DevicesService {
     }
   }
 
+  /**
+   * Elimina un dispositivo.
+   *
+   * @param id - ID del dispositivo
+   * @returns El dispositivo eliminado
+   * @throws NotFoundException - Si no existe
+   * @async
+   */
   async remove(id: string) {
     try {
       return await this.prisma.device.delete({
