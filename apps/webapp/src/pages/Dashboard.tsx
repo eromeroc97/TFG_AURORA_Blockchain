@@ -636,7 +636,7 @@ export default function Dashboard() {
           return [...preserved, ...ownedEcosystems]
         })
 
-        const needsUserCache = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
+        const needsUserCache = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
         if (needsUserCache) {
           try {
