@@ -1,18 +1,16 @@
-# Arquitectura del Proyecto
+﻿# Arquitectura del Proyecto
 
 ## 1. Visión General
 
-El proyecto **AURORA Smart Home** es una plataforma de investigación en ciberseguridad diseñada para la gestión, monitoreo y auditoría de dispositivos IoT en ecosistemas distribuidos. El sistema implementa un paradigma de arquitectura de microservicios orientado a la evaluación de vulnerabilidades en entornos controlados y al diseño de contramedidas criptográficas para la protección de datos de telemetría.
+El proyecto **AURORA Smart Home** es una plataforma de investigación en ciberseguridad para la gestión, monitoreo y auditoría de dispositivos IoT en ecosistemas distribuidos. El sistema utiliza una arquitectura de microservicios desplegada mediante **Docker Compose**, con cada servicio ejecutándose en su propio contenedor dentro de la red bridge `aurora-secure-net`.
 
-El despliegue se realiza mediante **Docker Compose**, donde cada servicio opera en un contenedor aislado dentro de una red bridge dedicada denominada `aurora-secure-net`. La arquitectura sigue el patrón de **API Gateway** utilizando Traefik como reverse proxy y balanceador de carga, lo que permite el enrutamiento inteligente basado en rutas path-prefix y la exposición segura de servicios hacia el exterior.
+La topología está diseñada alrededor de un **API Gateway** basado en Traefik, que enruta el tráfico HTTP hacia los servicios backend y despliega una aplicación web estática servida por Caddy. El enfoque separa responsabilidades en:
 
-El sistema se compone de tres pilares fundamentales:
+- **auth-service**: backend NestJS para identidad, autorización, ecosistemas y operaciones criptográficas.
+- **iot-manager**: backend Fastify para ingestión de telemetría, validación de API keys y persistencia en MongoDB.
+- **webapp**: frontend React + Vite servido estáticamente con Caddy.
 
-- **Servicio de Autenticación (auth-service)**: Backend NestJS responsable de la gestión de identidades, control de acceso basado en roles (RBAC), generación de tokens JWT con algoritmos asimétricos (RS256), y operaciones criptográficas mediante el módulo CryptoService.
-- **Servicio IoT Manager (iot-manager)**: Backend Fastify especializado en la ingestión de telemetría de dispositivos, validación de claves API, almacenamiento en MongoDB, y orquestación del descubrimiento de dispositivos.
-- **Aplicación Web (webapp)**: Frontend React con Vite que proporciona la interfaz de usuario para la gestión de ecosistemas, dispositivos y visualización de datos georreferenciados.
-
-La arquitectura incorpora patrones de seguridad avanzados como el cifrado de claves privadas con AES-256-GCM, firmas digitales Ed25519 para la integridad de datos, y una capa de logging centralizada mediante Seq para auditoría forense.
+Además, la infraestructura incluye componentes auxiliares para datos, cache, logging y administración.
 
 ## 2. Diagrama de Contexto y Entorno
 
@@ -58,9 +56,9 @@ graph TB
 
     USUARIO -->|HTTPS| TRAEFIK
     DISPOSITIVO_IoT -->|x-api-key| TRAEFIK
-    TRAEFIK -->|Path: /api/auth/**| AUTH
-    TRAEFIK -->|Path: /api/telemetry/**| IOT
-    TRAEFIK -->|Path: /| WEBAPP
+    TRAEFIK -->|PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`) || PathPrefix(`/api/devices`)| AUTH
+    TRAEFIK -->|PathPrefix(`/api/telemetry`) || PathPrefix(`/api/iot`)| IOT
+    TRAEFIK -->|PathPrefix(`/`) && !PathPrefix(`/api`)| WEBAPP
 
     AUTH -->|Prisma ORM| POSTGRES
     AUTH -->|Redis Client| REDIS_AUTH
@@ -83,24 +81,25 @@ El archivo `docker-compose.yml` define la siguiente topología de servicios:
 
 | Servicio | Imagen | Puertos Expuestos | Propósito |
 |----------|--------|-------------------|-----------|
-| **api-gateway** | traefik:latest | 80, 443, 8080 | Reverse proxy, balanceador y enrutador |
+| **api-gateway** | traefik:latest | 80, 443, 8080 | Reverse proxy, router y dashboard de Traefik |
 | **auth-service** | Build local (NestJS) | 3001 (interno) | Autenticación, gestión de usuarios y ecosistemas |
 | **iot-manager** | Build local (Fastify) | 3002 (interno) | Ingestión de telemetría IoT |
 | **webapp** | caddy:2.8.4-alpine | 80 (interno) | Interfaz web estática |
-| **postgres-db** | postgres:15-alpine | 5432 (localhost) | Base de datos relacional para identidades |
-| **mongo-db** | mongo:7.0 | 27017 (interno) | Almacenamiento de telemetría |
-| **redis-auth** | redis:7-alpine | 6379 | Cache de sesiones y token blacklist (auth-service) |
-| **redis-iot** | redis:7-alpine | 6380 | Cache de claves API (iot-manager) |
+| **postgres-db** | postgres:15-alpine | 127.0.0.1:5432 | Base de datos relacional para auth-service |
+| **mongo-db** | mongo:7.0 | interno | Almacenamiento de telemetría |
+| **redis-auth** | redis:7-alpine | 6379 | Cache de auth-service y blacklist de tokens |
+| **redis-iot** | redis:7-alpine | 6380 | Cache de API keys del IoT Manager |
 | **seq** | datalust/seq:latest | 5341, 8081 | Centralización de logs |
-| **mailpit** | axllent/mailpit | 1025, 8025 | Servidor SMTP mock para desarrollo |
-| **mongo-express** | mongo-express | 8090 (localhost) | Administración MongoDB |
-| **redis-commander** | rediscommander | 8091 (localhost) | Administración Redis |
-| **docker-socket-proxy** | tecnativa/docker-socket-proxy | - | Proxy seguro del socket Docker |
+| **mailpit** | axllent/mailpit | 1025, 8025 | SMTP y web UI para pruebas de correo |
+| **mongo-express** | mongo-express | 127.0.0.1:8090 | Administración MongoDB |
+| **redis-commander** | rediscommander | 127.0.0.1:8091 | Administración Redis |
+| **docker-socket-proxy** | tecnativa/docker-socket-proxy | interno | Proxy para acceso seguro de Traefik al socket Docker |
 
 **Decisiones de Seguridad en la Red:**
-- Los puertos de administración (Mongo Express, Redis Commander) solo exponen a `127.0.0.1`, previniendo acceso desde la red externa.
-- Todos los servicios de aplicación residen en la red `aurora-secure-net` con driver bridge.
-- Traefik utiliza etiquetas para el descubrimiento dinámico de servicios.
+- `mongo-express` y `redis-commander` están expuestos solo en `127.0.0.1`, evitando acceso remoto no autorizado.
+- `mongo-db` permanece dentro de la red interna y no se publica directamente al host.
+- Traefik usa el proveedor Docker a través de `docker-socket-proxy` y solo enruta servicios con etiquetas explícitas.
+- `webapp` solo sirve tráfico estático y está protegido contra rutas `/api` y `/traefik` mediante reglas de Stripprefix.
 
 ## 3. Módulos y Componentes Internos
 
@@ -172,35 +171,42 @@ graph TB
 
 | Módulo | Responsabilidad |
 |--------|----------------|
-| **AuthModule** | Gestión de autenticación JWT, login, logout, refresh tokens, recuperación de contraseña mediante tokens de un solo uso (OTP). Implementa estrategia de protección con Passport-JWT yguardias de roles. |
-| **UsersModule** | CRUD de usuarios, gestión de estados (ACTIVE, PENDING, REVOKED, PASSBLOCK), hashing de contraseñas con Argon2, almacenamiento de refresh tokens. |
-| **EcosystemsModule** | Creación de ecosistemas IoT, generación de claves API cifradas con AES-256-GCM, gestión del ciclo de vida de ecosistemas, firma de hashes mediante Ed25519. |
-| **DevicesModule** | Registro y actualización de dispositivos vinculados a ecosistemas, búsqueda por MAC address, control de vendors. |
-| **RedisModule** | Blacklisting de tokens revocados, cacheo de sesiones activas, gestión de rate limiting. |
-| **CryptoModule** | Servicios criptográficos centrales: generación de pares de claves Ed25519, cifrado/descifrado con AES-256-GCM, firma digital, verificación de firmas, hash SHA-256. |
-| **BlockchainModule** | Integración con Hyperledger FireFly para creación de identidades on-chain y broadcast de anchors (actualmente en modo mock). |
-| **MailModule** | Envío de correos electrónicos transaccionales (registro, recuperación de contraseña) utilizando Nodemailer con plantillas Handlebars. |
-| **PrismaService** | Capa de acceso a datos PostgreSQL mediante ORM Prisma, gestión de transacciones y migraciones. |
+| **AuthModule** | Gestión de autenticación JWT, login, logout, refresh tokens, recuperación de contraseña mediante tokens de un solo uso (OTP). Implementa guardias de roles con Passport-JWT. |
+| **UsersModule** | CRUD de usuarios, hashing de contraseñas con Argon2, gestión de estados y refresh tokens. |
+| **EcosystemsModule** | Gestión de ecosistemas IoT, creación y validación de API keys, firma de hashes con Ed25519. |
+| **DevicesModule** | Registro y actualización de dispositivos vinculados a ecosistemas, búsqueda por MAC address y vendor. |
+| **RedisModule** | Cache de datos y blacklist de tokens revocados. |
+| **CryptoModule** | Criptografía central para firmas Ed25519, AES-256-GCM y hashing SHA-256. |
+| **BlockchainModule** | Integración con FireFly para broadcast de anchors y transacciones blockchain (mock en desarrollo). |
+| **MailModule** | Envío de correos transaccionales mediante Nodemailer y Mailpit. |
+| **PrismaService** | Acceso a PostgreSQL con Prisma ORM, migraciones y seed. |
 
 #### IoT Manager (Fastify - Puerto 3002)
 
 | Módulo | Responsabilidad |
 |--------|----------------|
-| **index.ts (buildApp)** | Aplicación principal Fastify, definición de rutas POST /v1/ingest, GET /devices/last-interaction, middlewares de autenticación API key, pipeline de procesamiento de telemetría. |
-| **telemetry-store.ts** | Almacenamiento de datos de telemetría en MongoDB, cálculo de hash SHA-256 del payload, gestión de estados de anchor (PENDING, ANCHORED, FAILED). |
-| **device-discovery.ts** | Descubrimiento y sincronización de dispositivos con el servicio de autenticación, resolución de vendors mediante API externa macvendors.com, registro/update de dispositivos. |
-| **api-key-cache.ts** | Cacheo en Redis de claves API válidas con TTL configurable (default 10 min), invalidated cache para claves revocadas (TTL 15 seg). |
-| **config.ts** | Carga de variables de entorno, validación de configuración requerida. |
+| **index.ts (buildApp)** | Servidor Fastify, rutas POST `/v1/ingest`, GET `/iot/devices/last-interaction`, GET `/devices/last-interaction`, GET `/iot/devices/:deviceId/last-interaction`, GET `/devices/:deviceId/last-interaction`, GET `/v1/metrics` y GET `/api/telemetry/v1/metrics`; autenticación de API key para ingestión y autorización JWT para métricas. |
+| **telemetry-store.ts** | Persistencia de telemetría en MongoDB, actualización de estados de anclaje, cálculo de métricas y última interacción por dispositivo. |
+| **device-discovery.ts** | Resolución de vendors MAC, registro de dispositivos en auth-service y sincronización de metadatos. |
+| **api-key-cache.ts** | Cache Redis para validación de API keys, TTL configurable y fallback a auth-service. |
+| **config.ts** | Carga y validación de variables de entorno. |
+
+### Endpoints clave de IoT Manager
+
+- `POST /api/telemetry/v1/ingest` / `/v1/ingest` - Ingestión de telemetría con `x-api-key`.
+- `GET /iot/devices/last-interaction?macAddress={mac}&ecosystemId={eco}` / `GET /devices/last-interaction?macAddress={mac}&ecosystemId={eco}` - Última interacción por MAC.
+- `GET /iot/devices/{deviceId}/last-interaction` / `GET /devices/{deviceId}/last-interaction` - Última interacción por ID de dispositivo.
+- `GET /v1/metrics` / `GET /api/telemetry/v1/metrics` - Métricas de telemetría con cabecera `Authorization: Bearer <token>`.
 
 #### Webapp (React - Puerto 80 via Caddy)
 
 | Componente | Responsabilidad |
 |------------|-----------------|
-| **App.tsx** | Routing principal con React Router v7, definición de rutas protegidas y públicas. |
-| **AuthProvider** | Context provider para gestión de estado de autenticación, almacenamiento de JWT en memoria, protección de rutas. |
-| **pages/** | Componentes de vista: Login, Register, Recover, Reset, Dashboard (visualización de ecosistemas y dispositivos), Account. |
-| **api/axios.ts** | Cliente HTTP configurado con interceptores para inyección de tokens JWT y manejo de errores. |
-| **MainLayout** | Layout común con navegación, header, sidebar. |
+| **App.tsx** | Router principal y rutas protegidas. |
+| **AuthProvider** | Contexto de autenticación y gestión de sesión. |
+| **pages/** | Vistas de login, dashboard, cuenta y gestión de dispositivos. |
+| **api/axios.ts** | Cliente HTTP con interceptores de autenticación. |
+| **MainLayout** | Layout común con navegación, encabezado y sidebar. |
 
 ## 4. Flujo de Ejecución y Secuencias
 
@@ -224,9 +230,9 @@ sequenceDiagram
         Note over IOT: Validación API Key
         IOT->>REDIS: GET cache:hash(apiKey)
         alt Cache Hit
-            REDIS-->>IOT: {ecosystemId, valid}
+            REDIS-->>IOT: {ecosystemId}
         else Cache Miss
-            IOT->>AUTH: POST /api/ecosystems/validate-api-key<br/>lat, lng, x-api-key
+            IOT->>AUTH: POST /internal/auth/validate-ecosystem<br/>x-api-key, latitude, longitude, Authorization: Bearer <internal-token>
             AUTH->>AUTH: decryptApiKey & compare
             AUTH-->>IOT: {valid: true, ecosystemId}
             IOT->>REDIS: SET cache:hash(apiKey)<br/>TTL=600s
@@ -244,7 +250,7 @@ sequenceDiagram
         
         IOT->>IOT: buildPayloadHash<br/>SHA-256(payload + gps)
         
-        IOT->>AUTH: POST /api/ecosystems/sign<br/>ecosystemId, hash
+        IOT->>AUTH: POST /internal/auth/sign<br/>ecosystemId, hash, Authorization: Bearer <internal-token>
         AUTH->>AUTH: decryptPrivateKey
         AUTH->>AUTH: sign(hash, Ed25519)
         AUTH-->>IOT: {signature, publicKey}
@@ -259,93 +265,15 @@ sequenceDiagram
     rect rgb(255, 240, 240)
         Note over IOT: Device Discovery (Async)
         IOT->>IOT: resolveVendor(mac)<br/>via macvendors.com API
-        IOT->>AUTH: POST /api/devices/register<br/>mac, vendor, ecosystemId
+        IOT->>AUTH: POST /internal/auth/devices/exists<br/>macAddress, ecosystemId, Authorization: Bearer <internal-token>
+        alt Device no existe
+            IOT->>AUTH: POST /internal/auth/devices/register<br/>macAddress, vendor, preferredName, ecosystemId
+        else Vendor missing
+            IOT->>AUTH: POST /internal/auth/devices/vendor<br/>macAddress, vendor, ecosystemId
+        end
         AUTH->>POSTGRES: create/update device
     end
 ```
-
-### Diagrama de Flujo de Datos (Data Flow)
-
-```mermaid
-
-flowchart TB
-    subgraph "Input Layer"
-        DEVICES[Dispositivos IoT]
-        USER[Usuario Web]
-    end
-
-    subgraph "API Gateway Layer"
-        TRAEFIK[Traefik<br/>Routing & SSL]
-    end
-
-    subgraph "Auth Service Layer"
-        JWT[JWT Generation<br/>RS256]
-        CRYPTO[Crypto Ops<br/>Ed25519, AES-256-GCM]
-        DB_AUTH[(PostgreSQL<br/>Users, Ecosystems)]
-        REDIS_AUTH[(Redis Auth<br/>Token Blacklist)]
-    end
-
-    subgraph "IoT Manager Layer"
-        API_KEY[API Key Validation]
-        CACHE[(Redis IoT<br/>API Key Cache)]
-        TELEMETRY[Telemetry Processing]
-        DISCOVERY[Device Discovery]
-        DB_IOT[(MongoDB<br/>Telemetry)]
-    end
-
-    subgraph "Output Layer"
-        FIREFLY["FireFly Broadcast (Mock)"]
-        SEQ["Seq Logging"]
-        UI["Webapp UI (React Dashboard)"]
-    end
-
-    DEVICES -->|x-api-key| TRAEFIK
-    USER -->|HTTPS| TRAEFIK
-    
-    TRAEFIK -->|Path /api/auth| JWT
-    TRAEFIK -->|Path /api/telemetry| API_KEY
-    
-    JWT --> CRYPTO
-    JWT --> DB_AUTH
-    JWT --> REDIS_AUTH
-    
-    API_KEY --> CACHE
-    API_KEY --> JWT
-    API_KEY --> TELEMETRY
-    
-    TELEMETRY --> CRYPTO
-    TELEMETRY --> DB_IOT
-    TELEMETRY --> FIREFLY
-    TELEMETRY --> DISCOVERY
-    
-    DISCOVERY --> JWT
-    JWT --> DB_AUTH
-    
-    TELEMETRY -->|Winston| SEQ
-    
-    DB_AUTH --> UI
-    DB_IOT --> UI
-```
-
-### Descripción del Ciclo de Vida Principal
-
-El flujo de ejecución principal del sistema sigue un patrón de procesamiento de telemetría en 8 pasos:
-
-1. **Recepción de Solicitud**: El dispositivo IoT envía una petición POST a `/api/telemetry/v1/ingest` incluyendo la cabecera `x-api-key` con la clave del ecosistema y un body conteniendo latitud, longitud, array de dispositivos y timestamp opcional.
-
-2. **Validación de API Key (Cache)**: El IoT Manager consulta Redis con el hash SHA-256 de la clave API. Si existe en cache y no ha expirado, se extrae el ecosystemId directamente.
-
-3. **Fallback al Auth Service**: En caso de cache miss, el IoT Manager invoca al endpoint interno de validación del auth-service, que descifra la clave API almacenada en PostgreSQL y verifica su estado activo.
-
-4. **Almacenamiento Inicial**: Los datos de telemetría se persisten en MongoDB con estado inicial `PENDING_ANCHOR`, incluyendo el hash SHA-256 calculado a partir del payload normalizado y las coordenadas GPS.
-
-5. **Solicitud de Firma**: El IoT Manager invoca al endpoint `/api/ecosystems/sign` del auth-service proporcionando el ecosystemId y el hash. El servicio de autenticación recupera la clave privada del ecosistema (descifrada con AES-256-GCM usando la master key) y genera una firma Ed25519.
-
-6. **Broadcast a Blockchain**: La firma, el hash original y la clave pública se envían a FireFly (actualmente mockeado con un retraso de 500ms) para su anclaje en la blockchain. Se obtiene un txId como justificante.
-
-7. **Actualización de Estado**: Una vez confirmado el broadcast, se actualiza el registro en MongoDB con estado `ANCHORED`, incluyendo la firma, clave pública y txId.
-
-8. **Sincronización de Dispositivos (Asíncrono)**: En background, el DeviceDiscoveryService procesa los dispositivos recibidos, consulta la API externa macvendors.com para resolver el vendor por MAC, y registra/actualiza cada dispositivo en PostgreSQL a través del auth-service.
 
 ## 5. Pila Tecnológica e Infraestructura
 
@@ -353,59 +281,57 @@ El flujo de ejecución principal del sistema sigue un patrón de procesamiento d
 
 | Componente | Tecnología | Versión |
 |------------|------------|---------|
-| **Auth Service** | Node.js + NestJS | Node 22-alpine |
-| **IoT Manager** | Node.js + Fastify | Node 20-alpine |
-| **Webapp** | React + Vite | React 19, Vite 8 |
+| **Auth Service** | Node.js + NestJS | Node 22 / NestJS 10 |
+| **IoT Manager** | Node.js + Fastify | Node 20 / Fastify 5 |
+| **Webapp** | React + Vite | React 19 / Vite 8 |
 | **Base de Datos Relacional** | PostgreSQL | 15-alpine |
 | **Base de Datos Documental** | MongoDB | 7.0 |
 | **Cache y Sesiones** | Redis | 7-alpine |
-| **Logging Centralizado** | Seq (Datalust) | latest |
+| **Logging Centralizado** | Seq | latest |
 | **Reverse Proxy** | Traefik | latest |
 | **Servidor Web Estático** | Caddy | 2.8.4-alpine |
 
 ### Librerías de Seguridad y Redes Críticas
 
 #### Auth Service (package.json)
-- `@nestjs/jwt`: Generación y verificación de tokens JWT con algoritmos RS256.
-- `@nestjs/passport` + `passport-jwt`: Implementación de estrategia de autenticación basada en tokens.
-- `argon2`: Hashing de contraseñas resistant a ataques de fuerza bruta y GPU.
-- `nodemailer`: Envío de correos transaccionales con soporte SMTP.
-- `@prisma/client`: ORM con soporte para PostgreSQL.
-- `winston` + `winston-seq`: Logging estructurado con exportación a Seq.
+- `@nestjs/jwt`, `passport-jwt`: JWT RS256 y guardias de autenticación.
+- `argon2`: Hashing de contraseñas.
+- `axios`: Llamadas HTTP entre servicios.
+- `@prisma/client`: ORM PostgreSQL.
+- `ioredis`: Cache de tokens y sesión.
+- `nodemailer`: Envío de correos.
+- `winston` + `winston-seq`: Logging estructurado a Seq.
 
 #### IoT Manager (package.json)
-- `fastify`: Servidor HTTP de alto rendimiento con validación de esquemas.
-- `ioredis`: Cliente Redis con soporte para cluster y reconnections.
-- `mongodb`: Driver nativo para MongoDB con pooling de conexiones.
+- `fastify`: Servidor HTTP rápido con validación de esquemas.
+- `ioredis`: Cache API key.
+- `mongodb`: Driver MongoDB.
+- `dotenv`: Carga de variables de entorno.
 
 #### Webapp (package.json)
-- `react-router-dom`: Enrutamiento cliente-side con protección de rutas.
-- `axios`: Cliente HTTP con interceptores para autenticación.
-- `react-leaflet` + `leaflet`: Mapas interactivos para visualización de dispositivos.
-- `tailwindcss`: Framework CSS utility-first.
+- `axios`: Comunicación HTTP con los servicios.
+- `react-router-dom`: Enrutamiento cliente y rutas protegidas.
+- `leaflet` + `react-leaflet`: Visualización de dispositivos en mapa.
+- `recharts`: Gráficas de telemetría.
 
 ### Configuración de Contenedores
 
 #### Construcción de Imágenes
-- **Auth Service**: Multi-stage build (Node 22-alpine), generación de Prisma Client en tiempo de build, usuario no-root.
-- **IoT Manager**: Multi-stage build (Node 20-alpine), compilación TypeScript a JavaScript, usuario no-root.
-- **Webapp**: Pre-build externo (Vite), servida por Caddy con configuración Caddyfile para TLS automático.
+- **Auth Service**: Construido localmente desde `services/auth/Dockerfile`.
+- **IoT Manager**: Construido localmente desde `services/iot-manager/Dockerfile`.
+- **Webapp**: Servida estáticamente desde `apps/webapp/dist` con Caddy.
 
 #### Variables de Entorno Críticas
-- `DATABASE_URL`: Conexión PostgreSQL con credenciales.
-- `CRYPTO_MASTER_KEY`: Clave maestra para cifrado de claves privadas (Base64 32 bytes).
-- `API_KEY_ENCRYPTION_KEY`: Clave para cifrado de API keys de ecosistemas (Base64 32 bytes).
-- `JWT_PUBLIC_KEY` / `JWT_PRIVATE_KEY`: Par de claves RSA para firmas JWT.
+- `DATABASE_URL`: Conexión PostgreSQL.
+- `CRYPTO_MASTER_KEY`: Clave maestra para cifrado AES-256-GCM.
+- `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY`: Par de claves RSA para JWT.
 - `FIREFLY_API_URL`: Endpoint de la blockchain Hyperledger.
-- `MONGO_URI`: Connection string MongoDB.
-- `REDIS_HOST`: Host del servicio Redis.
+- `MONGO_URI`: Conexión MongoDB.
+- `REDIS_URL`: Conexión Redis para `iot-manager`.
 
 ### Servicios de Monitorización y Administración
-
-- **Seq**: Dashboard web para análisis de logs con búsqueda full-text y alertas.
-- **Mongo Express**: Interfaz administrativa para MongoDB (expuesto solo a localhost).
-- **Redis Commander**: Interfaz administrativa para Redis (expuesto solo a localhost).
-- **Traefik Dashboard**: Panel de control del API Gateway (expuesto en /traefik).
-- **Mailpit**: Interfaz web para inspección de correos electrónicos enviados en desarrollo.
-
-Este diseño arquitectónico proporciona una separación clara de responsabilidades, escalabilidad horizontal para el servicio de IoT, persistencia polyglot (relacional + documental), y una capa de seguridad multicapa que incluye cifrado en reposo, autenticación robusta, y auditoría centralizada.
+- **Seq**: Monitorización de logs y auditoría.
+- **Mongo Express**: GUI MongoDB en `127.0.0.1:8090`.
+- **Redis Commander**: GUI Redis en `127.0.0.1:8091`.
+- **Traefik Dashboard**: Accesible en `/traefik`.
+- **Mailpit**: SMTP en `127.0.0.1:1025` y UI en `127.0.0.1:8025`.
