@@ -37,6 +37,12 @@ const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryS
 
     return found?.timestamp ?? null;
   },
+  getMetrics: async () => ({
+    dailyVolume: [],
+    successRatio: [],
+    ecosystemUsage: [],
+    totalDevices: 0,
+  }),
   close: async () => {
     return;
   },

@@ -58,6 +58,22 @@ type AuthContext = {
 	publicKey: string;
 };
 
+type TelemetrySessionClaims = {
+	role?: string | string[];
+	roles?: string[];
+	userId?: string;
+	identityId?: string;
+	ecosystemIds?: string[];
+	ecosystems?: string[];
+	userEcosystems?: string[];
+};
+
+type TelemetryRequestContext = {
+	role: string;
+	userId: string;
+	ecosystemIds: string[] | null;
+};
+
 /**
  * Cuerpo de la solicitud de ingestión de telemetría.
  */
@@ -359,6 +375,20 @@ export const buildApp = (options: AppOptions = {}) => {
   app.get('/iot/devices/:deviceId/last-interaction', readParamLastInteraction);
   app.get('/devices/:deviceId/last-interaction', readParamLastInteraction);
 
+  app.get('/api/telemetry/v1/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
+    const context = await resolveTelemetryRequestContext(request, reply);
+    if (!context) {
+      return;
+    }
+
+    const metrics = await telemetryStore.getMetrics({
+      from: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      ecosystemIds: context.role === 'USER' ? context.ecosystemIds ?? [] : undefined,
+    });
+
+    return reply.code(200).send(metrics);
+  });
+
   const authenticateApiKey = async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply: FastifyReply) => {
     const apiKey = getApiKeyFromHeader(request);
 
@@ -440,6 +470,154 @@ export const buildApp = (options: AppOptions = {}) => {
     (request as AuthenticatedFastifyRequest).authContext = {
       ecosystemId: validationResult.ecosystemId,
       publicKey: '',
+    };
+  };
+
+  const parseBase64Url = (value: string): string => {
+    return value.replace(/-/g, '+').replace(/_/g, '/').padEnd(value.length + (4 - (value.length % 4)) % 4, '=');
+  };
+
+  const decodeJwtPayload = (token: string): TelemetrySessionClaims | null => {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    try {
+      const payloadSegment = parts[1];
+      const decoded = Buffer.from(parseBase64Url(payloadSegment), 'base64').toString('utf8');
+      return JSON.parse(decoded) as TelemetrySessionClaims;
+    } catch {
+      return null;
+    }
+  };
+
+  const getBearerTokenFromHeader = (request: FastifyRequest): string | null => {
+    const authorization = request.headers.authorization;
+    if (typeof authorization !== 'string') {
+      return null;
+    }
+
+    const [scheme, token] = authorization.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !token) {
+      return null;
+    }
+
+    return token.trim();
+  };
+
+  const normalizeEcosystemIds = (value: unknown): string[] | undefined => {
+    if (Array.isArray(value)) {
+      return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim());
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+    }
+
+    return undefined;
+  };
+
+  const resolveTelemetryRequestContext = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<TelemetryRequestContext | null> => {
+    const token = getBearerTokenFromHeader(request);
+    if (!token) {
+      reply.code(401).send({
+        error: 'AUTHORIZATION_REQUIRED',
+        message: 'Authorization header with Bearer token is required',
+      });
+      return null;
+    }
+
+    const claims = decodeJwtPayload(token);
+    if (!claims) {
+      reply.code(401).send({
+        error: 'INVALID_TOKEN',
+        message: 'Unable to decode JWT payload',
+      });
+      return null;
+    }
+
+    const rawRole = claims.role ?? (claims.roles?.[0] ?? undefined);
+    const role = typeof rawRole === 'string' ? rawRole.trim().toUpperCase() : undefined;
+    const userId = typeof claims.userId === 'string' && claims.userId.trim().length > 0 ? claims.userId.trim() :
+      typeof claims.identityId === 'string' && claims.identityId.trim().length > 0 ? claims.identityId.trim() :
+      undefined;
+
+    if (!role || !userId) {
+      reply.code(401).send({
+        error: 'INVALID_SESSION_CLAIMS',
+        message: 'Token payload must include role and userId/identityId',
+      });
+      return null;
+    }
+
+    const claimEcosystemIds =
+      normalizeEcosystemIds(claims.ecosystemIds) ??
+      normalizeEcosystemIds(claims.ecosystems) ??
+      normalizeEcosystemIds(claims.userEcosystems);
+
+    let ecosystemIds: string[] | null = null;
+
+    if (role === 'USER') {
+      ecosystemIds = claimEcosystemIds ?? null;
+
+      if (!ecosystemIds || ecosystemIds.length === 0) {
+        if (!config.authUserEcosystemsUrl || !config.authInternalToken) {
+          reply.code(403).send({
+            error: 'USER_ECOSYSTEM_ACCESS_REQUIRED',
+            message: 'User role requires ecosystem membership in token or auth service configuration',
+          });
+          return null;
+        }
+
+        try {
+          const userEcosystemsResponse = await fetch(
+            `${config.authUserEcosystemsUrl.replace(/\/$/, '')}/${encodeURIComponent(userId)}/ecosystems`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${config.authInternalToken}`,
+              },
+            },
+          );
+
+          if (!userEcosystemsResponse.ok) {
+            throw new Error(`Unexpected status ${userEcosystemsResponse.status}`);
+          }
+
+          const data = (await userEcosystemsResponse.json()) as {
+            ecosystemIds?: string[];
+            ecosystems?: string[];
+          };
+
+          ecosystemIds = normalizeEcosystemIds(data.ecosystemIds) ?? normalizeEcosystemIds(data.ecosystems) ?? [];
+        } catch (error) {
+          request.log.error({ error }, 'Unable to fetch user ecosystems from auth service');
+          reply.code(503).send({
+            error: 'AUTH_SERVICE_UNAVAILABLE',
+            message: 'Unable to resolve user ecosystems from auth service',
+          });
+          return null;
+        }
+      }
+
+      if (!ecosystemIds || ecosystemIds.length === 0) {
+        reply.code(403).send({
+          error: 'NO_ECOSYSTEM_ACCESS',
+          message: 'User has no associated ecosystems',
+        });
+        return null;
+      }
+    }
+
+    return {
+      role,
+      userId,
+      ecosystemIds,
     };
   };
 

@@ -75,6 +75,33 @@ export type SaveTelemetryResult = {
  * Interfaz para almacenamiento de telemetría.
  * Abstrae el backend (MongoDB).
  */
+export type TelemetryDailyVolumeMetric = {
+  hour: string;
+  tx: number;
+};
+
+export type TelemetrySuccessRatioMetric = {
+  name: AnchorStatus;
+  value: number;
+};
+
+export type TelemetryEcosystemUsageMetric = {
+  name: string;
+  anchors: number;
+};
+
+export type TelemetryMetricsResult = {
+  dailyVolume: TelemetryDailyVolumeMetric[];
+  successRatio: TelemetrySuccessRatioMetric[];
+  ecosystemUsage: TelemetryEcosystemUsageMetric[];
+  totalDevices: number;
+};
+
+export type TelemetryMetricsQuery = {
+  from: Date;
+  ecosystemIds?: string[];
+};
+
 export interface TelemetryStore {
   /**
    * Guarda telemetría en el almacenamiento.
@@ -103,6 +130,13 @@ export interface TelemetryStore {
    * @returns Promise con la fecha o null
    */
   findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null>;
+
+  /**
+   * Obtiene métricas de telemetría para el dashboard.
+   *
+   * @param query - Parámetros de consulta de métricas
+   */
+  getMetrics(query: TelemetryMetricsQuery): Promise<TelemetryMetricsResult>;
 
   /**
    * Cierra la conexión al armazenamento.
@@ -279,6 +313,122 @@ export class MongoTelemetryStore implements TelemetryStore {
       .next();
 
     return document?.timestamp ?? null;
+  }
+
+  async getMetrics(query: TelemetryMetricsQuery): Promise<TelemetryMetricsResult> {
+    const collection = await this.ensureCollection();
+    const filters: Record<string, unknown> = {
+      timestamp: { $gte: query.from },
+    };
+
+    if (query.ecosystemIds?.length) {
+      filters['metadata.ecosystemId'] = { $in: query.ecosystemIds };
+    }
+
+    const aggregation = await collection
+      .aggregate([
+        { $match: filters },
+        {
+          $facet: {
+            dailyVolume: [
+              {
+                $group: {
+                  _id: {
+                    $dateTrunc: {
+                      date: '$timestamp',
+                      unit: 'hour',
+                    },
+                  },
+                  tx: { $sum: 1 },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  hour: {
+                    $dateToString: {
+                      format: '%H:00',
+                      date: '$_id',
+                    },
+                  },
+                  tx: 1,
+                },
+              },
+              { $sort: { hour: 1 } },
+            ],
+            successRatio: [
+              {
+                $group: {
+                  _id: '$metadata.anchorStatus',
+                  value: { $sum: 1 },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  name: '$_id',
+                  value: 1,
+                },
+              },
+            ],
+            ecosystemUsage: [
+              {
+                $group: {
+                  _id: '$metadata.ecosystemId',
+                  anchors: { $sum: 1 },
+                },
+              },
+              { $sort: { anchors: -1 } },
+              { $limit: 5 },
+              {
+                $project: {
+                  _id: 0,
+                  name: '$_id',
+                  anchors: 1,
+                },
+              },
+            ],
+            totalDevices: [
+              { $unwind: '$payload.devices' },
+              {
+                $project: {
+                  deviceIdentifier: {
+                    $ifNull: ['$payload.devices.deviceId', '$payload.devices.mac_addr'],
+                  },
+                },
+              },
+              {
+                $match: {
+                  deviceIdentifier: { $exists: true, $nin: [null, ''] },
+                },
+              },
+              {
+                $group: {
+                  _id: '$deviceIdentifier',
+                },
+              },
+              {
+                $count: 'value',
+              },
+            ],
+          },
+        },
+      ])
+      .toArray();
+
+    const facet = aggregation[0] ?? {
+      dailyVolume: [],
+      successRatio: [],
+      ecosystemUsage: [],
+      totalDevices: [],
+    };
+
+    return {
+      dailyVolume: facet.dailyVolume,
+      successRatio: facet.successRatio,
+      ecosystemUsage: facet.ecosystemUsage,
+      totalDevices: facet.totalDevices?.[0]?.value ?? 0,
+    };
   }
 
   /**

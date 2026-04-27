@@ -22,6 +22,8 @@ export type AppConfig = {
 	authValidateApiKeyUrl?: string;
 	/** URL para firmar hashes */
 	authSignUrl?: string;
+	/** URL para obtener ecosistemas de un usuario desde Auth */
+	authUserEcosystemsUrl?: string;
 	/** Token interno para llamadas al Auth Service */
 	authInternalToken?: string;
 	/** Mapa estático de API keys (.Format: key1:id1,key2:id2) */
@@ -92,6 +94,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     authDeviceUpdateVendorUrl: env.AUTH_DEVICE_UPDATE_VENDOR_URL?.trim() || undefined,
     authValidateApiKeyUrl: env.AUTH_VALIDATE_API_KEY_URL?.trim() || undefined,
     authSignUrl: env.AUTH_SIGN_URL?.trim() || undefined,
+    authUserEcosystemsUrl: env.AUTH_USER_ECOSYSTEMS_URL?.trim() || undefined,
     authInternalToken: env.AUTH_INTERNAL_TOKEN?.trim() || undefined,
     iotApiKeyStaticMap: env.IOT_API_KEY_STATIC_MAP,
     iotApiKeyPositiveTtlMs: parsePositiveNumber(
