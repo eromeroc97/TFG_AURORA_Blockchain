@@ -224,14 +224,14 @@ export default function TelemetryDashboard() {
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted">
             Entidades participantes
           </p>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-6">
-            <img src={auroraLogo} alt="Logotipo de AURORA" className="h-12 w-auto object-contain" />
-            <img src={gsyaLogo} alt="Logotipo de GSYA" className="h-12 w-auto object-contain" />
-            <img src={uclmLogo} alt="Logotipo de UCLM" className="h-12 w-auto object-contain" />
-            <img src={ueLogo} alt="Logotipo de la UE" className="h-12 w-auto object-contain" />
-            <img src={mHaciendaLogo} alt="Logotipo de Ministerio de Hacienda" className="h-12 w-auto object-contain" />
-            <img src={federLogo} alt="Logotipo de FEDER" className="h-12 w-auto object-contain" />
-            <img src={clmLogo} alt="Logotipo de CLM" className="h-12 w-auto object-contain" />
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:flex-nowrap sm:justify-between sm:gap-6">
+            <img src={auroraLogo} alt="Logotipo de AURORA" className="h-10 sm:h-12 w-auto max-w-[7rem] object-contain" />
+            <img src={gsyaLogo} alt="Logotipo de GSYA" className="h-10 sm:h-12 w-auto max-w-[7rem] object-contain" />
+            <img src={uclmLogo} alt="Logotipo de UCLM" className="h-10 sm:h-12 w-auto max-w-[7rem] object-contain" />
+            <img src={ueLogo} alt="Logotipo de la UE" className="h-10 sm:h-12 w-auto max-w-[7rem] object-contain" />
+            <img src={mHaciendaLogo} alt="Logotipo de Ministerio de Hacienda" className="h-10 sm:h-12 w-auto max-w-[7rem] object-contain" />
+            <img src={federLogo} alt="Logotipo de FEDER" className="h-10 sm:h-12 w-auto max-w-[7rem] object-contain" />
+            <img src={clmLogo} alt="Logotipo de CLM" className="h-10 sm:h-12 w-auto max-w-[7rem] object-contain" />
           </div>
         </footer>
       </div>
