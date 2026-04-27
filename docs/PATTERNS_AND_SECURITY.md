@@ -32,7 +32,8 @@ flowchart TB
         subgraph "Datos"
             DB[(PostgreSQL)]
             MONGO[(MongoDB)]
-            REDIS[(Redis)]
+            REDIS_AUTH[(Redis Auth)]
+            REDIS_IOT[(Redis IoT)]
         end
         
         subgraph "Observabilidad"
@@ -47,10 +48,10 @@ flowchart TB
     GATEWAY -->|Path: /*| WEBAPP
     
     AUTH --> DB
-    AUTH --> REDIS
+    AUTH --> REDIS_AUTH
     AUTH --> SEQ
     IOT --> MONGO
-    IOT --> REDIS
+    IOT --> REDIS_IOT
     IOT --> AUTH
     IOT --> SEQ
     
@@ -268,7 +269,7 @@ sequenceDiagram
     participant FRONT as Webapp
     participant TRAEFIK as Traefik
     participant AUTH as Auth Service
-    participant REDIS as Redis
+    participant REDIS_AUTH as Redis Auth
 
     USER->>FRONT: Credenciales (email, password)
     FRONT->>TRAEFIK: POST /api/auth/login
@@ -289,8 +290,8 @@ sequenceDiagram
     rect rgb(230, 240, 245)
         Note over AUTH: Verificación JWT
         AUTH->>AUTH: Passport JWT Strategy validate()
-        AUTH->>REDIS: isBlacklisted(userId)
-        REDIS-->>AUTH: false
+        AUTH->>REDIS_AUTH: isBlacklisted(userId)
+        REDIS_AUTH-->>AUTH: false
     end
     
     AUTH-->>FRONT: Datos protegidos
@@ -416,11 +417,11 @@ Fastify utiliza el concepto de **Hooks** para interceptar el ciclo de vida de la
 - **Type Safety**: Los tipos de Fastify proporcionan seguridad compile-time.
 - **Scope reducido**: Los Hooks tienen acceso directo al contexto de la petición.
 
-### 4.2 Patrón Cache-Aside con Redis
+### 4.2 Patrón Cache-Aside con Redis IoT
 
 El servicio implementa el patrón **Cache-Aside** para la validación de claves API:
 
-1. **Check**: Se consulta Redis con el hash SHA-256 de la API Key.
+1. **Check**: Se consulta Redis IoT con el hash SHA-256 de la API Key.
 2. **Hit**: Si existe y no ha expirado, se usa el `ecosystemId` cacheado.
 3. **Miss**: Se invoca al Auth Service para validar la clave, luego se cachea el resultado.
 
@@ -428,11 +429,13 @@ El servicio implementa el patrón **Cache-Aside** para la validación de claves 
 - **TTL Positivo (válido)**: 600 segundos (10 minutos) — Configurable mediante `IOT_API_KEY_POSITIVE_TTL_MS`.
 - **TTL Negativo (inválido)**: 15 segundos — Previene ataques de fuerza bruta mediante cache de rechazos.
 
+**Nota**: El servicio IoT Manager utiliza una instancia Redis dedicada (`redis-iot`) separada del auth-service para cumplir con el patrón de aislamiento Zero Trust.
+
 ```mermaid
 flowchart TD
     A[Dispositivo IoT]
     B[IoT Manager]
-    C[Redis Cache]
+    C[Redis IoT]
     D[Auth Service]
     E[MongoDB]
     F[FireFly]

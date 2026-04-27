@@ -64,7 +64,8 @@ graph TD
         S1["Auth Service (NestJS)"]
         S2["IoT Manager (Fastify)"]
         S3["Traefik API Gateway"]
-        S4["Redis + PostgreSQL"]
+        S4["Redis Auth + Redis IoT"]
+        S5["PostgreSQL"]
     end
 
     A01 --> C1 --> S1
@@ -291,7 +292,7 @@ El sistema implementa un modelo de identidad para dispositivos IoT:
 **Seguridad de la API Key:**
 - Las API Keys se generan como `AUR-{32 bytes aleatorios en base64url}`.
 - Se almacenan cifradas en PostgreSQL (AES-256-GCM).
-- Se validan contra la base de datos o el cache de Redis.
+- Se validan contra la base de datos o el cache de Redis IoT.
 - No hay limites de uso por clave (area de mejora para rate limiting por ecosistema).
 
 ### 4.3 Integridad de Datos de Telemetria

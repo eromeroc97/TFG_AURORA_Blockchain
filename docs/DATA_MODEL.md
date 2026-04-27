@@ -366,15 +366,33 @@ mongo-db:
   networks:
     - aurora-secure-net
 
-redis:
-  image: redis:alpine
-  container_name: redis-cache
-  command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+## Redis (Instancias Aisladas)
+
+El sistema implementa dos instancias Redis separadas para cumplir con el patrón Zero Trust:
+
+- **redis-auth** (puerto 6379): Usado por auth-service para token blacklist y sesiones.
+- **redis-iot** (puerto 6380): Usado por iot-manager para cache de API keys.
+
+```yaml
+redis-auth:
+  image: redis:7-alpine
+  container_name: redis-auth
+  command: ["redis-server"]
   ports:
     - "6379:6379"
   volumes:
-    - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    - redis_data:/data
+    - redis_auth_data:/data
+  networks:
+    - aurora-secure-net
+
+redis-iot:
+  image: redis:7-alpine
+  container_name: redis-iot
+  command: ["redis-server"]
+  ports:
+    - "6380:6379"
+  volumes:
+    - redis_iot_data:/data
   networks:
     - aurora-secure-net
 ```
@@ -385,14 +403,16 @@ redis:
 |---------|------|------------|
 | `postgres_data` | Named Volume | Datos de PostgreSQL (identidades, usuarios, ecosistemas) |
 | `mongo_data` | Named Volume | Datos de MongoDB (telemetría) |
-| `redis_data` | Named Volume | Datos de Redis (cache de API keys, blacklists) |
+| `redis_auth_data` | Named Volume | Datos de Redis (auth-service: token blacklist, sesiones) |
+| `redis_iot_data` | Named Volume | Datos de Redis (iot-manager: cache de API keys) |
 | `seq_data` | Named Volume | Logs centralizados |
 
 ### 5.3 Configuración de Red
 
 - **PostgreSQL**: Expuesto solo en `127.0.0.1:5432` (localhost). Accesible internamente por Auth Service via hostname `postgres-db`.
 - **MongoDB**: Expuesto internamente en la red `aurora-secure-net`. Accesible por IoT Manager via hostname `mongo-db`.
-- **Redis**: Expuesto en puerto 6379 internamente. Usado por Auth Service e IoT Manager.
+- **Redis Auth**: Expuesto en puerto 6379 internamente. Usado por auth-service para token blacklist y sesiones.
+- **Redis IoT**: Expuesto en puerto 6380 internamente. Usado por iot-manager para cache de API keys.
 
 ### 5.4 Resumen de Versiones y Puertos
 
@@ -400,7 +420,8 @@ redis:
 |----------|--------|----------------|-----|
 | PostgreSQL | postgres:15-alpine | 127.0.0.1:5432 | aurora-secure-net |
 | MongoDB | mongo:7.0 | (interno) | aurora-secure-net |
-| Redis | redis:alpine | 6379 | aurora-secure-net |
+| Redis Auth | redis:7-alpine | 6379 | aurora-secure-net |
+| Redis IoT | redis:7-alpine | 6380 | aurora-secure-net |
 | Seq | datalust/seq:latest | 5341, 8081 | aurora-secure-net |
 
 ### 5.5 Flujo de Persistencia de Telemetría

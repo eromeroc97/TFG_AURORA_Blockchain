@@ -39,7 +39,8 @@ graph TB
         subgraph "Infraestructura de Datos"
             POSTGRES[(PostgreSQL<br/>:5432)]
             MONGO[(MongoDB<br/>:27017)]
-            REDIS[(Redis Cache<br/>:6379)]
+            REDIS_AUTH[(Redis Auth<br/>:6379)]
+            REDIS_IOT[(Redis IoT<br/>:6380)]
             SEQ[(Seq Logging<br/>:5341)]
         end
 
@@ -62,12 +63,12 @@ graph TB
     TRAEFIK -->|Path: /| WEBAPP
 
     AUTH -->|Prisma ORM| POSTGRES
-    AUTH -->|Redis Client| REDIS
+    AUTH -->|Redis Client| REDIS_AUTH
     AUTH -->|HTTP| FIREFLY
     AUTH -->|SMTP| MAILPIT
 
     IOT -->|Mongo Driver| MONGO
-    IOT -->|Redis Client| REDIS
+    IOT -->|Redis Client| REDIS_IOT
     IOT -->|HTTP POST| AUTH
     IOT -->|API Externa| MAC_VENDOR_API
 
@@ -88,7 +89,8 @@ El archivo `docker-compose.yml` define la siguiente topología de servicios:
 | **webapp** | caddy:2.8.4-alpine | 80 (interno) | Interfaz web estática |
 | **postgres-db** | postgres:15-alpine | 5432 (localhost) | Base de datos relacional para identidades |
 | **mongo-db** | mongo:7.0 | 27017 (interno) | Almacenamiento de telemetría |
-| **redis** | redis:alpine | 6379 | Cacheo de claves API y sesiones |
+| **redis-auth** | redis:7-alpine | 6379 | Cache de sesiones y token blacklist (auth-service) |
+| **redis-iot** | redis:7-alpine | 6380 | Cache de claves API (iot-manager) |
 | **seq** | datalust/seq:latest | 5341, 8081 | Centralización de logs |
 | **mailpit** | axllent/mailpit | 1025, 8025 | Servidor SMTP mock para desarrollo |
 | **mongo-express** | mongo-express | 8090 (localhost) | Administración MongoDB |
@@ -280,12 +282,12 @@ flowchart TB
         JWT[JWT Generation<br/>RS256]
         CRYPTO[Crypto Ops<br/>Ed25519, AES-256-GCM]
         DB_AUTH[(PostgreSQL<br/>Users, Ecosystems)]
-        REDIS_AUTH[(Redis<br/>Token Blacklist)]
+        REDIS_AUTH[(Redis Auth<br/>Token Blacklist)]
     end
 
     subgraph "IoT Manager Layer"
         API_KEY[API Key Validation]
-        CACHE[(Redis<br/>API Key Cache)]
+        CACHE[(Redis IoT<br/>API Key Cache)]
         TELEMETRY[Telemetry Processing]
         DISCOVERY[Device Discovery]
         DB_IOT[(MongoDB<br/>Telemetry)]
@@ -356,7 +358,7 @@ El flujo de ejecución principal del sistema sigue un patrón de procesamiento d
 | **Webapp** | React + Vite | React 19, Vite 8 |
 | **Base de Datos Relacional** | PostgreSQL | 15-alpine |
 | **Base de Datos Documental** | MongoDB | 7.0 |
-| **Cache y Sesiones** | Redis | alpine |
+| **Cache y Sesiones** | Redis | 7-alpine |
 | **Logging Centralizado** | Seq (Datalust) | latest |
 | **Reverse Proxy** | Traefik | latest |
 | **Servidor Web Estático** | Caddy | 2.8.4-alpine |
