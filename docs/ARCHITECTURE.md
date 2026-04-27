@@ -56,9 +56,9 @@ graph TB
 
     USUARIO -->|HTTPS| TRAEFIK
     DISPOSITIVO_IoT -->|x-api-key| TRAEFIK
-    TRAEFIK -->|PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`) || PathPrefix(`/api/devices`)| AUTH
-    TRAEFIK -->|PathPrefix(`/api/telemetry`) || PathPrefix(`/api/iot`)| IOT
-    TRAEFIK -->|PathPrefix(`/`) && !PathPrefix(`/api`)| WEBAPP
+    TRAEFIK -->|PathPrefix /api/auth, /api/users, /api/ecosystems, /api/devices| AUTH
+    TRAEFIK -->|PathPrefix /api/telemetry, /api/iot| IOT
+    TRAEFIK -->|PathPrefix / and not /api| WEBAPP
 
     AUTH -->|Prisma ORM| POSTGRES
     AUTH -->|Redis Client| REDIS_AUTH
