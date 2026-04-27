@@ -7,6 +7,7 @@ services:
       - ./services/auth/.env
     depends_on:
       - postgres-db
+      - redis-auth
       - mailpit
       - seq
     labels:
@@ -63,6 +64,7 @@ services:
       - ./services/iot-manager/.env
     depends_on:
       - mongo-db
+      - redis-iot
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.telemetry.rule=PathPrefix(`/api/telemetry`) || PathPrefix(`/api/iot`)"
@@ -193,15 +195,25 @@ services:
     networks:
       - aurora-secure-net
 
-  redis:
-    image: redis:alpine
-    container_name: redis-cache
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+  redis-auth:
+    image: redis:7-alpine
+    container_name: redis-auth
+    command: ["redis-server"]
     ports:
       - "6379:6379"
     volumes:
-      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-      - redis_data:/data
+      - redis_auth_data:/data
+    networks:
+      - aurora-secure-net
+
+  redis-iot:
+    image: redis:7-alpine
+    container_name: redis-iot
+    command: ["redis-server"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_iot_data:/data
     networks:
       - aurora-secure-net
 
@@ -245,11 +257,12 @@ services:
     ports:
       - "127.0.0.1:8091:8081"
     environment:
-      REDIS_HOSTS: local:redis:6379
+      REDIS_HOSTS: auth:redis-auth:6379,iot:redis-iot:6380
     networks:
       - aurora-secure-net
     depends_on:
-      - redis
+      - redis-auth
+      - redis-iot
 
 networks:
   aurora-secure-net:
@@ -258,5 +271,6 @@ networks:
 volumes:
   postgres_data:
   mongo_data:
-  redis_data:
+  redis_auth_data:
+  redis_iot_data:
   seq_data:

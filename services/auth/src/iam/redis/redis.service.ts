@@ -18,7 +18,7 @@ export class RedisService {
 	 */
 	constructor() {
 		this.redis = new Redis({
-			host: process.env.REDIS_HOST ?? 'redis',
+			host: process.env.REDIS_HOST ?? 'redis-auth',
 			port: +(process.env.REDIS_PORT ?? 6379),
 		});
 	}
