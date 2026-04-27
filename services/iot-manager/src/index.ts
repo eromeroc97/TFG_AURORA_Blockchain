@@ -59,6 +59,7 @@ type AuthContext = {
 };
 
 type TelemetrySessionClaims = {
+	sub?: string;
 	role?: string | string[];
 	roles?: string[];
 	userId?: string;
@@ -375,7 +376,7 @@ export const buildApp = (options: AppOptions = {}) => {
   app.get('/iot/devices/:deviceId/last-interaction', readParamLastInteraction);
   app.get('/devices/:deviceId/last-interaction', readParamLastInteraction);
 
-  app.get('/api/telemetry/v1/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
+  const telemetryMetricsHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const context = await resolveTelemetryRequestContext(request, reply);
     if (!context) {
       return;
@@ -387,7 +388,10 @@ export const buildApp = (options: AppOptions = {}) => {
     });
 
     return reply.code(200).send(metrics);
-  });
+  };
+
+  app.get('/v1/metrics', telemetryMetricsHandler);
+  app.get('/api/telemetry/v1/metrics', telemetryMetricsHandler);
 
   const authenticateApiKey = async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply: FastifyReply) => {
     const apiKey = getApiKeyFromHeader(request);
@@ -542,14 +546,15 @@ export const buildApp = (options: AppOptions = {}) => {
 
     const rawRole = claims.role ?? (claims.roles?.[0] ?? undefined);
     const role = typeof rawRole === 'string' ? rawRole.trim().toUpperCase() : undefined;
-    const userId = typeof claims.userId === 'string' && claims.userId.trim().length > 0 ? claims.userId.trim() :
-      typeof claims.identityId === 'string' && claims.identityId.trim().length > 0 ? claims.identityId.trim() :
-      undefined;
+    const userId =
+      (typeof claims.userId === 'string' && claims.userId.trim().length > 0 && claims.userId.trim()) ||
+      (typeof claims.identityId === 'string' && claims.identityId.trim().length > 0 && claims.identityId.trim()) ||
+      (typeof claims.sub === 'string' && claims.sub.trim().length > 0 && claims.sub.trim());
 
     if (!role || !userId) {
       reply.code(401).send({
         error: 'INVALID_SESSION_CLAIMS',
-        message: 'Token payload must include role and userId/identityId',
+        message: 'Token payload must include role and userId/identityId/sub',
       });
       return null;
     }

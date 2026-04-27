@@ -18,6 +18,13 @@ import {
 import { BarChart3, CircleDashed, TrendingUp, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
+import auroraLogo from '../assets/aurora-logo.png'
+import gsyaLogo from '../assets/gsya_logo.png'
+import uclmLogo from '../assets/uclm_logo.png'
+import ueLogo from '../assets/UE.png'
+import mHaciendaLogo from '../assets/MHacienda.png'
+import federLogo from '../assets/FEDER.png'
+import clmLogo from '../assets/CLM.png'
 
 /**
  * Página de Telemetría - Dashboard de métricas de telemetría.
@@ -25,7 +32,7 @@ import { useAuth } from '../context/auth-context'
  * tasa de éxito de anclaje y top ecosistemas.
  */
 export default function TelemetryDashboard() {
-  const { accessToken, authClaims } = useAuth()
+  const { accessToken } = useAuth()
   const [dailyVolume, setDailyVolume] = useState<Array<{ hour: string; tx: number }>>([])
   const [successRatio, setSuccessRatio] = useState<Array<{ name: string; value: number }>>([])
   const [ecosystemUsage, setEcosystemUsage] = useState<Array<{ name: string; anchors: number }>>([])
@@ -100,10 +107,6 @@ export default function TelemetryDashboard() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-              <CircleDashed className="mr-2 h-4 w-4 text-slate-500" />
-              Rol actual: {badge.toUpperCase()}
-            </span>
             <button
               type="button"
               onClick={fetchMetrics}
@@ -129,7 +132,7 @@ export default function TelemetryDashboard() {
             </p>
           </div>
         ) : isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             {[1, 2, 3].map((item) => (
               <div key={item} className="animate-pulse rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="mb-6 h-6 w-40 rounded-full bg-slate-200" />
@@ -141,7 +144,7 @@ export default function TelemetryDashboard() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-3 mb-4 text-slate-900">
                 <BarChart3 className="h-7 w-7 text-blue-600" />
@@ -174,7 +177,7 @@ export default function TelemetryDashboard() {
                 <TrendingUp className="h-7 w-7 text-emerald-500" />
                 <div>
                   <p className="text-sm font-medium text-slate-500">Tasa de éxito</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Anclajes v/s fallos</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Anclajes vs fallos</h2>
                 </div>
               </div>
               <div className="h-72">
@@ -182,7 +185,7 @@ export default function TelemetryDashboard() {
                   <PieChart>
                     <Pie data={successRatio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={48} paddingAngle={4}>
                       {successRatio.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? '#14b8a6' : '#f97316'} />
+                        <Cell key={`cell-${index}`} fill={index === 0 ? '#f97316' : '#14b8a6'} />
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
@@ -218,6 +221,21 @@ export default function TelemetryDashboard() {
             </div>
           </div>
         )}
+
+        <footer className="mt-6 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted">
+            Entidades participantes
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-6">
+            <img src={auroraLogo} alt="Logotipo de AURORA" className="h-12 w-auto object-contain" />
+            <img src={gsyaLogo} alt="Logotipo de GSYA" className="h-12 w-auto object-contain" />
+            <img src={uclmLogo} alt="Logotipo de UCLM" className="h-12 w-auto object-contain" />
+            <img src={ueLogo} alt="Logotipo de la UE" className="h-12 w-auto object-contain" />
+            <img src={mHaciendaLogo} alt="Logotipo de Ministerio de Hacienda" className="h-12 w-auto object-contain" />
+            <img src={federLogo} alt="Logotipo de FEDER" className="h-12 w-auto object-contain" />
+            <img src={clmLogo} alt="Logotipo de CLM" className="h-12 w-auto object-contain" />
+          </div>
+        </footer>
       </div>
     </div>
   )
