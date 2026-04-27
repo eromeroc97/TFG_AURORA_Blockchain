@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import { setupSeqErrorReporting } from './lib/seq'
 
 /**
  * Configura la ruta base de la API dinámicamente.
@@ -8,6 +9,11 @@ import './index.css'
  */
 (globalThis as typeof globalThis & { __WEBAPP_API_BASE_PATH__?: string }).__WEBAPP_API_BASE_PATH__ =
   import.meta.env.VITE_API_BASE_PATH || '/api'
+
+/**
+ * Configura el reporte de errores global de la aplicación.
+ */
+setupSeqErrorReporting()
 
 /**
  * Punto de entrada de la aplicación web.

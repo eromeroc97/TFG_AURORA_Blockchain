@@ -5,6 +5,7 @@ import * as argon2 from 'argon2';
 import { StringValue } from 'ms';
 import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
+import { decodeRsaPublicKey } from './jwt-key.util';
 
 /**
  * Payload del token JWT.
@@ -25,17 +26,6 @@ interface AuthPayload {
  * @returns Clave pública en formato PEM
  * @throws Error si no está configurada
  */
-const decodePublicKey = (rawValue: string | undefined): string => {
-  if (!rawValue) {
-    throw new Error('JWT_PUBLIC_KEY is not configured');
-  }
-
-  if (rawValue.includes('BEGIN')) {
-    return rawValue.replace(/\\n/g, '\n');
-  }
-
-  return Buffer.from(rawValue, 'base64').toString('utf8');
-};
 
 /**
  * Servicio de autenticación.
@@ -135,7 +125,7 @@ export class AuthService {
 				refreshToken,
 				{
 					algorithms: ['RS256'],
-					secret: decodePublicKey(process.env.JWT_PUBLIC_KEY),
+					secret: decodeRsaPublicKey(process.env.JWT_PUBLIC_KEY, 'JWT_PUBLIC_KEY'),
 				},
 			);
 

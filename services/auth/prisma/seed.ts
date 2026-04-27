@@ -27,7 +27,10 @@ async function main() {
       select: { id: true },
     });
 
-    const adminId = existingAdmin?.id ?? randomUUID();
+    if (existingAdmin) {
+      console.log(`[seed] GLOBAL_ADMIN already exists: ${existingAdmin.id}`);
+      return;
+    }
 
     const { publicKey, privateKey } = generateEd25519KeyPair();
     const encrypted = encryptPrivateKey(privateKey, masterKeyBase64);
@@ -45,17 +48,8 @@ async function main() {
       },
     });
 
-    const createdAdmin = await prisma.user.upsert({
-      where: { email: 'admin@uclm.es' },
-      update: {
-        identityId: identity.id,
-        passwordHash,
-        role: Role.GLOBAL_ADMIN,
-        status: UserStatus.ACTIVE,
-        isActive: true,
-      },
-      create: {
-        id: adminId,
+    const createdAdmin = await prisma.user.create({
+      data: {
         identityId: identity.id,
         email: 'admin@uclm.es',
         passwordHash,

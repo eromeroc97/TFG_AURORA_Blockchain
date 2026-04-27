@@ -2,18 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { RedisService } from '../../redis/redis.service';
-
-const decodePublicKey = (rawValue: string | undefined): string => {
-  if (!rawValue) {
-    throw new Error('JWT_PUBLIC_KEY is not configured');
-  }
-
-  if (rawValue.includes('BEGIN')) {
-    return rawValue.replace(/\\n/g, '\n');
-  }
-
-  return Buffer.from(rawValue, 'base64').toString('utf8');
-};
+import { decodeRsaPublicKey } from '../jwt-key.util';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -22,7 +11,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       algorithms: ['RS256'],
-      secretOrKey: decodePublicKey(process.env.JWT_PUBLIC_KEY),
+      secretOrKey: decodeRsaPublicKey(process.env.JWT_PUBLIC_KEY, 'JWT_PUBLIC_KEY'),
     });
   }
 

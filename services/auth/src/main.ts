@@ -6,6 +6,14 @@ import type { Request, Response, NextFunction } from 'express';
 import { AllExceptionsFilter } from './shared/errors/global-exception.filter';
 import { createAuthLogger } from './shared/logging/auth-logger';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection in auth-service:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception in auth-service:', error);
+});
+
 async function bootstrap() {
   const logger = createAuthLogger();
 

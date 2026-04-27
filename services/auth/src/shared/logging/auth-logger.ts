@@ -13,8 +13,8 @@ const attachServiceMetadata = winston.format((info) => ({
   environment: process.env.NODE_ENV ?? 'development',
 }));
 
-export const createSeqTransport = (seqUrl: string, seqApiKey?: string) =>
-  new SeqTransportCtor({
+export const createSeqTransport = (seqUrl: string, seqApiKey?: string) => {
+  const seqTransport = new SeqTransportCtor({
     serverUrl: seqUrl,
     apiKey: seqApiKey,
     onError: (error: unknown) => {
@@ -28,6 +28,15 @@ export const createSeqTransport = (seqUrl: string, seqApiKey?: string) =>
       winston.format.json(),
     ),
   });
+
+  if (typeof (seqTransport as any).on === 'function') {
+    (seqTransport as any).on('error', (error: unknown) => {
+      console.error('Seq transport runtime error:', error);
+    });
+  }
+
+  return seqTransport;
+};
 
 export const createAuthLogger = (
   seqUrl = process.env.SEQ_URL,
@@ -79,9 +88,18 @@ export const createAuthLogger = (
     }
   }
 
-  return WinstonModule.createLogger({
+  const logger = WinstonModule.createLogger({
     transports,
     exceptionHandlers,
     rejectionHandlers,
-  });
+    exitOnError: false,
+  }) as any;
+
+  if (typeof logger.on === 'function') {
+    logger.on('error', (error: Error) => {
+      console.error('Winston logger internal error:', error);
+    });
+  }
+
+  return logger;
 };

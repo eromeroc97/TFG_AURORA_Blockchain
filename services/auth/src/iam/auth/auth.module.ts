@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { decodeRsaPrivateKey, decodeRsaPublicKey } from './jwt-key.util';
 
 let cachedTestKeys: { privateKey: string; publicKey: string } | null = null;
 
@@ -36,11 +37,11 @@ const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => 
     throw new Error(`${keyName} is not configured`);
   }
 
-  if (rawValue.includes('BEGIN')) {
-    return rawValue.replace(/\\n/g, '\n');
+  if (keyName.includes('PUBLIC')) {
+    return decodeRsaPublicKey(rawValue, keyName);
   }
 
-  return Buffer.from(rawValue, 'base64').toString('utf8');
+  return decodeRsaPrivateKey(rawValue, keyName);
 };
 
 @Module({

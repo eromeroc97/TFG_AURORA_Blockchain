@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import Recover from './pages/Recover'
 import Register from './pages/Register'
 import Reset from './pages/Reset'
+import TelemetryDashboard from './pages/TelemetryDashboard'
 import MainLayout from './layouts/MainLayout'
 import RequireAuth from './components/routes/RequireAuth'
 
@@ -35,10 +36,13 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/recover" element={<Recover />} />
           <Route path="/reset" element={<Reset />} />
+          <Route path="/reset-password" element={<Reset />} />
+          <Route path="/auth/reset-password" element={<Reset />} />
           <Route path="/error" element={<ErrorPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/telemetry" element={<TelemetryDashboard />} />
               <Route path="/account" element={<AccountPage />} />
             </Route>
           </Route>
