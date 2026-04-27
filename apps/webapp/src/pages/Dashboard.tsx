@@ -12,7 +12,6 @@ import { apiClient } from '../api/axios'
 import AccessMap from '../components/dashboard/AccessMap'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { type AccessMapDevice, type AccessMapEcosystem } from '../components/dashboard/access-map.data'
-import { SECURITY_ALERTS_MOCK } from '../components/dashboard/dashboard.data'
 import { useAuth } from '../context/auth-context'
 
 /**
@@ -489,17 +488,7 @@ export default function Dashboard() {
     return accessibleEcosystems.length
   }, [accessibleEcosystems])
 
-  const securityAlertsCount = useMemo(() => {
-    const canViewAll = role === 'AUDITOR' || role === 'ADMIN' || role === 'GLOBAL_ADMIN'
-
-    if (canViewAll) {
-      return SECURITY_ALERTS_MOCK.length
-    }
-
-    const accessibleEcosystemIds = new Set(accessibleEcosystems.map((ecosystem) => ecosystem.id))
-
-    return SECURITY_ALERTS_MOCK.filter((alert) => accessibleEcosystemIds.has(alert.ecosystemId)).length
-  }, [accessibleEcosystems, role])
+  const securityAlertsCount = useMemo(() => 0, [])
 
   const metrics: DashboardMetric[] = useMemo(
     () => [
