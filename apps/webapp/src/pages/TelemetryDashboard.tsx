@@ -15,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { BarChart3, CircleDashed, TrendingUp, Zap } from 'lucide-react'
+import { BarChart3, TrendingUp, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import auroraLogo from '../assets/aurora-logo.png'
@@ -38,8 +38,6 @@ export default function TelemetryDashboard() {
   const [ecosystemUsage, setEcosystemUsage] = useState<Array<{ name: string; anchors: number }>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const badge = authClaims?.role?.toLowerCase() ?? 'guest'
 
   const normalizeSuccessName = (status: string) => {
     switch (status) {
