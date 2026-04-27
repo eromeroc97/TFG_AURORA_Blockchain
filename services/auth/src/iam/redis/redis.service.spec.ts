@@ -33,7 +33,7 @@ describe('RedisService', () => {
 
   it('uses default redis host and port when env is missing', () => {
     const RedisMock = Redis as unknown as jest.Mock;
-    expect(RedisMock).toHaveBeenCalledWith({ host: 'redis', port: 6379 });
+    expect(RedisMock).toHaveBeenCalledWith({ host: 'redis-auth', port: 6379 });
   });
 
   it('uses redis host and port from env when configured', async () => {

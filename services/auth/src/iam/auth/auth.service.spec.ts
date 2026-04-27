@@ -4,6 +4,10 @@ import { UnauthorizedException } from '@nestjs/common';
 import { UserStatus, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { AuthService } from './auth.service';
+
+jest.mock('./jwt-key.util', () => ({
+  decodeRsaPublicKey: jest.fn().mockReturnValue('mock-parsed-public-key'),
+}));
 import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 

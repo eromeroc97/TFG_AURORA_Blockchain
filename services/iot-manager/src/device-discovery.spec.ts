@@ -68,6 +68,7 @@ describe('DeviceDiscoveryService', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.macvendors.com/AA%3ABB%3ACC%3ADD%3AEE%3A01',
+      expect.any(Object),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
@@ -183,6 +184,7 @@ describe('DeviceDiscoveryService', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.macvendors.com/AA%3ABB%3ACC%3ADD%3AEE%3A01',
+      expect.any(Object),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
@@ -228,6 +230,6 @@ describe('DeviceDiscoveryService', () => {
     const result = await resolveMacVendor('00:EF:01:1C:62:77', fetchMock as unknown as typeof fetch);
 
     expect(result).toBe('Generic Device');
-    expect(fetchMock).toHaveBeenCalledWith('https://api.macvendors.com/00%3AEF%3A01%3A1C%3A62%3A77');
+    expect(fetchMock).toHaveBeenCalledWith('https://api.macvendors.com/00%3AEF%3A01%3A1C%3A62%3A77', expect.any(Object));
   });
 });

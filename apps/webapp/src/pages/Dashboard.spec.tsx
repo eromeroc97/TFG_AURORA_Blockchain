@@ -23,6 +23,21 @@ const mockedApiClient = apiClient as {
 
 const clipboardWriteTextMock = jest.fn().mockResolvedValue(undefined)
 
+const getUserTableRowByEmail = (emailRegex: RegExp): HTMLTableRowElement | null => {
+  return screen
+    .getAllByRole('row')
+    .map((row) => {
+      try {
+        return within(row).getByRole('cell', { name: emailRegex })
+          ? (row as HTMLTableRowElement)
+          : null
+      } catch {
+        return null
+      }
+    })
+    .find((row): row is HTMLTableRowElement => row !== null)
+}
+
 const apiUsers = [
   {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -260,6 +275,10 @@ describe('Dashboard', () => {
         return Promise.resolve({ data: updatedDevice })
       }
 
+      if (url.startsWith('/ecosystems/')) {
+        return Promise.resolve({ data: body as Record<string, unknown> })
+      }
+
       return Promise.reject(new Error(`Unhandled PATCH mock for ${url}`))
     })
     mockedApiClient.delete.mockReset()
@@ -281,7 +300,7 @@ describe('Dashboard', () => {
   it('renders the admin dashboard by default', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
     expect(screen.getByRole('heading', { level: 1, name: /cybersecurity/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: /Gestión de usuarios/i })).toBeInTheDocument()
@@ -292,8 +311,8 @@ describe('Dashboard', () => {
     expect(screen.getByText(/Usuarios activos/i)).toBeInTheDocument()
     expect(screen.getByText(/Usuarios pendientes/i)).toBeInTheDocument()
     expect(screen.getByText(/Usuarios bloqueados/i)).toBeInTheDocument()
-    expect(screen.queryByText(/admin@aurora.local/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/global-admin@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /admin@aurora.local/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /global-admin@aurora.local/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/DID:/i)).not.toBeInTheDocument()
     expect(screen.queryByText('123e4567-e89b-12d3-a456-426614174000')).not.toBeInTheDocument()
     expect(mockedApiClient.get).toHaveBeenCalledWith('/users')
@@ -303,7 +322,7 @@ describe('Dashboard', () => {
   it('does not show revoked in status filter options', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
     const statusFilter = screen.getByRole('combobox', { name: /Estado/i })
     expect(within(statusFilter).queryByRole('option', { name: /Revocado/i })).not.toBeInTheDocument()
@@ -312,7 +331,7 @@ describe('Dashboard', () => {
   it('prevents admin users from seeing GLOBAL_ADMIN role filter option', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
     const roleFilter = screen.getByRole('combobox', { name: /Rol/i })
     expect(within(roleFilter).queryByRole('option', { name: /GLOBAL_ADMIN/i })).not.toBeInTheDocument()
@@ -327,7 +346,7 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
     const roleFilter = screen.getByRole('combobox', { name: /Rol/i })
     expect(within(roleFilter).queryByRole('option', { name: /GLOBAL_ADMIN/i })).not.toBeInTheDocument()
@@ -336,9 +355,9 @@ describe('Dashboard', () => {
   it('allows admin to see ADMIN users but not manage their role or revocation', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/admin2@aurora.local/i)
+    await screen.findByRole('cell', { name: /admin2@aurora.local/i })
 
-    const adminRow = screen.getByText(/admin2@aurora.local/i).closest('tr')
+    const adminRow = getUserTableRowByEmail(/admin2@aurora.local/i)
     expect(adminRow).not.toBeNull()
 
     expect(within(adminRow as HTMLTableRowElement).queryByRole('button', { name: /Cambiar rol/i })).not.toBeInTheDocument()
@@ -349,21 +368,21 @@ describe('Dashboard', () => {
   it('filters users by search term', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
     fireEvent.change(screen.getByPlaceholderText(/Email/i), {
       target: { value: 'user2@aurora.local' },
     })
 
-    expect(screen.getByText(/user2@aurora.local/i)).toBeInTheDocument()
-    expect(screen.queryByText(/user1@aurora.local/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/auditor@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: /user2@aurora.local/i })).toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /user1@aurora.local/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /auditor@aurora.local/i })).not.toBeInTheDocument()
   })
 
   it('filters users by role and status', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
     const roleFilter = screen.getByRole('combobox', { name: /Rol/i })
     const statusFilter = screen.getByRole('combobox', { name: /Estado/i })
@@ -371,9 +390,9 @@ describe('Dashboard', () => {
     fireEvent.change(roleFilter, { target: { value: 'USER' } })
     fireEvent.change(statusFilter, { target: { value: 'PENDING' } })
 
-    expect(screen.getByText(/user2@aurora.local/i)).toBeInTheDocument()
-    expect(screen.queryByText(/user1@aurora.local/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/auditor@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: /user2@aurora.local/i })).toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /user1@aurora.local/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /auditor@aurora.local/i })).not.toBeInTheDocument()
   })
 
   it('renders the user dashboard content', async () => {
@@ -552,8 +571,8 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
-    await screen.findByText(/user2@aurora.local/i)
-    await screen.findByText(/global-admin@aurora.local/i)
+    await screen.findByRole('cell', { name: /user2@aurora.local/i })
+    await screen.findByRole('cell', { name: /global-admin@aurora.local/i })
 
     expect(screen.getByRole('heading', { level: 2, name: /Gestión de usuarios/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: /^Ecosistemas instanciados$/i })).toBeInTheDocument()
@@ -566,14 +585,14 @@ describe('Dashboard', () => {
   it('shows user info action only for active and pending users', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
-    const activeRow = screen.getByText(/user1@aurora.local/i).closest('tr')
-    const pendingRow = screen.getByText(/user2@aurora.local/i).closest('tr')
+    const activeRow = getUserTableRowByEmail(/user1@aurora.local/i)
+    const pendingRow = getUserTableRowByEmail(/user2@aurora.local/i)
 
     expect(activeRow).not.toBeNull()
     expect(pendingRow).not.toBeNull()
-    expect(screen.queryByText(/user3@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /user3@aurora.local/i })).not.toBeInTheDocument()
 
     expect(within(activeRow as HTMLTableRowElement).getByRole('button', { name: /Ver información/i })).toBeInTheDocument()
     expect(within(pendingRow as HTMLTableRowElement).getByRole('button', { name: /Ver información/i })).toBeInTheDocument()
@@ -582,9 +601,9 @@ describe('Dashboard', () => {
   it('opens user information modal for active and pending users', async () => {
     render(<Dashboard />)
 
-    await screen.findByText(/user2@aurora.local/i)
+    await screen.findByRole('cell', { name: /user2@aurora.local/i })
 
-    const pendingRow = screen.getByText(/user2@aurora.local/i).closest('tr')
+    const pendingRow = getUserTableRowByEmail(/user2@aurora.local/i)
     expect(pendingRow).not.toBeNull()
 
     fireEvent.click(within(pendingRow as HTMLTableRowElement).getByRole('button', { name: /Ver información/i }))
@@ -614,9 +633,9 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
-    await screen.findByText(/auditor@aurora.local/i)
+    await screen.findByRole('cell', { name: /auditor@aurora.local/i })
 
-    const row = screen.getByText(/auditor@aurora.local/i).closest('tr')
+    const row = getUserTableRowByEmail(/auditor@aurora.local/i)
     expect(row).not.toBeNull()
 
     fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: /Revocar/i }))
@@ -630,7 +649,7 @@ describe('Dashboard', () => {
       expect(mockedApiClient.delete).toHaveBeenCalledWith('/users/71ac8f45-8d9f-4e03-bfdf-3f0c81a4e7f4')
     })
 
-    expect(screen.queryByText(/auditor@aurora.local/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: /auditor@aurora.local/i })).not.toBeInTheDocument()
   })
 
   it('opens a confirmation modal before approving a pending user', async () => {
@@ -643,7 +662,7 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
-    await screen.findByText(/user2@aurora.local/i)
+    await screen.findByRole('cell', { name: /user2@aurora.local/i })
 
     fireEvent.click(screen.getByRole('button', { name: /Aprobar/i }))
 
@@ -656,7 +675,7 @@ describe('Dashboard', () => {
       expect(mockedApiClient.patch).toHaveBeenCalledWith('/users/8d7f4f2c-3f1a-4e4e-8a2e-123456789abc/approve')
     })
 
-    const row = screen.getByText(/user2@aurora.local/i).closest('tr')
+    const row = getUserTableRowByEmail(/user2@aurora.local/i)
     expect(row).not.toBeNull()
     expect(within(row as HTMLTableRowElement).getByText('Activo')).toBeInTheDocument()
   })
@@ -671,9 +690,9 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
-    const row = screen.getByText(/user1@aurora.local/i).closest('tr')
+    const row = getUserTableRowByEmail(/user1@aurora.local/i)
     expect(row).not.toBeNull()
 
     fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: /Cambiar rol/i }))
@@ -695,7 +714,7 @@ describe('Dashboard', () => {
       })
     })
 
-    const updatedRow = screen.getByText(/user1@aurora.local/i).closest('tr')
+    const updatedRow = getUserTableRowByEmail(/user1@aurora.local/i)
     expect(updatedRow).not.toBeNull()
     expect(within(updatedRow as HTMLTableRowElement).getByText('AUDITOR')).toBeInTheDocument()
   })
@@ -709,7 +728,7 @@ describe('Dashboard', () => {
 
     render(<Dashboard />)
 
-    await screen.findByText(/user1@aurora.local/i)
+    await screen.findByRole('cell', { name: /user1@aurora.local/i })
 
     fireEvent.click(screen.getAllByRole('button', { name: /Cambiar rol/i })[0])
 
@@ -772,7 +791,10 @@ describe('Dashboard', () => {
     fireEvent.change(ecosystemNameInput, { target: { value: 'Hogar Inteligente - Toledo Sur' } })
     fireEvent.click(screen.getByRole('button', { name: /Guardar nombre ecosistema/i }))
 
-    expect((await screen.findAllByText(/Hogar Inteligente - Toledo Sur/i)).length).toBeGreaterThan(0)
+    const updatedNameElements = await screen.findAllByText((content, element) =>
+      element?.textContent?.trim() === 'Hogar Inteligente - Toledo Sur',
+    )
+    expect(updatedNameElements.length).toBeGreaterThan(0)
     expect(screen.getByText(/Nombre del ecosistema actualizado correctamente\./i)).toBeInTheDocument()
   })
 

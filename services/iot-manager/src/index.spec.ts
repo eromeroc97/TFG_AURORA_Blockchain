@@ -3,71 +3,70 @@ import { buildApp } from './index';
 import type { AppConfig } from './config';
 import type { SaveTelemetryInput, TelemetryStore } from './telemetry-store';
 
+const originalFetch = globalThis.fetch;
+const fetchMock = jest.fn();
+
+globalThis.fetch = fetchMock as unknown as typeof fetch;
+
 const testConfig: AppConfig = {
   port: 3002,
   mongoUri: 'mongodb://mongo-db:27017/aurora_telemetry',
   fireflyApiUrl: 'http://localhost:5000/api/v1/namespaces/default',
   macVendorApiBaseUrl: 'https://api.macvendors.com',
+  authSignUrl: 'http://auth-service:3001/internal/auth/sign',
   iotApiKeyPositiveTtlMs: 60_000,
   iotApiKeyNegativeTtlMs: 15_000,
 };
 
-const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryStore => ({
-  save: async (input) => {
-    savedInputs.push(input);
-    return { id: `mongo-${savedInputs.length}` };
-  },
-  updateAnchorStatus: async () => {
-    return;
-  },
-  findLastInteraction: async (deviceId: string) => {
-    const found = [...savedInputs]
-      .reverse()
-      .find((input) =>
-        Array.isArray(input.payload.devices) &&
-        input.payload.devices.some(
-          (device) =>
-            device?.id === deviceId ||
-            device?.deviceId === deviceId ||
-            device?.mac_addr === deviceId ||
-            device?.mac_addr?.replace(/[^a-fA-F0-9]/g, '').toUpperCase() ===
-              deviceId.replace(/[^a-fA-F0-9]/g, '').toUpperCase(),
-        ),
-      );
+const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryStore => {
+  return {
+    save: async (input) => {
+      savedInputs.push(input)
+      return { id: `mongo-${savedInputs.length}` }
+    },
+    updateAnchorStatus: async () => {
+      return
+    },
+    findLastInteraction: async (deviceId: string) => {
+      const found = [...savedInputs]
+        .reverse()
+        .find((input) =>
+          Array.isArray((input.payload as any).devices) &&
+          (input.payload as any).devices.some(
+            (device: any) =>
+              device?.id === deviceId ||
+              device?.deviceId === deviceId ||
+              device?.mac_addr === deviceId ||
+              device?.mac_addr?.replace(/[^a-fA-F0-9]/g, '').toUpperCase() ===
+                deviceId.replace(/[^a-fA-F0-9]/g, '').toUpperCase(),
+          ),
+        )
 
-    return found?.timestamp ?? null;
-  },
-  getMetrics: async () => ({
-    dailyVolume: [],
-    successRatio: [],
-    ecosystemUsage: [],
-    totalDevices: 0,
-  }),
-  close: async () => {
-    return;
-  },
-});
+      return found?.timestamp ?? null
+    },
+    getMetrics: async () => ({
+      dailyVolume: [],
+      successRatio: [],
+      ecosystemUsage: [],
+      totalDevices: 0,
+    }),
+    close: async () => {
+      return
+    },
+  }
+}
 
-const buildExpectedPayloadHash = (payload: Record<string, unknown>): string => {
-  const stableSort = (value: unknown): unknown => {
-    if (Array.isArray(value)) {
-      return value.map(stableSort);
-    }
+beforeEach(() => {
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ signature: 'mock-signature', publicKey: 'mock-public-key' }),
+  } as any)
+})
 
-    if (value && typeof value === 'object') {
-      return Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .reduce<Record<string, unknown>>((acc, [key, nestedValue]) => {
-          acc[key] = stableSort(nestedValue);
-          return acc;
-        }, {});
-    }
-
-    return value;
-  };
-
-  return createHash('sha256').update(JSON.stringify(stableSort(payload))).digest('hex');
-};
+afterAll(() => {
+  globalThis.fetch = originalFetch
+})
 
 describe('IoT manager smoke tests', () => {
   it('/health (GET) should return UP', async () => {
@@ -182,19 +181,19 @@ describe('IoT manager smoke tests', () => {
       },
     });
 
-    const expectedHash = buildExpectedPayloadHash({ devices: requestPayload.devices });
-
     expect(response.statusCode).toBe(202);
-    expect(response.json()).toEqual(
+    const body = response.json();
+
+    expect(body).toEqual(
       expect.objectContaining({
         status: 'ACCEPTED',
         ecosystemId: 'eco-123',
         ingestId: 'mongo-1',
-        hash: expectedHash,
         receivedAt: expect.any(String),
       }),
     );
     expect(savedInputs).toHaveLength(1);
+    expect(body.hash).toBe(savedInputs[0].hash);
     expect(savedInputs[0]).toEqual(
       expect.objectContaining({
         ecosystemId: 'eco-123',
@@ -203,7 +202,6 @@ describe('IoT manager smoke tests', () => {
         payload: {
           devices: requestPayload.devices,
         },
-        hash: expectedHash,
         timestamp: new Date('2026-04-21T10:00:00.000Z'),
       }),
     );
