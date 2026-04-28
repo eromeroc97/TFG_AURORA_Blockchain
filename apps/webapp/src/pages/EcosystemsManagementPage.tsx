@@ -1,19 +1,78 @@
-import { RefreshCcw, ServerCog, TreeDeciduous } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { House, RefreshCcw, TreeDeciduous } from 'lucide-react'
+import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { useEcosystemsController } from '../controllers/useEcosystemsController'
+import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
 
 export default function EcosystemsManagementPage() {
   const { ecosystems, isLoading, error, refreshEcosystems } = useEcosystemsController()
+  const [visibleEcosystems, setVisibleEcosystems] = useState<AccessMapEcosystem[]>(ecosystems)
+  const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
+
+  useEffect(() => {
+    setVisibleEcosystems(ecosystems)
+  }, [ecosystems])
+
+  const sharedEcosystemCount = useMemo(
+    () => visibleEcosystems.filter((eco) => eco.isShared).length,
+    [visibleEcosystems],
+  )
+
+  const geolocatedEcosystemCount = useMemo(
+    () => visibleEcosystems.filter((eco) => typeof eco.lat === 'number' && typeof eco.lng === 'number').length,
+    [visibleEcosystems],
+  )
+
+  const canManageEcosystem = true
+
+  const handleOpenEcosystemModal = (ecosystem: AccessMapEcosystem) => {
+    setSelectedEcosystem(ecosystem)
+  }
+
+  const handleCloseEcosystemModal = () => {
+    setSelectedEcosystem(null)
+  }
+
+  const handleEcosystemUpdated = (ecosystem: AccessMapEcosystem) => {
+    setVisibleEcosystems((current) => current.map((item) => (item.id === ecosystem.id ? ecosystem : item)))
+    if (selectedEcosystem?.id === ecosystem.id) {
+      setSelectedEcosystem(ecosystem)
+    }
+  }
+
+  const handleEcosystemRevoked = (ecosystemId: string) => {
+    setVisibleEcosystems((current) => current.filter((ecosystem) => ecosystem.id !== ecosystemId))
+    if (selectedEcosystem?.id === ecosystemId) {
+      setSelectedEcosystem(null)
+    }
+  }
+
+  const handleDeviceUpdated = (device: { id: string }) => {
+    if (!selectedEcosystem) return
+    setVisibleEcosystems((current) =>
+      current.map((ecosystem) =>
+        ecosystem.id === selectedEcosystem.id
+          ? {
+              ...ecosystem,
+              devices: ecosystem.devices.map((existingDevice) =>
+                existingDevice.id === device.id ? { ...existingDevice, ...device } : existingDevice,
+              ),
+            }
+          : ecosystem,
+      ),
+    )
+  }
 
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="flex items-center gap-3">
-            <ServerCog className="h-6 w-6 text-slate-700" />
+            <House className="h-6 w-6 text-emerald-500" />
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Gestión de ecosistemas</h1>
               <p className="text-slate-600 mt-2">
-                Revisa el estado, la geolocalización y la visibilidad de los ecosistemas registrados.
+                Lista general de ecosistemas registrados y acceso rápido a sus detalles operativos.
               </p>
             </div>
           </div>
@@ -30,58 +89,62 @@ export default function EcosystemsManagementPage() {
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Ecosistemas totales</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{ecosystems.length}</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{visibleEcosystems.length}</p>
           </div>
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Ecosistemas compartidos</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{ecosystems.filter((eco) => eco.isShared).length}</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{sharedEcosystemCount}</p>
           </div>
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Con coordenadas</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{ecosystems.filter((eco) => typeof eco.lat === 'number' && typeof eco.lng === 'number').length}</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{geolocatedEcosystemCount}</p>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
+          <div className="flex items-center gap-3 text-primary">
+            <House className="size-5 text-accent" />
+            <h2 className="font-heading text-xl font-semibold">Ecosistemas instanciados</h2>
+          </div>
+          <p className="mt-3 text-xs text-muted">Lista general de ecosistemas (sin información de dispositivos)</p>
+
           {error ? (
-            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
+            <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
               <p className="font-semibold">Error de carga</p>
               <p className="mt-2">{error}</p>
             </div>
           ) : null}
 
           {isLoading ? (
-            <div className="space-y-4">
+            <div className="mt-6 space-y-4">
               {[1, 2, 3].map((item) => (
-                <div key={item} className="h-14 rounded-3xl bg-slate-100" />
+                <div key={item} className="h-16 rounded-2xl bg-slate-100" />
               ))}
             </div>
-          ) : ecosystems.length === 0 ? (
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
+          ) : visibleEcosystems.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
               <p className="font-medium text-slate-900">No hay ecosistemas disponibles.</p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-3xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm text-slate-700">
-                <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.2em] text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4">Ecosistema</th>
-                    <th className="px-6 py-4">Ubicación</th>
-                    <th className="px-6 py-4">Compartido</th>
-                    <th className="px-6 py-4">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {ecosystems.map((ecosystem) => (
-                    <tr key={ecosystem.id}>
-                      <td className="px-6 py-4 font-medium text-slate-900">{ecosystem.name}</td>
-                      <td className="px-6 py-4">{typeof ecosystem.lat === 'number' && typeof ecosystem.lng === 'number' ? `${ecosystem.lat.toFixed(3)}, ${ecosystem.lng.toFixed(3)}` : 'Sin ubicación'}</td>
-                      <td className="px-6 py-4">{ecosystem.isShared ? 'Sí' : 'No'}</td>
-                      <td className="px-6 py-4 text-slate-900">Sin dato</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-6 space-y-3">
+              {visibleEcosystems.map((ecosystem) => (
+                <button
+                  key={ecosystem.id}
+                  type="button"
+                  onClick={() => handleOpenEcosystemModal(ecosystem)}
+                  className="w-full text-left rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-primary">{ecosystem.name}</p>
+                      <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                    </div>
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
+                      {ecosystem.isShared ? 'Compartido' : 'Privado'}
+                    </span>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -91,14 +154,25 @@ export default function EcosystemsManagementPage() {
             <TreeDeciduous className="h-6 w-6 text-emerald-500" />
             <div>
               <p className="text-sm font-medium text-slate-500">Información adicional</p>
-              <h2 className="text-xl font-semibold">Arquitectura de ecosistemas</h2>
+              <h2 className="text-xl font-semibold">Administración alineada</h2>
             </div>
           </div>
           <p className="mt-4 text-sm leading-6 text-slate-600">
-            Esta vista separa la administración de recursos de la operativa del dashboard principal. Utiliza esta sección para auditar y reconciliar cargas de cada ecosistema.
+            Esta vista está pensada para la auditoría y el mantenimiento de los ecosistemas registrados. Selecciona un ecosistema para ver y editar sus dispositivos, nombre o revocarlo.
           </p>
         </div>
       </div>
+
+      {selectedEcosystem ? (
+        <EcosystemDevicesModal
+          ecosystem={selectedEcosystem}
+          onClose={handleCloseEcosystemModal}
+          onDeviceUpdated={handleDeviceUpdated}
+          onEcosystemUpdated={handleEcosystemUpdated}
+          onEcosystemRevoked={handleEcosystemRevoked}
+          canManageEcosystem={canManageEcosystem}
+        />
+      ) : null}
     </div>
   )
 }

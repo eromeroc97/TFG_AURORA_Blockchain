@@ -96,49 +96,54 @@ export default function UsersManagementPage() {
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-6 grid gap-4 md:grid-cols-3">
-            <label className="block text-sm font-medium text-slate-700">
-              Buscar usuarios
-              <div className="mt-2 flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="mb-6 grid gap-3 md:grid-cols-3">
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Buscar</span>
+              <div className="flex items-center rounded-xl border border-border bg-slate-50 px-3 py-2">
                 <Search className="h-4 w-4 text-slate-400" />
                 <input
+                  type="text"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Buscar por nombre o correo"
+                  placeholder="Buscar por correo"
                   className="ml-2 w-full border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                 />
               </div>
             </label>
 
-            <label className="block text-sm font-medium text-slate-700">
-              Filtrar por rol
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Rol</span>
               <select
                 value={roleFilter}
                 onChange={(event) => setRoleFilter(event.target.value as typeof USER_ROLES[number])}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
               >
                 {USER_ROLES.map((role) => (
                   <option key={role} value={role}>
-                    {role}
+                    {role === 'ALL' ? 'Todos' : role}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label className="block text-sm font-medium text-slate-700">
-              Filtrar por estado
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Estado</span>
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as typeof USER_STATUSES[number])}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
               >
                 {USER_STATUSES.map((status) => (
                   <option key={status} value={status}>
-                    {status}
+                    {status === 'ALL' ? 'Todos' : status}
                   </option>
                 ))}
               </select>
             </label>
+          </div>
+
+          <div className="mb-3 text-xs text-muted">
+            Mostrando {filteredUsers.length} usuario{filteredUsers.length === 1 ? '' : 's'}
           </div>
 
           {error ? (
