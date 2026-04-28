@@ -124,8 +124,9 @@ flowchart TB
     subgraph "Capa 4: Datos"
         DB[(Datos Cifrados<br/>PostgreSQL)]
         CRYPTO[Cifrado en Reposo<br/>AES-256-GCM]
-        DB[(Telemetría no modificable<br/>MongoDB Time Series)]
+        MONGO[(Telemetría no modificable<br/>MongoDB Time Series)]
     end
+
 
     ATACANTE --> FW
     FW --> NETWORK
@@ -134,6 +135,7 @@ flowchart TB
     PROXY --> IOT
     AUTH --> CRYPTO
     CRYPTO --> DB
+    IOT --> MONGO
     
     style ATACANTE fill:#ffcccc,stroke:#ff0000,stroke-width:2px
     style FW fill:#f9e79f,stroke:#333,stroke-width:2px
@@ -141,6 +143,7 @@ flowchart TB
     style AUTH fill:#a9dfbf,stroke:#333,stroke-width:2px
     style CRYPTO fill:#85c1e9,stroke:#333,stroke-width:2px
     style DB fill:#d5dbdb,stroke:#333
+    style MONGO fill:#d5dbdb,stroke:#333
 ```
 
 ### 2.1 Aislamiento de Contenedores (Docker Socket Proxy)
