@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { apiClient } from '../api/axios'
-import Dashboard from './Dashboard'
+import Dashboard from './Dashboard.deprecated'
 
 type MockAuthClaims = {
   sub: string

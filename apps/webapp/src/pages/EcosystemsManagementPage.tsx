@@ -5,7 +5,7 @@ export default function EcosystemsManagementPage() {
   const { ecosystems, isLoading, error, refreshEcosystems } = useEcosystemsController()
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="flex items-center gap-3">
@@ -38,7 +38,7 @@ export default function EcosystemsManagementPage() {
           </div>
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Con coordenadas</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{ecosystems.filter((eco) => eco.lat !== null && eco.lng !== null).length}</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{ecosystems.filter((eco) => typeof eco.lat === 'number' && typeof eco.lng === 'number').length}</p>
           </div>
         </div>
 
@@ -75,7 +75,7 @@ export default function EcosystemsManagementPage() {
                   {ecosystems.map((ecosystem) => (
                     <tr key={ecosystem.id}>
                       <td className="px-6 py-4 font-medium text-slate-900">{ecosystem.name}</td>
-                      <td className="px-6 py-4">{ecosystem.lat !== null && ecosystem.lng !== null ? `${ecosystem.lat.toFixed(3)}, ${ecosystem.lng.toFixed(3)}` : 'Sin ubicación'}</td>
+                      <td className="px-6 py-4">{typeof ecosystem.lat === 'number' && typeof ecosystem.lng === 'number' ? `${ecosystem.lat.toFixed(3)}, ${ecosystem.lng.toFixed(3)}` : 'Sin ubicación'}</td>
                       <td className="px-6 py-4">{ecosystem.isShared ? 'Sí' : 'No'}</td>
                       <td className="px-6 py-4 text-slate-900">Sin dato</td>
                     </tr>

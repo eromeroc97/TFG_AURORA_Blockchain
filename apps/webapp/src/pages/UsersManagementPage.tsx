@@ -1,15 +1,47 @@
 import { useMemo, useState } from 'react'
 import { RefreshCcw, Search, Users } from 'lucide-react'
 import { useUsersController } from '../controllers/useUsersController'
+import { useAuth } from '../context/auth-context'
 
 const USER_ROLES = ['ALL', 'USER', 'AUDITOR', 'ADMIN'] as const
 const USER_STATUSES = ['ALL', 'ACTIVE', 'PENDING', 'PASSBLOCK'] as const
 
 export default function UsersManagementPage() {
   const { users, isLoading, error, refreshUsers } = useUsersController()
+  const { authClaims } = useAuth()
+  const role = (authClaims?.role ?? 'USER').toUpperCase()
+  const isGlobalAdmin = role === 'GLOBAL_ADMIN'
   const [roleFilter, setRoleFilter] = useState<(typeof USER_ROLES)[number]>('ALL')
   const [statusFilter, setStatusFilter] = useState<(typeof USER_STATUSES)[number]>('ALL')
   const [searchTerm, setSearchTerm] = useState('')
+
+  const canManageAdministratorUser = (user: { role: string }) => isGlobalAdmin || user.role !== 'ADMIN'
+  const canViewUserInfo = (user: { status: string }) => user.status === 'ACTIVE' || user.status === 'PENDING'
+  const canRevokeUser = (user: { status: string; role: string }) => user.status !== 'REVOKED' && canManageAdministratorUser(user)
+  const canChangeUserRole = (user: { status: string; role: string }) => user.status === 'ACTIVE' && canManageAdministratorUser(user)
+
+  const handleShowUserInfo = (user: { email: string; role: string; status: string }) => {
+    window.alert(`Usuario: ${user.email}\nRol: ${user.role}\nEstado: ${user.status}`)
+  }
+
+  const handleRoleChange = (user: { email: string; role: string }) => {
+    const nextRole = window.prompt(`Nuevo rol para ${user.email} (USER/AUDITOR/ADMIN):`, user.role)
+
+    if (!nextRole) {
+      return
+    }
+
+    if (!['USER', 'AUDITOR', 'ADMIN'].includes(nextRole.toUpperCase())) {
+      window.alert('Rol inválido. Usa USER, AUDITOR o ADMIN.')
+      return
+    }
+
+    window.alert(`Cambio de rol solicitado para ${user.email}: ${nextRole.toUpperCase()}`)
+  }
+
+  const handleUserAction = (user: { email: string }, action: 'approve' | 'revoke') => {
+    window.alert(`${action === 'approve' ? 'Aprobar' : 'Revocar'} usuario ${user.email}`)
+  }
 
   const filteredUsers = useMemo(
     () =>
@@ -26,7 +58,7 @@ export default function UsersManagementPage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="flex items-center gap-3">
@@ -131,19 +163,76 @@ export default function UsersManagementPage() {
               <table className="min-w-full divide-y divide-slate-200 text-sm text-slate-700">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.2em] text-slate-500">
                   <tr>
-                    <th className="px-6 py-4">Nombre</th>
                     <th className="px-6 py-4">Correo</th>
                     <th className="px-6 py-4">Rol</th>
                     <th className="px-6 py-4">Estado</th>
+                    <th className="px-6 py-4">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {filteredUsers.map((user) => (
                     <tr key={user.id}>
-                      <td className="px-6 py-4 font-medium text-slate-900">{user.name}</td>
-                      <td className="px-6 py-4">{user.email}</td>
-                      <td className="px-6 py-4">{user.role}</td>
-                      <td className="px-6 py-4">{user.status}</td>
+                      <td className="px-6 py-4 font-medium text-slate-900">{user.email}</td>
+                      <td className="px-6 py-4">
+                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary">
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`text-xs font-medium px-2 py-1 rounded-full ${
+                            user.status === 'ACTIVE'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : user.status === 'PENDING'
+                                ? 'bg-amber-100 text-amber-700'
+                                : user.status === 'PASSBLOCK'
+                                  ? 'bg-slate-100 text-slate-700'
+                                  : 'bg-rose-100 text-rose-700'
+                          }`}
+                        >
+                          {user.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          {canViewUserInfo(user) && (
+                            <button
+                              type="button"
+                              onClick={() => handleShowUserInfo(user)}
+                              className="text-xs px-2 py-1 rounded hover:bg-sky-100 hover:text-sky-700 transition-colors text-sky-600"
+                            >
+                              Ver información
+                            </button>
+                          )}
+                          {canChangeUserRole(user) && (
+                            <button
+                              type="button"
+                              onClick={() => handleRoleChange(user)}
+                              className="text-xs px-2 py-1 rounded hover:bg-slate-100 hover:text-slate-700 transition-colors text-slate-600"
+                            >
+                              Cambiar rol
+                            </button>
+                          )}
+                          {user.status === 'PENDING' && (
+                            <button
+                              type="button"
+                              onClick={() => handleUserAction(user, 'approve')}
+                              className="text-xs px-2 py-1 rounded hover:bg-emerald-100 hover:text-emerald-700 transition-colors text-emerald-600"
+                            >
+                              Aprobar
+                            </button>
+                          )}
+                          {canRevokeUser(user) && (
+                            <button
+                              type="button"
+                              onClick={() => handleUserAction(user, 'revoke')}
+                              className="text-xs px-2 py-1 rounded hover:bg-rose-100 hover:text-rose-700 transition-colors text-rose-600"
+                            >
+                              Revocar
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

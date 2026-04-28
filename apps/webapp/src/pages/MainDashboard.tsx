@@ -14,7 +14,7 @@ export default function MainDashboard() {
   const hasData = !telemetryError && data.dailyVolume.length > 0
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>

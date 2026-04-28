@@ -30,7 +30,7 @@ describe('TelemetryDashboard page', () => {
       refreshMetrics: jest.fn(),
     })
 
-    const TelemetryDashboard = require('./TelemetryDashboard').default
+    const TelemetryDashboard = require('./TelemetryDashboard.deprecated').default
 
     render(<TelemetryDashboard />)
 
@@ -51,7 +51,7 @@ describe('TelemetryDashboard page', () => {
       refreshMetrics: jest.fn(),
     })
 
-    const TelemetryDashboard = require('./TelemetryDashboard').default
+    const TelemetryDashboard = require('./TelemetryDashboard.deprecated').default
 
     try {
       render(<TelemetryDashboard />)
@@ -78,7 +78,7 @@ describe('TelemetryDashboard page', () => {
       refreshMetrics: jest.fn(),
     })
 
-    const TelemetryDashboard = require('./TelemetryDashboard').default
+    const TelemetryDashboard = require('./TelemetryDashboard.deprecated').default
     const { container } = render(<TelemetryDashboard />)
 
     expect(screen.getByRole('button', { name: /Actualizar/i })).toBeInTheDocument()

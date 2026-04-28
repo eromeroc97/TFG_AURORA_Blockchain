@@ -80,7 +80,7 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
   const sourceNodes = ecosystems ?? ACCESS_MAP_ECOSYSTEMS_MOCK
   const mapNodes = sourceNodes.filter(
     (node): node is AccessMapEcosystem & { lat: number; lng: number } =>
-      node.lat !== null && node.lng !== null,
+      node.lat != null && node.lng != null,
   )
 
   const visibleNodes = useMemo(() => {
@@ -132,7 +132,9 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
               <div className="space-y-2 text-primary">
                 <p className="text-sm font-semibold">{node.name}</p>
                 <p className="text-xs text-muted">
-                  Ubicación: {node.lat.toFixed(3)}, {node.lng.toFixed(3)}
+                  Ubicación: {typeof node.lat === 'number' && typeof node.lng === 'number'
+                    ? `${node.lat.toFixed(3)}, ${node.lng.toFixed(3)}`
+                    : 'No disponible'}
                 </p>
 
                 {canViewDevices(node) ? (
