@@ -20,6 +20,12 @@ services:
       - "traefik.http.routers.auth.middlewares=auth-strip"
       - "traefik.http.routers.auth-internal.service=auth"
       - "traefik.http.routers.auth-internal.priority=200"
+      - "traefik.http.routers.auth-health.rule=PathPrefix(`/api/auth/health`)"
+      - "traefik.http.routers.auth-health.entrypoints=web"
+      - "traefik.http.routers.auth-health.priority=201"
+      - "traefik.http.routers.auth-health.service=auth"
+      - "traefik.http.middlewares.auth-health-strip.stripprefix.prefixes=/api/auth"
+      - "traefik.http.routers.auth-health.middlewares=auth-health-strip"
       - "traefik.docker.network=aurora-secure-net"
     networks:
       - aurora-secure-net
@@ -73,6 +79,12 @@ services:
       - "traefik.http.services.telemetry.loadbalancer.server.port=3002"
       - "traefik.http.middlewares.telemetry-strip.stripprefix.prefixes=/api/telemetry,/api/iot"
       - "traefik.http.routers.telemetry.middlewares=telemetry-strip"
+      - "traefik.http.routers.telemetry-health.rule=PathPrefix(`/api/iot/health`) || PathPrefix(`/api/telemetry/health`)"
+      - "traefik.http.routers.telemetry-health.entrypoints=web"
+      - "traefik.http.routers.telemetry-health.priority=202"
+      - "traefik.http.routers.telemetry-health.service=telemetry"
+      - "traefik.http.middlewares.telemetry-health-strip.stripprefix.prefixes=/api/iot,/api/telemetry"
+      - "traefik.http.routers.telemetry-health.middlewares=telemetry-health-strip"
       - "traefik.docker.network=aurora-secure-net"
     networks:
       - aurora-secure-net

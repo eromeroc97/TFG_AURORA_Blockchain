@@ -319,12 +319,23 @@ export const buildApp = (options: AppOptions = {}) => {
     }
   });
 
-  app.get('/health', async () => {
-    return {
-      status: 'UP',
-      service: 'iot-manager',
-    };
-  });
+  app.options('/health', async (_, reply) => {
+    reply
+      .header('Access-Control-Allow-Origin', '*')
+      .header('Access-Control-Allow-Methods', 'GET,OPTIONS')
+      .header('Access-Control-Allow-Headers', 'Content-Type,Accept')
+      .send()
+  })
+
+  app.get('/health', async (_, reply) => {
+    reply
+      .header('Access-Control-Allow-Origin', '*')
+      .code(200)
+      .send({
+        status: 'UP',
+        service: 'iot-manager',
+      })
+  })
 
   const sendLastInteractionResponse = async (
     reply: FastifyReply,

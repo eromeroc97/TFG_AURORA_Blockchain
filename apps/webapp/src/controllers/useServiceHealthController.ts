@@ -29,6 +29,11 @@ const serviceDefinitions = [
     name: 'Autenticación',
     envKey: 'VITE_AUTH_HEALTH_URL',
   },
+  {
+    id: 'audit',
+    name: 'Auditoría',
+    envKey: 'VITE_AUDIT_HEALTH_URL',
+  },
 ]
 
 const getHealthUrl = (envKey: string) => (import.meta.env as Record<string, string | undefined>)[envKey] ?? ''
@@ -39,11 +44,25 @@ const checkServiceHealth = async (url: string): Promise<{ status: 'Online' | 'Of
   }
 
   try {
-    const response = await fetch(url, { method: 'GET' })
-    if (response.ok) {
-      return { status: 'Online' }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      return { status: 'Offline', message: `HTTP ${response.status}` }
     }
-    return { status: 'Offline', message: `HTTP ${response.status}` }
+
+    const data = await response.json().catch(() => null)
+    if (data && typeof data.status === 'string') {
+      return data.status.toUpperCase() === 'UP'
+        ? { status: 'Online' }
+        : { status: 'Offline', message: `Estado ${data.status}` }
+    }
+
+    return { status: 'Online' }
   } catch (error) {
     return { status: 'Offline', message: 'No disponible' }
   }
