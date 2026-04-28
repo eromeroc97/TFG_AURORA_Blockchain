@@ -1,0 +1,26 @@
+{
+  "latitude": 40.633000,
+  "longitude": -3.170000,
+  "devices": [
+    {
+      "mac_addr": "AA:BB:CC:11:22:33",
+      "device_id": "env-guadalajara-02",
+      "type": "humidity",
+      "battery_level": 77,
+      "signal_strength": -61,
+      "status": "active",
+      "location_description": "Parque del Palacio",
+      "last_seen": "2026-04-28T11:42:52Z"
+    },
+    {
+      "mac_addr": "DE:AD:BE:EF:66:77",
+      "device_id": "gate-guadalajara-05",
+      "type": "door",
+      "battery_level": 54,
+      "signal_strength": -70,
+      "status": "closed",
+      "location_description": "Entrada principal",
+      "last_seen": "2026-04-28T11:50:17Z"
+    }
+  ]
+}

@@ -1,5 +1,10 @@
-Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-2TIQtvwx7YXBa6oT5q26QfoBpeqmHQbGBmzjF2ylZko' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/01-test.json' -UseBasicParsing
+Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-dXN5P0WcZjNA4jBZLCg__PKU3ah7Z-xaTsJD9rzh_r0' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/01-test.json' -UseBasicParsing
 
+
+Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-9jH-zKejzlqdMsbufRHh9QTLIabbRtETdFiyuADNjo8' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/02-test.json' -UseBasicParsing
+
+
+Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-GX2lsmJvw-YnZDBsRZlqTMx8g_OJm6EbIJKML8wg83E' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/02-test.json' -UseBasicParsing
 
 docker-compose up -d --build webapp
 
