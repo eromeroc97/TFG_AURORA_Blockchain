@@ -12,13 +12,13 @@ La topología está diseñada alrededor de un **API Gateway** basado en Traefik,
 
 Además, la infraestructura incluye componentes auxiliares para datos, cache, logging y administración.
 
-## 2. Diagrama de Contexto y Entorno
+## 2. Diagrama de Arquitectura
 
 ```mermaid
 
 graph TB
     subgraph "Red Externa"
-        USUARIO[Usuario/Investigador]
+        USUARIO[Usuario]
         DISPOSITIVO_IoT[Dispositivo IoT]
         MAC_VENDOR_API[API MacVendors]
     end
@@ -88,11 +88,11 @@ El archivo `docker-compose.yml` define la siguiente topología de servicios:
 | **postgres-db** | postgres:15-alpine | 127.0.0.1:5432 | Base de datos relacional para auth-service |
 | **mongo-db** | mongo:7.0 | interno | Almacenamiento de telemetría |
 | **redis-auth** | redis:7-alpine | 6379 | Cache de auth-service y blacklist de tokens |
-| **redis-iot** | redis:7-alpine | 6380 | Cache de API keys del IoT Manager |
+| **redis-iot** | redis:7-alpine | 6380 | Cache de API keys del IoT Manager, reducción de carga de peticiones de validación |
 | **seq** | datalust/seq:latest | 5341, 8081 | Centralización de logs |
 | **mailpit** | axllent/mailpit | 1025, 8025 | SMTP y web UI para pruebas de correo |
-| **mongo-express** | mongo-express | 127.0.0.1:8090 | Administración MongoDB |
-| **redis-commander** | rediscommander | 127.0.0.1:8091 | Administración Redis |
+| **mongo-express** | mongo-express | 127.0.0.1:8090 | Administración MongoDB - a eliminar en producción |
+| **redis-commander** | rediscommander | 127.0.0.1:8091 | Administración Redis - a eliminar en producción |
 | **docker-socket-proxy** | tecnativa/docker-socket-proxy | interno | Proxy para acceso seguro de Traefik al socket Docker |
 
 **Decisiones de Seguridad en la Red:**
@@ -174,11 +174,11 @@ graph TB
 | **AuthModule** | Gestión de autenticación JWT, login, logout, refresh tokens, recuperación de contraseña mediante tokens de un solo uso (OTP). Implementa guardias de roles con Passport-JWT. |
 | **UsersModule** | CRUD de usuarios, hashing de contraseñas con Argon2, gestión de estados y refresh tokens. |
 | **EcosystemsModule** | Gestión de ecosistemas IoT, creación y validación de API keys, firma de hashes con Ed25519. |
-| **DevicesModule** | Registro y actualización de dispositivos vinculados a ecosistemas, búsqueda por MAC address y vendor. |
+| **DevicesModule** | Registro y actualización de dispositivos vinculados a ecosistemas. |
 | **RedisModule** | Cache de datos y blacklist de tokens revocados. |
-| **CryptoModule** | Criptografía central para firmas Ed25519, AES-256-GCM y hashing SHA-256. |
-| **BlockchainModule** | Integración con FireFly para broadcast de anchors y transacciones blockchain (mock en desarrollo). |
-| **MailModule** | Envío de correos transaccionales mediante Nodemailer y Mailpit. |
+| **CryptoModule** | Criptografía central para firmas Ed25519, AES-256-GCM y hashing SHA-256 para blockchain. |
+| **BlockchainModule** | Integración con FireFly para broadcast de anchors y transacciones blockchain (en desarrollo). |
+| **MailModule** | Envío de correos transaccionales mediante Nodemailer. |
 | **PrismaService** | Acceso a PostgreSQL con Prisma ORM, migraciones y seed. |
 
 #### IoT Manager (Fastify - Puerto 3002)
@@ -294,7 +294,7 @@ sequenceDiagram
 ### Librerías de Seguridad y Redes Críticas
 
 #### Auth Service (package.json)
-- `@nestjs/jwt`, `passport-jwt`: JWT RS256 y guardias de autenticación.
+- `@nestjs/jwt`, `passport-jwt`: JWT RSA2048 y Passport.
 - `argon2`: Hashing de contraseñas.
 - `axios`: Llamadas HTTP entre servicios.
 - `@prisma/client`: ORM PostgreSQL.
