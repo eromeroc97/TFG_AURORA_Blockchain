@@ -71,112 +71,114 @@ export default function TelemetryDashboard() {
           </div>
         ) : null}
 
-        {!isLoading && !error && data.dailyVolume.length === 0 && data.successRatio.length === 0 && data.ecosystemUsage.length === 0 ? (
-          <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-8 text-slate-700 shadow-sm">
-            <p className="text-lg font-semibold text-slate-900">Sin métricas disponibles</p>
-            <p className="mt-2 text-slate-600">
-              No se ha registrado telemetría en las últimas 24 horas para los ecosistemas disponibles.
-            </p>
-          </div>
-        ) : isLoading ? (
-          <div className="space-y-6">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className="animate-pulse rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 h-6 w-40 rounded-full bg-slate-200" />
-                <div className="space-y-3">
-                  <div className="h-48 rounded-3xl bg-slate-100" />
-                  <div className="h-4 w-3/4 rounded-full bg-slate-200" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4 text-slate-900">
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="h-7 w-7 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Volumen transaccional</p>
-                    <h2 className="text-xl font-semibold text-slate-900">Últimas 24 horas</h2>
+        {!error ? (
+          !isLoading && data.dailyVolume.length === 0 && data.successRatio.length === 0 && data.ecosystemUsage.length === 0 ? (
+            <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-8 text-slate-700 shadow-sm">
+              <p className="text-lg font-semibold text-slate-900">Sin métricas disponibles</p>
+              <p className="mt-2 text-slate-600">
+                No se ha registrado telemetría en las últimas 24 horas para los ecosistemas disponibles.
+              </p>
+            </div>
+          ) : isLoading ? (
+            <div className="space-y-6">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="animate-pulse rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="mb-6 h-6 w-40 rounded-full bg-slate-200" />
+                  <div className="space-y-3">
+                    <div className="h-48 rounded-3xl bg-slate-100" />
+                    <div className="h-4 w-3/4 rounded-full bg-slate-200" />
                   </div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                  <p className="font-medium text-slate-900">Total dispositivos</p>
-                  <p className="mt-1 text-lg font-semibold">{data.totalDevices}</p>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4 text-slate-900">
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="h-7 w-7 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Volumen transaccional</p>
+                      <h2 className="text-xl font-semibold text-slate-900">Últimas 24 horas</h2>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <p className="font-medium text-slate-900">Total dispositivos</p>
+                    <p className="mt-1 text-lg font-semibold">{data.totalDevices}</p>
+                  </div>
+                </div>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data.dailyVolume} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
+                      <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                      <Area type="monotone" dataKey="tx" stroke="#2563eb" fill="url(#volumeGradient)" fillOpacity={1} />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.dailyVolume} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
-                    <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                    <Area type="monotone" dataKey="tx" stroke="#2563eb" fill="url(#volumeGradient)" fillOpacity={1} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-4 text-slate-900">
-                <TrendingUp className="h-7 w-7 text-emerald-500" />
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Tasa de éxito</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Anclajes vs fallos</h2>
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 text-slate-900">
+                  <TrendingUp className="h-7 w-7 text-emerald-500" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">Tasa de éxito</p>
+                    <h2 className="text-xl font-semibold text-slate-900">Anclajes vs fallos</h2>
+                  </div>
+                </div>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={data.successRatio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={48} paddingAngle={4}>
+                        {data.successRatio.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.name === 'Anclajes OK' ? '#14b8a6' : entry.name === 'Fallidos' ? '#f97316' : '#a855f7'}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                      <Legend verticalAlign="bottom" height={36} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={data.successRatio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={48} paddingAngle={4}>
-                      {data.successRatio.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.name === 'Anclajes OK' ? '#14b8a6' : entry.name === 'Fallidos' ? '#f97316' : '#a855f7'}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                    <Legend verticalAlign="bottom" height={36} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-4 text-slate-900">
-                <Zap className="h-7 w-7 text-violet-600" />
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Top ecosistemas</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Anclajes por red</h2>
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 text-slate-900">
+                  <Zap className="h-7 w-7 text-violet-600" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">Top ecosistemas</p>
+                    <h2 className="text-xl font-semibold text-slate-900">Anclajes por red</h2>
+                  </div>
+                </div>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.ecosystemUsage} layout="vertical" margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
+                      <XAxis type="number" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#0f172a', fontSize: 13 }} />
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                      <Bar dataKey="anchors" radius={[8, 8, 8, 8]} fill="#7c3aed">
+                        {data.ecosystemUsage.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#7c3aed' : '#a855f7'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.ecosystemUsage} layout="vertical" margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
-                    <XAxis type="number" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#0f172a', fontSize: 13 }} />
-                    <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                    <Bar dataKey="anchors" radius={[8, 8, 8, 8]} fill="#7c3aed">
-                      {data.ecosystemUsage.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#7c3aed' : '#a855f7'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
             </div>
-          </div>
-        )}
+          )
+        ) : null}
 
         <footer className="mt-6 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted">

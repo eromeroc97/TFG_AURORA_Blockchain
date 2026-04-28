@@ -1,5 +1,5 @@
 import { apiClient } from '../api/axios'
-import { TelemetryMetrics } from '../models/telemetry.model'
+import type { TelemetryMetrics } from '../models/telemetry.model'
 
 export async function getTelemetryMetrics(): Promise<TelemetryMetrics> {
   const response = await apiClient.get<TelemetryMetrics>('/api/telemetry/v1/metrics')

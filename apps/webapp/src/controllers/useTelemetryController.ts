@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getTelemetryMetrics } from '../services/telemetry.service'
-import { TelemetryMetrics, SuccessRatioItem } from '../models/telemetry.model'
+import type { TelemetryMetrics, SuccessRatioItem } from '../models/telemetry.model'
 
 const normalizeSuccessName = (status: string) => {
   switch (status) {
