@@ -1,5 +1,3 @@
-import axios from 'axios'
-import { useCallback, useEffect, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -16,8 +14,8 @@ import {
   YAxis,
 } from 'recharts'
 import { BarChart3, TrendingUp, Zap } from 'lucide-react'
-import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
+import { useTelemetryController } from '../controllers/useTelemetryController'
 import auroraLogo from '../assets/aurora-logo.png'
 import gsyaLogo from '../assets/gsya_logo.png'
 import uclmLogo from '../assets/uclm_logo.png'
@@ -32,72 +30,9 @@ import clmLogo from '../assets/CLM.png'
  * tasa de éxito de anclaje y top ecosistemas.
  */
 export default function TelemetryDashboard() {
-  const { accessToken, authClaims } = useAuth()
+  const { authClaims } = useAuth()
   const isUser = authClaims?.role === 'USER'
-  const [dailyVolume, setDailyVolume] = useState<Array<{ hour: string; tx: number }>>([])
-  const [successRatio, setSuccessRatio] = useState<Array<{ name: string; value: number }>>([])
-  const [ecosystemUsage, setEcosystemUsage] = useState<Array<{ name: string; anchors: number }>>([])
-  const [totalDevices, setTotalDevices] = useState<number>(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const normalizeSuccessName = (status: string) => {
-    switch (status) {
-      case 'ANCHORED':
-        return 'Anclajes OK'
-      case 'PENDING_ANCHOR':
-        return 'Pendientes'
-      case 'FAILED':
-        return 'Fallidos'
-      default:
-        return status
-    }
-  }
-
-  const fetchMetrics = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      if (!accessToken || !authClaims) {
-        throw new Error('No autorizado para ver métricas de telemetría')
-      }
-
-      const response = await apiClient.get('/telemetry/v1/metrics')
-
-      const data = response.data as {
-        dailyVolume: Array<{ hour: string; tx: number }>
-        successRatio: Array<{ name: string; value: number }>
-        ecosystemUsage: Array<{ name: string; anchors: number }>
-        totalDevices: number
-      }
-
-      setDailyVolume(data.dailyVolume ?? [])
-      setSuccessRatio(
-        (data.successRatio ?? []).map((metric) => ({
-          name: normalizeSuccessName(metric.name),
-          value: metric.value,
-        })),
-      )
-      setEcosystemUsage(data.ecosystemUsage ?? [])
-      setTotalDevices(data.totalDevices ?? 0)
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        setError(null)
-      } else {
-        setError('No se pudieron cargar las métricas. Intenta de nuevo más tarde.')
-      }
-      setDailyVolume([])
-      setSuccessRatio([])
-      setEcosystemUsage([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [accessToken])
-
-  useEffect(() => {
-    void fetchMetrics()
-  }, [fetchMetrics])
+  const { data, isLoading, error, refreshMetrics } = useTelemetryController()
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -112,7 +47,7 @@ export default function TelemetryDashboard() {
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={fetchMetrics}
+              onClick={refreshMetrics}
               className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               Actualizar
@@ -136,7 +71,7 @@ export default function TelemetryDashboard() {
           </div>
         ) : null}
 
-        {!isLoading && !error && dailyVolume.length === 0 && successRatio.length === 0 && ecosystemUsage.length === 0 ? (
+        {!isLoading && !error && data.dailyVolume.length === 0 && data.successRatio.length === 0 && data.ecosystemUsage.length === 0 ? (
           <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-8 text-slate-700 shadow-sm">
             <p className="text-lg font-semibold text-slate-900">Sin métricas disponibles</p>
             <p className="mt-2 text-slate-600">
@@ -168,12 +103,12 @@ export default function TelemetryDashboard() {
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
                   <p className="font-medium text-slate-900">Total dispositivos</p>
-                  <p className="mt-1 text-lg font-semibold">{totalDevices}</p>
+                  <p className="mt-1 text-lg font-semibold">{data.totalDevices}</p>
                 </div>
               </div>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={dailyVolume} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
+                  <AreaChart data={data.dailyVolume} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
@@ -201,8 +136,8 @@ export default function TelemetryDashboard() {
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={successRatio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={48} paddingAngle={4}>
-                      {successRatio.map((entry, index) => (
+                    <Pie data={data.successRatio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={48} paddingAngle={4}>
+                      {data.successRatio.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={entry.name === 'Anclajes OK' ? '#14b8a6' : entry.name === 'Fallidos' ? '#f97316' : '#a855f7'}
@@ -226,13 +161,13 @@ export default function TelemetryDashboard() {
               </div>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={ecosystemUsage} layout="vertical" margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <BarChart data={data.ecosystemUsage} layout="vertical" margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
                     <XAxis type="number" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#0f172a', fontSize: 13 }} />
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
                     <Bar dataKey="anchors" radius={[8, 8, 8, 8]} fill="#7c3aed">
-                      {ecosystemUsage.map((_, index) => (
+                      {data.ecosystemUsage.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#7c3aed' : '#a855f7'} />
                       ))}
                     </Bar>
