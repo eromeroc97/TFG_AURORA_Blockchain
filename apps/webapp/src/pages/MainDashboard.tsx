@@ -36,6 +36,26 @@ export default function MainDashboard() {
 
   const ranges: TelemetryRange[] = ['30m', '1h', '12h', '24h', '1w', '1M', '1y']
 
+  const totalInformationBytes = data.dailyVolume.reduce((sum, item) => sum + item.tx, 0) * 1024
+
+  const formatBytes = (bytes: number) => {
+    const absBytes = Math.max(0, bytes)
+    if (absBytes < 1024) {
+      return `${absBytes} B`
+    }
+
+    const units = ['KB', 'MB', 'GB', 'TB']
+    let value = absBytes / 1024
+    let unitIndex = 0
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024
+      unitIndex += 1
+    }
+
+    return `${value.toFixed(1)} ${units[unitIndex]}`
+  }
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
@@ -66,27 +86,54 @@ export default function MainDashboard() {
         <div className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
           <section className="space-y-6">
             {isAdminOrGlobalAdmin ? (
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center gap-3 text-slate-900">
-                  <MapPin className="h-6 w-6 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Mapa de ecosistemas</p>
-                    <h2 className="text-xl font-semibold">Acceso y presencia geográfica</h2>
+              <>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 text-slate-900">
+                    <MapPin className="h-6 w-6 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Mapa de ecosistemas</p>
+                      <h2 className="text-xl font-semibold">Acceso y presencia geográfica</h2>
+                    </div>
+                  </div>
+                  <div className="mt-5">
+                    {mapError ? (
+                      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+                        <p className="font-semibold">Error al cargar los ecosistemas</p>
+                        <p className="mt-2">{mapError}</p>
+                      </div>
+                    ) : isMapLoading ? (
+                      <div className="h-[520px] rounded-[1.25rem] bg-slate-100" />
+                    ) : (
+                      <AccessMap ecosystems={ecosystems} />
+                    )}
                   </div>
                 </div>
-                <div className="mt-5">
-                  {mapError ? (
-                    <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
-                      <p className="font-semibold">Error al cargar los ecosistemas</p>
-                      <p className="mt-2">{mapError}</p>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 text-slate-900">
+                    <Zap className="h-6 w-6 text-violet-600" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Volumen de información generado</p>
                     </div>
-                  ) : isMapLoading ? (
-                    <div className="h-[520px] rounded-[1.25rem] bg-slate-100" />
-                  ) : (
-<AccessMap ecosystems={ecosystems} />
-                  )}
+                  </div>
+                  <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
+                    <p className="text-sm text-slate-500">Rango actual: {range === '30m'
+                      ? 'Últimos 30 minutos'
+                      : range === '1h'
+                        ? 'Última hora'
+                        : range === '12h'
+                          ? 'Últimas 12 horas'
+                          : range === '24h'
+                            ? 'Últimas 24 horas'
+                            : range === '1w'
+                              ? 'Última semana'
+                              : range === '1M'
+                                ? 'Último mes'
+                                : 'Último año'}</p>
+                    <p className="mt-3 text-4xl font-semibold text-slate-900">{formatBytes(totalInformationBytes)}</p>
+                  </div>
                 </div>
-              </div>
+              </>
             ) : null}
           </section>
 
@@ -96,7 +143,6 @@ export default function MainDashboard() {
                 <BarChart3 className="h-6 w-6 text-slate-700" />
                 <div>
                   <p className="text-sm font-medium text-slate-500">Estado Global</p>
-                  <h2 className="text-xl font-semibold">Resumen</h2>
                 </div>
               </div>
 
@@ -128,7 +174,6 @@ export default function MainDashboard() {
                 <Zap className="h-6 w-6 text-fuchsia-600" />
                 <div>
                   <p className="text-sm font-medium text-slate-500">Estado operativo</p>
-                  <h2 className="text-xl font-semibold">Disponibilidad</h2>
                 </div>
               </div>
 

@@ -11,18 +11,23 @@ type ServiceHealth = {
 const serviceDefinitions = [
   {
     id: 'firefly',
-    name: 'Servicio Blockchain',
+    name: 'Blockchain Fabric',
     envKey: 'VITE_FIREFLY_HEALTH_URL',
   },
   {
     id: 'threadIntelligence',
-    name: 'Servicio Thread Intelligence',
+    name: 'Thread Intelligence',
     envKey: 'VITE_THREAD_INTELLIGENCE_HEALTH_URL',
   },
   {
     id: 'iotManager',
-    name: 'Servicio Ingesta y Descubrimiento',
+    name: 'Ingesta y Descubrimiento',
     envKey: 'VITE_IOT_MANAGER_HEALTH_URL',
+  },
+  {
+    id: 'auth',
+    name: 'Autenticación',
+    envKey: 'VITE_AUTH_HEALTH_URL',
   },
 ]
 
