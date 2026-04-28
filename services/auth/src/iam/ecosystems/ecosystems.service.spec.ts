@@ -1,7 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { createCipheriv, randomBytes } from 'crypto';
-import { EcosystemStatus, IdentityType, Role, UserStatus } from '@prisma/client';
+import { EcosystemStatus, IdentityType, Prisma, Role, UserStatus } from '@prisma/client';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { CryptoService } from '../../crypto/crypto.service';
@@ -16,11 +16,21 @@ describe('EcosystemsService', () => {
   const prismaMock = {
     user: { findUnique: jest.fn<() => Promise<any>>() },
     identity: { create: jest.fn<() => Promise<any>>() },
-    ecosystem: { create: jest.fn<() => Promise<any>>(), findUnique: jest.fn<() => Promise<any>>(), update: jest.fn<() => Promise<any>>() },
+    ecosystem: {
+      create: jest.fn<() => Promise<any>>(),
+      findUnique: jest.fn<() => Promise<any>>(),
+      findMany: jest.fn<() => Promise<any>>(),
+      update: jest.fn<() => Promise<any>>(),
+    },
   };
 
   const fireflyMock = { broadcastAnchor: jest.fn() };
-  const cryptoMock = { generateKeyPair: jest.fn(), encryptPrivateKey: jest.fn() };
+  const cryptoMock = {
+    generateKeyPair: jest.fn(),
+    encryptPrivateKey: jest.fn(),
+    decryptPrivateKey: jest.fn(),
+    sign: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -67,5 +77,87 @@ describe('EcosystemsService', () => {
     expect(prismaMock.identity.create).toHaveBeenCalled();
     expect(prismaMock.ecosystem.create).toHaveBeenCalled();
     expect(result.name).toBe('test');
+  });
+
+  it('getApiKey should return decrypted api key for owner', async () => {
+    const apiKey = 'AUR-TEST-KEY';
+    const encrypted = service['encryptApiKey'](apiKey);
+    prismaMock.ecosystem.findUnique.mockResolvedValue({
+      id: 'eco-id',
+      ownerId: 'actor-id',
+      apiKey: encrypted.apiKeyCiphertext,
+      apiKeyIv: encrypted.apiKeyIv,
+      apiKeyAuthTag: encrypted.apiKeyAuthTag,
+    });
+
+    const result = await service.getApiKey('eco-id', 'actor-id');
+
+    expect(result).toEqual({ ecosystemId: 'eco-id', apiKey });
+  });
+
+  it('getApiKey should throw ForbiddenException when owner mismatch', async () => {
+    prismaMock.ecosystem.findUnique.mockResolvedValue({
+      id: 'eco-id',
+      ownerId: 'other-id',
+      apiKey: 'cipher',
+      apiKeyIv: 'iv',
+      apiKeyAuthTag: 'tag',
+    });
+
+    await expect(service.getApiKey('eco-id', 'actor-id')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('validateApiKey should return valid true and update coordinates when matching', async () => {
+    const apiKey = 'AUR-VALID-KEY';
+    const encrypted = service['encryptApiKey'](apiKey);
+    prismaMock.ecosystem.findMany.mockResolvedValue([
+      {
+        id: 'eco-id',
+        status: EcosystemStatus.ACTIVE,
+        apiKey: encrypted.apiKeyCiphertext,
+        apiKeyIv: encrypted.apiKeyIv,
+        apiKeyAuthTag: encrypted.apiKeyAuthTag,
+      },
+    ]);
+    prismaMock.ecosystem.update.mockResolvedValue({ id: 'eco-id' });
+
+    const result = await service.validateApiKey(apiKey, 1, 2);
+
+    expect(result).toEqual({ valid: true, ecosystemId: 'eco-id' });
+    expect(prismaMock.ecosystem.update).toHaveBeenCalled();
+  });
+
+  it('validateApiKey should return valid false when no matching key exists', async () => {
+    prismaMock.ecosystem.findMany.mockResolvedValue([]);
+
+    await expect(service.validateApiKey('AUR-NOT-FOUND', 1, 2)).resolves.toEqual({ valid: false });
+  });
+
+  it('signHash should return signature and publicKey for active ecosystem', async () => {
+    prismaMock.ecosystem.findUnique.mockResolvedValue({
+      id: 'eco-id',
+      status: EcosystemStatus.ACTIVE,
+      identity: {
+        privateKeyCiphertext: 'cipher',
+        privateKeyIv: 'iv',
+        privateKeyAuthTag: 'tag',
+        publicKey: 'pub-key',
+      },
+    });
+    cryptoMock.decryptPrivateKey.mockReturnValue('private-key');
+    cryptoMock.sign.mockReturnValue('signed-hash');
+
+    const result = await service.signHash('eco-id', 'some-hash');
+
+    expect(result).toEqual({ signature: 'signed-hash', publicKey: 'pub-key' });
+  });
+
+  it('updateHeartbeat should throw NotFoundException on P2025', async () => {
+    const p2025Error = new Error('Not found') as Prisma.PrismaClientKnownRequestError;
+    Object.setPrototypeOf(p2025Error, Prisma.PrismaClientKnownRequestError.prototype);
+    (p2025Error as any).code = 'P2025';
+    prismaMock.ecosystem.update.mockRejectedValue(p2025Error);
+
+    await expect(service.updateHeartbeat('eco-id')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
