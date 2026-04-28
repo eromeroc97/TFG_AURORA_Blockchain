@@ -32,10 +32,12 @@ import clmLogo from '../assets/CLM.png'
  * tasa de éxito de anclaje y top ecosistemas.
  */
 export default function TelemetryDashboard() {
-  const { accessToken } = useAuth()
+  const { accessToken, authClaims } = useAuth()
+  const isUser = authClaims?.role === 'USER'
   const [dailyVolume, setDailyVolume] = useState<Array<{ hour: string; tx: number }>>([])
   const [successRatio, setSuccessRatio] = useState<Array<{ name: string; value: number }>>([])
   const [ecosystemUsage, setEcosystemUsage] = useState<Array<{ name: string; anchors: number }>>([])
+  const [totalDevices, setTotalDevices] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,9 +59,11 @@ export default function TelemetryDashboard() {
     setError(null)
 
     try {
-      const response = await apiClient.get('/telemetry/v1/metrics', {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      })
+      if (!accessToken || !authClaims) {
+        throw new Error('No autorizado para ver métricas de telemetría')
+      }
+
+      const response = await apiClient.get('/telemetry/v1/metrics')
 
       const data = response.data as {
         dailyVolume: Array<{ hour: string; tx: number }>
@@ -76,6 +80,7 @@ export default function TelemetryDashboard() {
         })),
       )
       setEcosystemUsage(data.ecosystemUsage ?? [])
+      setTotalDevices(data.totalDevices ?? 0)
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         setError(null)
@@ -122,6 +127,15 @@ export default function TelemetryDashboard() {
           </div>
         ) : null}
 
+        {authClaims && isUser ? (
+          <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+            <p className="font-semibold text-slate-900">Métricas de tus ecosistemas</p>
+            <p className="mt-2 text-slate-600">
+              Estas métricas están filtradas para los ecosistemas asociados a tu usuario.
+            </p>
+          </div>
+        ) : null}
+
         {!isLoading && !error && dailyVolume.length === 0 && successRatio.length === 0 && ecosystemUsage.length === 0 ? (
           <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-8 text-slate-700 shadow-sm">
             <p className="text-lg font-semibold text-slate-900">Sin métricas disponibles</p>
@@ -144,11 +158,17 @@ export default function TelemetryDashboard() {
         ) : (
           <div className="space-y-6">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-4 text-slate-900">
-                <BarChart3 className="h-7 w-7 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Volumen transaccional</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Últimas 24 horas</h2>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4 text-slate-900">
+                <div className="flex items-center gap-3">
+                  <BarChart3 className="h-7 w-7 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">Volumen transaccional</p>
+                    <h2 className="text-xl font-semibold text-slate-900">Últimas 24 horas</h2>
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  <p className="font-medium text-slate-900">Total dispositivos</p>
+                  <p className="mt-1 text-lg font-semibold">{totalDevices}</p>
                 </div>
               </div>
               <div className="h-72">
@@ -182,8 +202,11 @@ export default function TelemetryDashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={successRatio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={48} paddingAngle={4}>
-                      {successRatio.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? '#f97316' : '#14b8a6'} />
+                      {successRatio.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.name === 'Anclajes OK' ? '#14b8a6' : entry.name === 'Fallidos' ? '#f97316' : '#a855f7'}
+                        />
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
