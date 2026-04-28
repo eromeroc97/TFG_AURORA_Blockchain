@@ -32,11 +32,12 @@ describe('Header', () => {
   })
 
   it('renders navigation and profile fallback data', () => {
-    renderHeader('/dashboard#auditoria')
+    renderHeader('/users')
 
     expect(screen.getByAltText('AURORA')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard')
-    expect(screen.getByRole('link', { name: 'Auditoría' })).toHaveAttribute('href', '/dashboard#auditoria')
+    expect(screen.getByRole('link', { name: 'Usuarios' })).toHaveAttribute('href', '/users')
+    expect(screen.getByRole('link', { name: 'Ecosistemas' })).toHaveAttribute('href', '/ecosystems')
     expect(screen.getByRole('button', { name: /Sesión activa/i })).toBeInTheDocument()
   })
 

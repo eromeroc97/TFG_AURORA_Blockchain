@@ -11,8 +11,8 @@ type HeaderProps = {
 
 const navigationItems = [
   { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Telemetría', to: '/telemetry' },
-  { label: 'Auditoría', to: '/dashboard#auditoria' },
+  { label: 'Usuarios', to: '/users' },
+  { label: 'Ecosistemas', to: '/ecosystems' },
 ] as const
 
 export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) {
@@ -50,10 +50,7 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
   }, [])
 
   const getLinkClassName = (to: string) => {
-    const isDashboard = to === '/dashboard'
-    const isActive = isDashboard
-      ? location.pathname === '/dashboard'
-      : `${location.pathname}${location.hash}` === to
+    const isActive = location.pathname === to
 
     return [
       'rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200',
