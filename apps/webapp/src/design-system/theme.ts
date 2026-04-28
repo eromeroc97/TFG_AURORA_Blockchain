@@ -16,9 +16,4 @@ export const auroraTheme = {
   },
 }
 
-export default {
-  content: ['./index.html', './src/**/*.{ts,tsx,js,jsx}'],
-  theme: {
-    extend: auroraTheme,
-  },
-}
+export type AuroraTheme = typeof auroraTheme

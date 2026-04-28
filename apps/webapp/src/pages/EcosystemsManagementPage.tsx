@@ -26,7 +26,9 @@ export default function EcosystemsManagementPage() {
   const canManageEcosystem = true
 
   const handleOpenEcosystemModal = (ecosystem: AccessMapEcosystem) => {
-    setSelectedEcosystem(ecosystem)
+    setSelectedEcosystem((current) =>
+      current?.id === ecosystem.id ? current : ecosystem,
+    )
   }
 
   const handleCloseEcosystemModal = () => {
@@ -128,11 +130,19 @@ export default function EcosystemsManagementPage() {
           ) : (
             <div className="mt-6 space-y-3">
               {visibleEcosystems.map((ecosystem) => (
-                <button
+                <article
                   key={ecosystem.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleOpenEcosystemModal(ecosystem)}
-                  className="w-full text-left rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      handleOpenEcosystemModal(ecosystem)
+                    }
+                  }}
+                  className="w-full cursor-pointer text-left rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  aria-label={`Abrir ecosistema ${ecosystem.name}`}
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -143,7 +153,7 @@ export default function EcosystemsManagementPage() {
                       {ecosystem.isShared ? 'Compartido' : 'Privado'}
                     </span>
                   </div>
-                </button>
+                </article>
               ))}
             </div>
           )}

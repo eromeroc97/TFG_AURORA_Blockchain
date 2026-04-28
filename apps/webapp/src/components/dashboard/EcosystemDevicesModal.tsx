@@ -20,9 +20,10 @@ export default function EcosystemDevicesModal({
   onEcosystemRevoked,
   canManageEcosystem,
 }: EcosystemDevicesModalProps) {
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(ecosystem.devices[0]?.id ?? null)
-  const [selectedDevice, setSelectedDevice] = useState<AccessMapDevice | null>(ecosystem.devices[0] ?? null)
-  const [editedDeviceName, setEditedDeviceName] = useState<string>(ecosystem.devices[0]?.name ?? '')
+  const devices = ecosystem.devices ?? []
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(devices[0]?.id ?? null)
+  const [selectedDevice, setSelectedDevice] = useState<AccessMapDevice | null>(devices[0] ?? null)
+  const [editedDeviceName, setEditedDeviceName] = useState<string>(devices[0]?.name ?? '')
   const [editedEcosystemName, setEditedEcosystemName] = useState<string>(ecosystem.name)
   const [isDeviceLoading, setIsDeviceLoading] = useState(false)
   const [isDeviceStatusLoading, setIsDeviceStatusLoading] = useState(false)
@@ -40,15 +41,15 @@ export default function EcosystemDevicesModal({
   const [ecosystemSaveMessage, setEcosystemSaveMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    setSelectedDeviceId(ecosystem.devices[0]?.id ?? null)
-    setSelectedDevice(ecosystem.devices[0] ?? null)
-    setEditedDeviceName(ecosystem.devices[0]?.name ?? '')
+    setSelectedDeviceId(devices[0]?.id ?? null)
+    setSelectedDevice(devices[0] ?? null)
+    setEditedDeviceName(devices[0]?.name ?? '')
     setEditedEcosystemName(ecosystem.name)
     setIsEditingEcosystemName(false)
     setEcosystemError(null)
     setModalError(null)
     setSaveMessage(null)
-  }, [ecosystem])
+  }, [ecosystem, devices])
 
   useEffect(() => {
     if (!selectedDeviceId) {
@@ -81,8 +82,8 @@ export default function EcosystemDevicesModal({
   }, [selectedDeviceId, ecosystem.devices])
 
   const displayedDevice = useMemo(() => {
-    return selectedDevice ?? ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
-  }, [ecosystem.devices, selectedDevice, selectedDeviceId])
+    return selectedDevice ?? devices.find((device) => device.id === selectedDeviceId) ?? null
+  }, [devices, selectedDevice, selectedDeviceId])
 
   useEffect(() => {
     if (!selectedDeviceId) {
