@@ -376,14 +376,26 @@ export const buildApp = (options: AppOptions = {}) => {
   app.get('/iot/devices/:deviceId/last-interaction', readParamLastInteraction);
   app.get('/devices/:deviceId/last-interaction', readParamLastInteraction);
 
-  const telemetryMetricsHandler = async (request: FastifyRequest, reply: FastifyReply) => {
+  const telemetryMetricsHandler = async (request: FastifyRequest<{ Querystring: { range?: string } }>, reply: FastifyReply) => {
     const context = await resolveTelemetryRequestContext(request, reply);
     if (!context) {
       return;
     }
 
+    const queryRange = request.query.range as string | undefined;
+    const rangeMs: Record<string, number> = {
+      '30m': 30 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '12h': 12 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '1w': 7 * 24 * 60 * 60 * 1000,
+      '1M': 30 * 24 * 60 * 60 * 1000,
+      '1y': 365 * 24 * 60 * 60 * 1000,
+    };
+    const range = queryRange && rangeMs[queryRange] ? rangeMs[queryRange] : 24 * 60 * 60 * 1000;
+
     const metrics = await telemetryStore.getMetrics({
-      from: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      from: new Date(Date.now() - range),
       ecosystemIds: context.role === 'USER' ? context.ecosystemIds ?? [] : undefined,
     });
 

@@ -336,7 +336,7 @@ export class MongoTelemetryStore implements TelemetryStore {
                   _id: {
                     $dateTrunc: {
                       date: '$timestamp',
-                      unit: 'hour',
+                      unit: 'minute',
                     },
                   },
                   tx: { $sum: 1 },
@@ -345,16 +345,17 @@ export class MongoTelemetryStore implements TelemetryStore {
               {
                 $project: {
                   _id: 0,
-                  hour: {
+                  timestamp: {
                     $dateToString: {
-                      format: '%H:00',
+                      format: '%Y-%m-%dT%H:%M:%S',
                       date: '$_id',
+                      timezone: 'Europe/Madrid',
                     },
                   },
                   tx: 1,
                 },
               },
-              { $sort: { hour: 1 } },
+              { $sort: { timestamp: 1 } },
             ],
             successRatio: [
               {

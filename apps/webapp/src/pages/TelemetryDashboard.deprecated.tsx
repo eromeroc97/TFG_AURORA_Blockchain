@@ -117,7 +117,7 @@ export default function TelemetryDashboard() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
-                      <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <XAxis dataKey="timestamp" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                       <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                       <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
                       <Area type="monotone" dataKey="tx" stroke="#2563eb" fill="url(#volumeGradient)" fillOpacity={1} />

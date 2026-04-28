@@ -1,5 +1,5 @@
 export type DailyVolumeItem = {
-  hour: string
+  timestamp: string
   tx: number
 }
 

@@ -1,6 +1,6 @@
 import {
-  Area,
-  AreaChart,
+  Line,
+  LineChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -14,6 +14,8 @@ import {
   YAxis,
 } from 'recharts'
 import { BarChart3, MapPin, TrendingUp, Zap } from 'lucide-react'
+import { type TelemetryRange } from '../services/telemetry.service'
+import { useAuth } from '../context/auth-context'
 import AccessMap from '../components/dashboard/AccessMap'
 import { useDashboardController } from '../controllers/useDashboardController'
 import { useTelemetryController } from '../controllers/useTelemetryController'
@@ -21,12 +23,18 @@ import { useUsersController } from '../controllers/useUsersController'
 import { useServiceHealthController } from '../controllers/useServiceHealthController'
 
 export default function MainDashboard() {
+  const { authClaims } = useAuth()
+  const role = (authClaims?.role ?? 'USER').toUpperCase()
+  const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
+
   const { ecosystems, isLoading: isMapLoading, error: mapError, refreshEcosystems } = useDashboardController()
-  const { data, isLoading: isTelemetryLoading, error: telemetryError, refreshMetrics } = useTelemetryController()
+  const { data, isLoading: isTelemetryLoading, error: telemetryError, range, changeRange, refreshMetrics } = useTelemetryController()
   const { users, isLoading: isUsersLoading, refreshUsers } = useUsersController()
   const { services, isLoading: isServiceHealthLoading, refreshServiceHealth } = useServiceHealthController()
 
   const isLoading = isMapLoading || isTelemetryLoading || isUsersLoading || isServiceHealthLoading
+
+  const ranges: TelemetryRange[] = ['30m', '1h', '12h', '24h', '1w', '1M', '1y']
 
   return (
     <div className="min-h-screen p-6">
@@ -57,29 +65,30 @@ export default function MainDashboard() {
 
         <div className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
           <section className="space-y-6">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3 text-slate-900">
-                <MapPin className="h-6 w-6 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Mapa de ecosistemas</p>
-                  <h2 className="text-xl font-semibold">Acceso y presencia geográfica</h2>
+            {isAdminOrGlobalAdmin ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3 text-slate-900">
+                  <MapPin className="h-6 w-6 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">Mapa de ecosistemas</p>
+                    <h2 className="text-xl font-semibold">Acceso y presencia geográfica</h2>
+                  </div>
+                </div>
+                <div className="mt-5">
+                  {mapError ? (
+                    <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+                      <p className="font-semibold">Error al cargar los ecosistemas</p>
+                      <p className="mt-2">{mapError}</p>
+                    </div>
+                  ) : isMapLoading ? (
+                    <div className="h-[520px] rounded-[1.25rem] bg-slate-100" />
+                  ) : (
+<AccessMap ecosystems={ecosystems} />
+                  )}
                 </div>
               </div>
-              <div className="mt-5">
-                {mapError ? (
-                  <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
-                    <p className="font-semibold">Error al cargar los ecosistemas</p>
-                    <p className="mt-2">{mapError}</p>
-                  </div>
-                ) : isMapLoading ? (
-                  <div className="h-[520px] rounded-[1.25rem] bg-slate-100" />
-                ) : (
-                  <AccessMap ecosystems={ecosystems} />
-                )}
-              </div>
-            </div>
-
-            </section>
+            ) : null}
+          </section>
 
           <section className="space-y-6">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -155,29 +164,80 @@ export default function MainDashboard() {
                 <BarChart3 className="h-7 w-7 text-blue-600" />
                 <div>
                   <p className="text-sm font-medium text-slate-500">Volumen transaccional</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Últimas 24 horas</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    {range === '30m'
+                      ? 'Últimos 30 minutos'
+                      : range === '1h'
+                        ? 'Última hora'
+                        : range === '12h'
+                          ? 'Últimas 12 horas'
+                          : range === '24h'
+                            ? 'Últimas 24 horas'
+                            : range === '1w'
+                              ? 'Última semana'
+                              : range === '1M'
+                                ? 'Último mes'
+                                : 'Último año'}
+                  </h2>
                 </div>
               </div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                <p className="font-medium text-slate-900">Total dispositivos</p>
-                <p className="mt-1 text-lg font-semibold">{data.totalDevices}</p>
+              <div className="flex items-center gap-2">
+                {ranges.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => changeRange(r)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                      range === r
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.dailyVolume} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <LineChart data={data.dailyVolume} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
-                  <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <XAxis
+                    dataKey="timestamp"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: '#64748b', fontSize: 11 }}
+                    tickFormatter={(value) => {
+                      const date = new Date(value)
+                      if (isNaN(date.getTime())) return ''
+                      return date.toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    }}
+                    type="category"
+                    allowDuplicatedCategory={false}
+                  />
                   <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                  <Area type="monotone" dataKey="tx" stroke="#2563eb" fill="url(#volumeGradient)" fillOpacity={1} />
-                </AreaChart>
+                  <Tooltip
+                    contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }}
+                    labelFormatter={(value) => {
+                      const date = new Date(value)
+                      return date.toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })
+                    }}
+                    formatter={(value: number) => [`${value} transacciones`, 'Volumen']}
+                  />
+                  <Line type="monotone" dataKey="tx" stroke="#2563eb" strokeWidth={2} dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -188,7 +248,7 @@ export default function MainDashboard() {
                 <TrendingUp className="h-7 w-7 text-emerald-500" />
                 <div>
                   <p className="text-sm font-medium text-slate-500">Tasa de éxito</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Anclajes vs fallos</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Anclajes en Blockchain</h2>
                 </div>
               </div>
               <div className="h-72">
@@ -214,17 +274,17 @@ export default function MainDashboard() {
                 <Zap className="h-7 w-7 text-violet-600" />
                 <div>
                   <p className="text-sm font-medium text-slate-500">Top ecosistemas</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Anclajes por red</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Anclajes por ecosistema</h2>
                 </div>
               </div>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.ecosystemUsage} layout="vertical" margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <BarChart data={data.ecosystemUsage} margin={{ top: 10, right: 18, left: 0, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
-                    <XAxis type="number" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#0f172a', fontSize: 13 }} />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#0f172a', fontSize: 12 }} interval={0} angle={-45} textAnchor="end" />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                    <Bar dataKey="anchors" radius={[8, 8, 8, 8]} fill="#7c3aed">
+                    <Bar dataKey="anchors" radius={[4, 4, 0, 0]} fill="#7c3aed">
                       {data.ecosystemUsage.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#7c3aed' : '#a855f7'} />
                       ))}
