@@ -108,7 +108,7 @@ flowchart TB
     end
 
     subgraph "Capa 1: Perímetro"
-        FW[Traefik<br/>WAF, Rate Limit,<br/>TLS Termination]
+        FW[Traefik<br/>Rate Limit,<br/>TLS Termination]
     end
 
     subgraph "Capa 2: Red"
@@ -124,6 +124,7 @@ flowchart TB
     subgraph "Capa 4: Datos"
         DB[(Datos Cifrados<br/>PostgreSQL)]
         CRYPTO[Cifrado en Reposo<br/>AES-256-GCM]
+        DB[(Telemetría no modificable<br/>MongoDB Time Series)]
     end
 
     ATACANTE --> FW
