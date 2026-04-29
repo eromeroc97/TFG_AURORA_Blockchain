@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { getUsers } from '../services/users.service'
+import { getUsers, approveUser as apiApproveUser, revokeUser as apiRevokeUser } from '../services/users.service'
 import type { User } from '../components/dashboard/users.data'
 
 export function useUsersController() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
   const refreshUsers = async () => {
     setIsLoading(true)
@@ -22,6 +23,30 @@ export function useUsersController() {
     }
   }
 
+  const approveUser = async (userId: string) => {
+    setActionLoading(true)
+    try {
+      await apiApproveUser(userId)
+      await refreshUsers()
+    } catch (err) {
+      throw err
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const revokeUser = async (userId: string) => {
+    setActionLoading(true)
+    try {
+      await apiRevokeUser(userId)
+      await refreshUsers()
+    } catch (err) {
+      throw err
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   useEffect(() => {
     void refreshUsers()
   }, [])
@@ -30,6 +55,9 @@ export function useUsersController() {
     users,
     isLoading,
     error,
+    actionLoading,
     refreshUsers,
+    approveUser,
+    revokeUser,
   }
 }

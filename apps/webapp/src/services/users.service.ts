@@ -9,3 +9,12 @@ export async function getUsers(): Promise<User[]> {
     return []
   }
 }
+
+export async function approveUser(userId: string): Promise<User> {
+  const response = await apiClient.patch<User>(`/users/${userId}/approve`)
+  return response.data
+}
+
+export async function revokeUser(userId: string): Promise<void> {
+  await apiClient.delete(`/users/${userId}`)
+}

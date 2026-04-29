@@ -8,7 +8,7 @@ const USER_STATUSES = ['ALL', 'ACTIVE', 'PENDING', 'PASSBLOCK'] as const
 const PAGE_SIZES = [10, 25, 50, 100] as const
 
 export default function UsersManagementPage() {
-  const { users, isLoading, error, refreshUsers } = useUsersController()
+  const { users, isLoading, error, actionLoading, refreshUsers, approveUser, revokeUser } = useUsersController()
   const { authClaims } = useAuth()
   const [selectedUserInfo, setSelectedUserInfo] = useState<{ email: string; role: string; status: string } | null>(null)
   const [pendingUserAction, setPendingUserAction] = useState<{
@@ -52,13 +52,26 @@ export default function UsersManagementPage() {
     })
   }
 
-  const handleConfirmUserAction = () => {
+  const handleConfirmUserAction = async () => {
     if (!pendingUserAction) return
 
-    window.alert(
-      `${pendingUserAction.action === 'approve' ? 'Aprobar' : 'Revocar'} usuario ${pendingUserAction.userEmail}`,
-    )
-    setPendingUserAction(null)
+    const user = users.find((u) => u.email === pendingUserAction.userEmail)
+    if (!user) {
+      setPendingUserAction(null)
+      return
+    }
+
+    try {
+      if (pendingUserAction.action === 'approve') {
+        await approveUser(user.id)
+      } else {
+        await revokeUser(user.id)
+      }
+    } catch {
+      // Error handling without alert
+    } finally {
+      setPendingUserAction(null)
+    }
   }
 
   const handleConfirmRoleChange = () => {
@@ -412,12 +425,13 @@ export default function UsersManagementPage() {
               <button
                 type="button"
                 onClick={handleConfirmUserAction}
+                disabled={actionLoading}
                 className={`inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-white transition-colors ${pendingUserAction.action === 'approve'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : 'bg-rose-600 hover:bg-rose-700'
-                  }`}
+                  } ${actionLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {pendingUserAction.action === 'approve' ? 'Confirmar aprobación' : 'Confirmar revocación'}
+                {actionLoading ? 'Procesando...' : pendingUserAction.action === 'approve' ? 'Confirmar aprobación' : 'Confirmar revocación'}
               </button>
             </div>
           </div>
