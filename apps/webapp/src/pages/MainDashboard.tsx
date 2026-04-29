@@ -137,18 +137,24 @@ export default function MainDashboard() {
               ) : null}
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
-                  <p className="text-sm font-medium text-slate-500">Usuarios existentes</p>
-                  <p className="mt-3 text-4xl font-semibold text-slate-900">{users.length}</p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
-                  <p className="text-sm font-medium text-slate-500">Ecosistemas instanciados</p>
-                  <p className="mt-3 text-4xl font-semibold text-slate-900">{ecosystems.length}</p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
-                  <p className="text-sm font-medium text-slate-500">Dispositivos conectados</p>
-                  <p className="mt-3 text-4xl font-semibold text-slate-900">{data.totalDevices}</p>
-                </div>
+                <a href="/users" className="sm:col-span-2" text-decoration="none">
+                  <div className="sm:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
+                    <p className="text-sm font-medium text-slate-500">Usuarios existentes</p>
+                    <p className="mt-3 text-4xl font-semibold text-slate-900">{users.length}</p>
+                  </div>
+                </a>
+                <a href="/ecosystems" text-decoration="none">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
+                    <p className="text-sm font-medium text-slate-500">Ecosistemas instanciados</p>
+                    <p className="mt-3 text-4xl font-semibold text-slate-900">{ecosystems.length}</p>
+                  </div>
+                </a>
+                <a href="/ecosystems" text-decoration="none">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
+                    <p className="text-sm font-medium text-slate-500">Dispositivos conectados</p>
+                    <p className="mt-3 text-4xl font-semibold text-slate-900">{data.totalDevices}</p>
+                  </div>
+                </a>
               </div>
             </div>
 
@@ -170,11 +176,10 @@ export default function MainDashboard() {
                       <p className="text-sm font-medium text-slate-700">{service.name}</p>
                     </div>
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
-                        service.status === 'Online'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-rose-100 text-rose-700'
-                      }`}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${service.status === 'Online'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
+                        }`}
                     >
                       {service.status}
                     </span>
@@ -215,11 +220,10 @@ export default function MainDashboard() {
                     key={r}
                     type="button"
                     onClick={() => changeRange(r)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                      range === r
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${range === r
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
                   >
                     {r}
                   </button>

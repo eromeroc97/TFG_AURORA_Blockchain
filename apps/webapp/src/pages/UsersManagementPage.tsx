@@ -10,6 +10,16 @@ const PAGE_SIZES = [10, 25, 50, 100] as const
 export default function UsersManagementPage() {
   const { users, isLoading, error, refreshUsers } = useUsersController()
   const { authClaims } = useAuth()
+  const [selectedUserInfo, setSelectedUserInfo] = useState<{ email: string; role: string; status: string } | null>(null)
+  const [pendingUserAction, setPendingUserAction] = useState<{
+    userEmail: string
+    action: 'approve' | 'revoke'
+  } | null>(null)
+  const [pendingRoleChange, setPendingRoleChange] = useState<{
+    userEmail: string
+    currentRole: string
+    nextRole: string
+  } | null>(null)
   const role = (authClaims?.role ?? 'USER').toUpperCase()
   const isGlobalAdmin = role === 'GLOBAL_ADMIN'
   const [roleFilter, setRoleFilter] = useState<(typeof USER_ROLES)[number]>('ALL')
@@ -24,26 +34,38 @@ export default function UsersManagementPage() {
   const canChangeUserRole = (user: { status: string; role: string }) => user.status === 'ACTIVE' && canManageAdministratorUser(user)
 
   const handleShowUserInfo = (user: { email: string; role: string; status: string }) => {
-    window.alert(`Usuario: ${user.email}\nRol: ${user.role}\nEstado: ${user.status}`)
+    setSelectedUserInfo(user)
   }
 
-  const handleRoleChange = (user: { email: string; role: string }) => {
-    const nextRole = window.prompt(`Nuevo rol para ${user.email} (USER/AUDITOR/ADMIN):`, user.role)
-
-    if (!nextRole) {
-      return
-    }
-
-    if (!['USER', 'AUDITOR', 'ADMIN'].includes(nextRole.toUpperCase())) {
-      window.alert('Rol inválido. Usa USER, AUDITOR o ADMIN.')
-      return
-    }
-
-    window.alert(`Cambio de rol solicitado para ${user.email}: ${nextRole.toUpperCase()}`)
+  const handleOpenRoleChange = (user: { email: string; role: string }) => {
+    setPendingRoleChange({
+      userEmail: user.email,
+      currentRole: user.role,
+      nextRole: user.role,
+    })
   }
 
   const handleUserAction = (user: { email: string }, action: 'approve' | 'revoke') => {
-    window.alert(`${action === 'approve' ? 'Aprobar' : 'Revocar'} usuario ${user.email}`)
+    setPendingUserAction({
+      userEmail: user.email,
+      action,
+    })
+  }
+
+  const handleConfirmUserAction = () => {
+    if (!pendingUserAction) return
+
+    window.alert(
+      `${pendingUserAction.action === 'approve' ? 'Aprobar' : 'Revocar'} usuario ${pendingUserAction.userEmail}`,
+    )
+    setPendingUserAction(null)
+  }
+
+  const handleConfirmRoleChange = () => {
+    if (!pendingRoleChange) return
+
+    window.alert(`Cambio de rol solicitado para ${pendingRoleChange.userEmail}: ${pendingRoleChange.nextRole}`)
+    setPendingRoleChange(null)
   }
 
   const filteredUsers = useMemo(
@@ -279,7 +301,7 @@ export default function UsersManagementPage() {
                           {canChangeUserRole(user) && (
                             <button
                               type="button"
-                              onClick={() => handleRoleChange(user)}
+                              onClick={() => handleOpenRoleChange(user)}
                               className="text-xs px-2 py-1 rounded hover:bg-slate-100 hover:text-slate-700 transition-colors text-slate-600"
                             >
                               Cambiar rol
@@ -313,6 +335,146 @@ export default function UsersManagementPage() {
           )}
         </div>
       </div>
+
+      {selectedUserInfo ? (
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Información de usuario</h3>
+                <p className="text-sm leading-6 text-slate-500">Detalle de la cuenta seleccionada.</p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p>
+                <span className="font-semibold">Email:</span> {selectedUserInfo.email}
+              </p>
+              <p>
+                <span className="font-semibold">Rol:</span> {selectedUserInfo.role}
+              </p>
+              <p>
+                <span className="font-semibold">Estado:</span> {selectedUserInfo.status}
+              </p>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedUserInfo(null)}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingUserAction ? (
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Confirmación requerida</h3>
+                <p className="text-sm leading-6 text-slate-500">
+                  {pendingUserAction.action === 'approve'
+                    ? `¿Quieres aprobar a ${pendingUserAction.userEmail}?`
+                    : `¿Quieres revocar a ${pendingUserAction.userEmail}?`}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingUserAction(null)}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmUserAction}
+                className={`inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-white transition-colors ${
+                  pendingUserAction.action === 'approve'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {pendingUserAction.action === 'approve' ? 'Confirmar aprobación' : 'Confirmar revocación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingRoleChange ? (
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Cambiar rol de usuario</h3>
+                <p className="text-sm leading-6 text-slate-500">
+                  Selecciona el nuevo rol para {pendingRoleChange.userEmail}. El rol actual es {pendingRoleChange.currentRole}.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-900">Nuevo rol</span>
+                <select
+                  value={pendingRoleChange.nextRole}
+                  onChange={(event) =>
+                    setPendingRoleChange((current) =>
+                      current
+                        ? {
+                            ...current,
+                            nextRole: event.target.value,
+                          }
+                        : current,
+                    )
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
+                >
+                  {['USER', 'AUDITOR', 'ADMIN'].map((assignableRole) => (
+                    <option key={assignableRole} value={assignableRole}>
+                      {assignableRole}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingRoleChange(null)}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRoleChange}
+                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+              >
+                Confirmar cambio de rol
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
