@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Eye, EyeOff, House, Key, Plus, RefreshCcw, Share2, TreeDeciduous } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff, House, Key, Plus, Share2, TreeDeciduous, UserMinus, X } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
@@ -34,6 +34,7 @@ export default function EcosystemsManagementPage() {
   const [shareEmail, setShareEmail] = useState('')
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
+  const [revokingEcosystemId, setRevokingEcosystemId] = useState<string | null>(null)
 
   useEffect(() => {
     setVisibleEcosystems(ecosystems)
@@ -107,6 +108,17 @@ export default function EcosystemsManagementPage() {
     }
   }
 
+  const handleRevokeSharing = async (ecosystemId: string) => {
+    setRevokingEcosystemId(ecosystemId)
+    try {
+      await apiClient.delete(`/ecosystems/${ecosystemId}/share`)
+      await refreshEcosystems()
+    } catch {
+    } finally {
+      setRevokingEcosystemId(null)
+    }
+  }
+
   const maskApiKey = (key: string) => {
     if (key.length <= 8) return '••••••••'
     return key.slice(0, 4) + '••••••••' + key.slice(-4)
@@ -159,6 +171,11 @@ export default function EcosystemsManagementPage() {
   const sharedEcosystemCount = useMemo(
     () => visibleEcosystems.filter((eco) => eco.isShared).length,
     [visibleEcosystems],
+  )
+
+  const ecosystemsSharedWithMe = useMemo(
+    () => visibleEcosystems.filter((eco) => eco.isShared && eco.ownerId !== userId),
+    [visibleEcosystems, userId],
   )
 
   const totalDevicesCount = useMemo(
@@ -222,14 +239,7 @@ export default function EcosystemsManagementPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={refreshEcosystems}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refrescar
-          </button>
+          
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -368,6 +378,51 @@ export default function EcosystemsManagementPage() {
                         {ecosystem.isShared ? 'Compartido' : 'Privado'}
                       </span>
                     </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
+          <div className="flex items-center gap-3 text-primary">
+            <Share2 className="size-5 text-accent" />
+            <h2 className="font-heading text-xl font-semibold">Ecosistemas compartidos conmigo</h2>
+          </div>
+          <p className="mt-3 text-xs text-muted">Ecosistemas que otros usuarios han compartido contigo.</p>
+
+          {ecosystemsSharedWithMe.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
+              <p className="font-medium text-slate-900">No hay ecosistemas compartidos contigo.</p>
+            </div>
+          ) : (
+            <div className="mt-6 space-y-3">
+              {ecosystemsSharedWithMe.map((ecosystem) => (
+                <article
+                  key={ecosystem.id}
+                  className="w-full rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="font-medium text-primary">{ecosystem.name}</p>
+                      <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRevokeSharing(ecosystem.id)}
+                      disabled={revokingEcosystemId === ecosystem.id}
+                      className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600 hover:bg-rose-100 disabled:opacity-50"
+                    >
+                      {revokingEcosystemId === ecosystem.id ? (
+                        <>Revocando...</>
+                      ) : (
+                        <>
+                          <UserMinus className="size-3" />
+                          Dejar de compartir
+                        </>
+                      )}
+                    </button>
                   </div>
                 </article>
               ))}
