@@ -9,6 +9,15 @@ type ApiEcosystem = {
   longitude: number | null
 }
 
+type CreateEcosystemResponse = {
+  id: string
+  name: string
+  ownerId: string
+  apiKey: string
+  latitude: number | null
+  longitude: number | null
+}
+
 export async function getEcosystems(): Promise<AccessMapEcosystem[]> {
   try {
     const response = await apiClient.get<ApiEcosystem[]>('/ecosystems')
@@ -25,4 +34,9 @@ export async function getEcosystems(): Promise<AccessMapEcosystem[]> {
   } catch {
     return ACCESS_MAP_ECOSYSTEMS_MOCK
   }
+}
+
+export async function createEcosystem(name: string): Promise<CreateEcosystemResponse> {
+  const response = await apiClient.post<CreateEcosystemResponse>('/ecosystems', { name })
+  return response.data
 }
