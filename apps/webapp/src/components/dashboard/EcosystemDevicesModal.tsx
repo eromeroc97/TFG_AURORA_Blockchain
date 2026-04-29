@@ -48,6 +48,8 @@ export default function EcosystemDevicesModal({
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [ecosystemError, setEcosystemError] = useState<string | null>(null)
   const [ecosystemSaveMessage, setEcosystemSaveMessage] = useState<string | null>(null)
+  const [filterLocation, setFilterLocation] = useState<string>('')
+  const [filterCategory, setFilterCategory] = useState<string>('')
 
   useEffect(() => {
     setSelectedDeviceId(devices[0]?.id ?? null)
@@ -101,6 +103,14 @@ export default function EcosystemDevicesModal({
   const displayedDevice = useMemo(() => {
     return selectedDevice ?? devices.find((device) => device.id === selectedDeviceId) ?? null
   }, [devices, selectedDevice, selectedDeviceId])
+
+  const filteredDevices = useMemo(() => {
+    return devices.filter((device) => {
+      const matchesLocation = !filterLocation || device.location === filterLocation
+      const matchesCategory = !filterCategory || device.category === filterCategory
+      return matchesLocation && matchesCategory
+    })
+  }, [devices, filterLocation, filterCategory])
 
   useEffect(() => {
     if (!selectedDeviceId) {
@@ -321,9 +331,34 @@ export default function EcosystemDevicesModal({
         <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
           <div className="rounded-3xl border border-border bg-surface/60 p-4 overflow-hidden">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Lista de dispositivos</p>
-            <div className="mt-4 max-h-[calc(100vh-20rem)] overflow-y-auto pr-2 space-y-2">
-              {ecosystem.devices.length > 0 ? (
-                ecosystem.devices.map((device) => (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <select
+                value={filterLocation}
+                onChange={(event) => setFilterLocation(event.target.value)}
+                className="flex-1 rounded-xl border border-border bg-white px-2 py-1.5 text-xs text-primary outline-none focus:border-accent"
+              >
+                <option value="">Todas las ubicaciones</option>
+                <option value="SALON">Salón</option>
+                <option value="COMEDOR">Comedor</option>
+                <option value="HABITACION">Habitación</option>
+                <option value="BAÑO">Baño</option>
+                <option value="OTRO">Otro</option>
+              </select>
+              <select
+                value={filterCategory}
+                onChange={(event) => setFilterCategory(event.target.value)}
+                className="flex-1 rounded-xl border border-border bg-white px-2 py-1.5 text-xs text-primary outline-none focus:border-accent"
+              >
+                <option value="">Todas las categorías</option>
+                <option value="BOMBILLA">Bombilla</option>
+                <option value="PANEL_INTELIGENTE">Panel</option>
+                <option value="ENCHUFE_INTELIGENTE">Enchufe</option>
+                <option value="OTRO">Otro</option>
+              </select>
+            </div>
+            <div className="mt-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2 space-y-2">
+              {filteredDevices.length > 0 ? (
+                filteredDevices.map((device) => (
                   <button
                     key={device.id}
                     type="button"
@@ -341,7 +376,9 @@ export default function EcosystemDevicesModal({
                 ))
               ) : (
                 <div className="rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">
-                  No hay dispositivos registrados para este ecosistema.
+                  {ecosystem.devices.length === 0
+                    ? 'No hay dispositivos registrados para este ecosistema.'
+                    : 'No hay dispositivos que coincidan con los filtros seleccionados.'}
                 </div>
               )}
             </div>
