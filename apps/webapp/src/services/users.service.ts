@@ -1,6 +1,15 @@
 import { apiClient } from '../api/axios'
 import type { User } from '../components/dashboard/users.data'
 
+export async function getUserById(userId: string): Promise<User | null> {
+  try {
+    const response = await apiClient.get<User>(`/users/${userId}`)
+    return response.data
+  } catch {
+    return null
+  }
+}
+
 export async function getUsers(): Promise<User[]> {
   try {
     const response = await apiClient.get<User[]>('/users')

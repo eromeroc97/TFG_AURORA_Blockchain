@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Eye, EyeOff, House, Info, Key, Lightbulb, Plus, Share2, Thermometer, TreeDeciduous, UserMinus, Wifi, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, House, Info, Key, Lightbulb, Plus, Search, Share2, Thermometer, TreeDeciduous, UserMinus, Wifi, X } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { useEcosystemsController } from '../controllers/useEcosystemsController'
+import { getUserById } from '../services/users.service'
 import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
 
 type CreateEcosystemStep = 'form' | 'confirm' | 'result'
@@ -19,6 +20,7 @@ export default function EcosystemsManagementPage() {
   const [visibleEcosystems, setVisibleEcosystems] = useState<AccessMapEcosystem[]>(ecosystems)
   const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
   const [detailEcosystemId, setDetailEcosystemId] = useState<string | null>(null)
+  const [selectedDeviceFromPlan, setSelectedDeviceFromPlan] = useState<string | null>(null)
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [createStep, setCreateStep] = useState<CreateEcosystemStep>('form')
@@ -36,6 +38,37 @@ export default function EcosystemsManagementPage() {
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
   const [revokingEcosystemId, setRevokingEcosystemId] = useState<string | null>(null)
+
+  const PAGE_SIZES = [10, 25, 50, 100] as const
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sharedStatusFilter, setSharedStatusFilter] = useState<'ALL' | 'SHARED' | 'PRIVATE'>('ALL')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+  const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({})
+  const [sharedSearchTerm, setSharedSearchTerm] = useState('')
+  const [sharedCurrentPage, setSharedCurrentPage] = useState(1)
+  const [sharedPageSize, setSharedPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+
+  useEffect(() => {
+    const loadOwnerEmails = async () => {
+      const uniqueOwnerIds = [...new Set(visibleEcosystems.map((eco) => eco.ownerId).filter(Boolean))]
+      const newEmails: Record<string, string> = {}
+      for (const ownerId of uniqueOwnerIds) {
+        if (ownerId && !ownerEmails[ownerId]) {
+          const user = await getUserById(ownerId)
+          if (user?.email) {
+            newEmails[ownerId] = user.email
+          }
+        }
+      }
+      if (Object.keys(newEmails).length > 0) {
+        setOwnerEmails((prev) => ({ ...prev, ...newEmails }))
+      }
+    }
+    loadOwnerEmails()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleEcosystems.map((e) => e.ownerId).join(',')])
 
   useEffect(() => {
     setVisibleEcosystems(ecosystems)
@@ -185,10 +218,74 @@ export default function EcosystemsManagementPage() {
     [visibleEcosystems, userId],
   )
 
+  const filteredSharedEcosystems = useMemo(
+    () =>
+      ecosystemsSharedWithMe.filter((eco) => {
+        const matchesSearch =
+          eco.name.toLowerCase().includes(sharedSearchTerm.toLowerCase()) ||
+          (eco.ownerId && eco.ownerId.toLowerCase().includes(sharedSearchTerm.toLowerCase()))
+        return matchesSearch
+      }),
+    [ecosystemsSharedWithMe, sharedSearchTerm],
+  )
+
+  const sharedTotalPages = Math.ceil(filteredSharedEcosystems.length / sharedPageSize)
+  const paginatedSharedEcosystems = useMemo(
+    () => {
+      const start = (sharedCurrentPage - 1) * sharedPageSize
+      return filteredSharedEcosystems.slice(start, start + sharedPageSize)
+    },
+    [filteredSharedEcosystems, sharedCurrentPage, sharedPageSize],
+  )
+
+  const handleSharedPageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= sharedTotalPages) {
+      setSharedCurrentPage(newPage)
+    }
+  }
+
+  useEffect(() => {
+    setSharedCurrentPage(1)
+  }, [sharedSearchTerm])
+
   const totalDevicesCount = useMemo(
     () => visibleEcosystems.reduce((sum, eco) => sum + (eco.devices?.length ?? 0), 0),
     [visibleEcosystems],
   )
+
+  const filteredEcosystems = useMemo(
+    () =>
+      visibleEcosystems.filter((eco) => {
+        const matchesSearch =
+          eco.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (eco.ownerId && eco.ownerId.toLowerCase().includes(searchTerm.toLowerCase()))
+        const matchesSharedStatus =
+          sharedStatusFilter === 'ALL' ||
+          (sharedStatusFilter === 'SHARED' && eco.isShared) ||
+          (sharedStatusFilter === 'PRIVATE' && !eco.isShared)
+        return matchesSearch && matchesSharedStatus
+      }),
+    [visibleEcosystems, searchTerm, sharedStatusFilter],
+  )
+
+  const totalPages = Math.ceil(filteredEcosystems.length / pageSize)
+  const paginatedEcosystems = useMemo(
+    () => {
+      const start = (currentPage - 1) * pageSize
+      return filteredEcosystems.slice(start, start + pageSize)
+    },
+    [filteredEcosystems, currentPage, pageSize],
+  )
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage)
+    }
+  }
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, sharedStatusFilter])
 
   const ROOM_ORDER = ['Salón', 'Dormitorio', 'Cocina', 'Baño', 'Otro']
 
@@ -321,6 +418,28 @@ export default function EcosystemsManagementPage() {
               </div>
               <p className="mt-3 text-xs text-muted">Aquí puedes obtener informacion de tus ecosistemas o añadir nuevos.</p>
 
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o propietario..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
+                  />
+                </div>
+                <select
+                  value={sharedStatusFilter}
+                  onChange={(e) => setSharedStatusFilter(e.target.value as 'ALL' | 'SHARED' | 'PRIVATE')}
+                  className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
+                >
+                  <option value="ALL">Todos los estados</option>
+                  <option value="PRIVATE">Privado</option>
+                  <option value="SHARED">Compartido</option>
+                </select>
+              </div>
+
               {error ? (
                 <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
                   <p className="font-semibold">Error de carga</p>
@@ -334,13 +453,14 @@ export default function EcosystemsManagementPage() {
                     <div key={item} className="h-16 rounded-2xl bg-slate-100" />
                   ))}
                 </div>
-              ) : visibleEcosystems.length === 0 ? (
+              ) : paginatedEcosystems.length === 0 ? (
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
                   <p className="font-medium text-slate-900">No hay ecosistemas disponibles.</p>
                 </div>
               ) : (
-                <div className="mt-6 space-y-3">
-                  {visibleEcosystems.map((ecosystem) => (
+                <>
+                  <div className="mt-6 space-y-3">
+                    {paginatedEcosystems.map((ecosystem) => (
                     <article
                       key={ecosystem.id}
                       role="button"
@@ -410,7 +530,9 @@ export default function EcosystemsManagementPage() {
                             </div>
                           )}
                           {!isUser && (
-                            <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                            <p className="text-xs text-muted mt-1">
+                              Propietario: {ecosystem.ownerId ? ownerEmails[ecosystem.ownerId] ?? ecosystem.ownerId : 'Desconocido'}
+                            </p>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -435,9 +557,55 @@ export default function EcosystemsManagementPage() {
                     </article>
                   ))}
                 </div>
+
+                {filteredEcosystems.length > 0 && (
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-500">Mostrar</span>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(Number(e.target.value) as typeof pageSize)
+                          setCurrentPage(1)
+                        }}
+                        className="rounded-lg border border-border bg-white px-2 py-1 text-sm text-primary outline-none focus:border-accent"
+                      >
+                        {PAGE_SIZES.map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-sm text-slate-500">resultados</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <ChevronLeft className="size-4" />
+                      </button>
+                      <span className="text-sm text-slate-600">
+                        Página {currentPage} de {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <ChevronRight className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                </>
               )}
             </div>
 
+            {isUser && (
             <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
               <div className="flex items-center gap-3 text-primary">
                 <Share2 className="size-5 text-accent" />
@@ -445,47 +613,110 @@ export default function EcosystemsManagementPage() {
               </div>
               <p className="mt-3 text-xs text-muted">Ecosistemas que otros usuarios han compartido contigo.</p>
 
-              {ecosystemsSharedWithMe.length === 0 ? (
+              <div className="mt-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o propietario..."
+                    value={sharedSearchTerm}
+                    onChange={(e) => setSharedSearchTerm(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
+                  />
+                </div>
+              </div>
+
+              {filteredSharedEcosystems.length === 0 ? (
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
                   <p className="font-medium text-slate-900">No hay ecosistemas compartidos contigo.</p>
                 </div>
               ) : (
-                <div className="mt-6 space-y-3">
-                  {ecosystemsSharedWithMe.map((ecosystem) => (
-                    <article
-                      key={ecosystem.id}
-                      className="w-full rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <p className="font-medium text-primary">{ecosystem.name}</p>
-                          <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                <>
+                  <div className="mt-6 space-y-3">
+                    {paginatedSharedEcosystems.map((ecosystem) => (
+                      <article
+                        key={ecosystem.id}
+                        className="w-full rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="font-medium text-primary">{ecosystem.name}</p>
+                            <p className="text-xs text-muted mt-1">
+                              Propietario: {ecosystem.ownerId ? ownerEmails[ecosystem.ownerId] ?? ecosystem.ownerId : 'Desconocido'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeSharing(ecosystem.id)}
+                            disabled={revokingEcosystemId === ecosystem.id}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600 hover:bg-rose-100 disabled:opacity-50"
+                          >
+                            {revokingEcosystemId === ecosystem.id ? (
+                              <>Revocando...</>
+                            ) : (
+                              <>
+                                <UserMinus className="size-3" />
+                                Dejar de compartir
+                              </>
+                            )}
+                          </button>
                         </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  {filteredSharedEcosystems.length > 0 && (
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500">Mostrar</span>
+                        <select
+                          value={sharedPageSize}
+                          onChange={(e) => {
+                            setSharedPageSize(Number(e.target.value) as typeof sharedPageSize)
+                            setSharedCurrentPage(1)
+                          }}
+                          className="rounded-lg border border-border bg-white px-2 py-1 text-sm text-primary outline-none focus:border-accent"
+                        >
+                          {PAGE_SIZES.map((size) => (
+                            <option key={size} value={size}>
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-slate-500">resultados</span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => handleRevokeSharing(ecosystem.id)}
-                          disabled={revokingEcosystemId === ecosystem.id}
-                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600 hover:bg-rose-100 disabled:opacity-50"
+                          onClick={() => handleSharedPageChange(sharedCurrentPage - 1)}
+                          disabled={sharedCurrentPage === 1}
+                          className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {revokingEcosystemId === ecosystem.id ? (
-                            <>Revocando...</>
-                          ) : (
-                            <>
-                              <UserMinus className="size-3" />
-                              Dejar de compartir
-                            </>
-                          )}
+                          <ChevronLeft className="size-4" />
+                        </button>
+                        <span className="text-sm text-slate-600">
+                          Página {sharedCurrentPage} de {sharedTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSharedPageChange(sharedCurrentPage + 1)}
+                          disabled={sharedCurrentPage === sharedTotalPages}
+                          className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ChevronRight className="size-4" />
                         </button>
                       </div>
-                    </article>
-                  ))}
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
+            )}
+
           </div>
 
           <div className="col-span-7">
-            <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora h-full">
+            <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
               {detailEcosystem ? (
                 <>
                   <div className="flex items-center justify-between">
@@ -523,6 +754,19 @@ export default function EcosystemsManagementPage() {
                               {devicesByRoom[room]?.map((device) => (
                                 <div
                                   key={device.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => {
+                                    setSelectedDeviceFromPlan(device.id)
+                                    handleOpenEcosystemModal(detailEcosystem!)
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault()
+                                      setSelectedDeviceFromPlan(device.id)
+                                      handleOpenEcosystemModal(detailEcosystem!)
+                                    }
+                                  }}
                                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-100 hover:border-accent/30 hover:bg-accent/5 transition cursor-pointer group"
                                 >
                                   {device.category?.toLowerCase().includes('temperature') ||
@@ -556,6 +800,19 @@ export default function EcosystemsManagementPage() {
                           {devicesByRoom['Otro']?.map((device) => (
                             <div
                               key={device.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                setSelectedDeviceFromPlan(device.id)
+                                handleOpenEcosystemModal(detailEcosystem!)
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  setSelectedDeviceFromPlan(device.id)
+                                  handleOpenEcosystemModal(detailEcosystem!)
+                                }
+                              }}
                               className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 hover:border-accent/30 hover:bg-accent/5 transition cursor-pointer group"
                             >
                               <Wifi className="size-3 text-slate-400" />
@@ -589,12 +846,16 @@ export default function EcosystemsManagementPage() {
       {selectedEcosystem ? (
         <EcosystemDevicesModal
           ecosystem={selectedEcosystem}
-          onClose={handleCloseEcosystemModal}
+          onClose={() => {
+            handleCloseEcosystemModal()
+            setSelectedDeviceFromPlan(null)
+          }}
           onDeviceUpdated={handleDeviceUpdated}
           onEcosystemUpdated={handleEcosystemUpdated}
           onEcosystemRevoked={handleEcosystemRevoked}
           canManageEcosystem={canManageEcosystem}
           canRevokeEcosystem={canRevokeEcosystem}
+          initialDeviceId={selectedDeviceFromPlan}
         />
       ) : null}
 

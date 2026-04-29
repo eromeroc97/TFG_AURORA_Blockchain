@@ -12,6 +12,7 @@ type EcosystemDevicesModalProps = {
   onEcosystemRevoked: (ecosystemId: string) => void
   canManageEcosystem: boolean
   canRevokeEcosystem: boolean
+  initialDeviceId?: string | null
 }
 
 export default function EcosystemDevicesModal({
@@ -22,6 +23,7 @@ export default function EcosystemDevicesModal({
   onEcosystemRevoked,
   canManageEcosystem,
   canRevokeEcosystem,
+  initialDeviceId,
 }: EcosystemDevicesModalProps) {
   const { authClaims } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
@@ -53,17 +55,20 @@ export default function EcosystemDevicesModal({
   const [filterCategory, setFilterCategory] = useState<string>('')
 
   useEffect(() => {
-    setSelectedDeviceId(devices[0]?.id ?? null)
-    setSelectedDevice(devices[0] ?? null)
-    setEditedDeviceName(devices[0]?.name ?? '')
-    setEditedDeviceLocation(devices[0]?.location ?? '')
-    setEditedDeviceCategory(devices[0]?.category ?? '')
+    const initialDevice = initialDeviceId
+      ? devices.find((d) => d.id === initialDeviceId)
+      : devices[0]
+    setSelectedDeviceId(initialDevice?.id ?? null)
+    setSelectedDevice(initialDevice ?? null)
+    setEditedDeviceName(initialDevice?.name ?? '')
+    setEditedDeviceLocation(initialDevice?.location ?? '')
+    setEditedDeviceCategory(initialDevice?.category ?? '')
     setEditedEcosystemName(ecosystem.name)
     setIsEditingEcosystemName(false)
     setEcosystemError(null)
     setModalError(null)
     setSaveMessage(null)
-  }, [ecosystem.id])
+  }, [ecosystem.id, initialDeviceId])
 
   useEffect(() => {
     if (!selectedDeviceId) {
