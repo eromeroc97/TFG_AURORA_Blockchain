@@ -5,6 +5,7 @@ import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { useEcosystemsController } from '../controllers/useEcosystemsController'
 import { getUserById } from '../services/users.service'
+import Select from '../components/Select'
 import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
 
 type CreateEcosystemStep = 'form' | 'confirm' | 'result'
@@ -429,15 +430,16 @@ export default function EcosystemsManagementPage() {
                     className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
                   />
                 </div>
-                <select
+                <Select
                   value={sharedStatusFilter}
-                  onChange={(e) => setSharedStatusFilter(e.target.value as 'ALL' | 'SHARED' | 'PRIVATE')}
-                  className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
-                >
-                  <option value="ALL">Todos los estados</option>
-                  <option value="PRIVATE">Privado</option>
-                  <option value="SHARED">Compartido</option>
-                </select>
+                  onChange={(value) => setSharedStatusFilter(value as 'ALL' | 'SHARED' | 'PRIVATE')}
+                  options={[
+                    { value: 'ALL', label: 'Todos los estados' },
+                    { value: 'PRIVATE', label: 'Privado' },
+                    { value: 'SHARED', label: 'Compartido' },
+                  ]}
+                  className="w-44"
+                />
               </div>
 
               {error ? (
@@ -562,20 +564,15 @@ export default function EcosystemsManagementPage() {
                   <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-slate-500">Mostrar</span>
-                      <select
-                        value={pageSize}
-                        onChange={(e) => {
-                          setPageSize(Number(e.target.value) as typeof pageSize)
+                      <Select
+                        value={String(pageSize)}
+                        onChange={(value) => {
+                          setPageSize(Number(value) as typeof pageSize)
                           setCurrentPage(1)
                         }}
-                        className="rounded-lg border border-border bg-white px-2 py-1 text-sm text-primary outline-none focus:border-accent"
-                      >
-                        {PAGE_SIZES.map((size) => (
-                          <option key={size} value={size}>
-                            {size}
-                          </option>
-                        ))}
-                      </select>
+                        options={PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))}
+                        className="w-20"
+                      />
                       <span className="text-sm text-slate-500">resultados</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -669,20 +666,15 @@ export default function EcosystemsManagementPage() {
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-slate-500">Mostrar</span>
-                        <select
-                          value={sharedPageSize}
-                          onChange={(e) => {
-                            setSharedPageSize(Number(e.target.value) as typeof sharedPageSize)
+                        <Select
+                          value={String(sharedPageSize)}
+                          onChange={(value) => {
+                            setSharedPageSize(Number(value) as typeof sharedPageSize)
                             setSharedCurrentPage(1)
                           }}
-                          className="rounded-lg border border-border bg-white px-2 py-1 text-sm text-primary outline-none focus:border-accent"
-                        >
-                          {PAGE_SIZES.map((size) => (
-                            <option key={size} value={size}>
-                              {size}
-                            </option>
-                          ))}
-                        </select>
+                          options={PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))}
+                          className="w-20"
+                        />
                         <span className="text-sm text-slate-500">resultados</span>
                       </div>
                       <div className="flex items-center gap-2">

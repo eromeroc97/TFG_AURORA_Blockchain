@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
+import Select from '../components/Select'
 import { useUsersController } from '../controllers/useUsersController'
 import { useAuth } from '../context/auth-context'
 
@@ -109,9 +110,10 @@ export default function UsersManagementPage() {
       users.filter((user) => {
         const matchesRole = roleFilter === 'ALL' || user.role === roleFilter
         const matchesStatus = statusFilter === 'ALL' || user.status === statusFilter
+        const searchLower = searchTerm?.toLowerCase() || ''
         const matchesSearch =
-          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.name.toLowerCase().includes(searchTerm.toLowerCase())
+          (user.email?.toLowerCase() || '').includes(searchLower) ||
+          (user.name?.toLowerCase() || '').includes(searchLower)
 
         return matchesRole && matchesStatus && matchesSearch
       }),
@@ -216,32 +218,20 @@ export default function UsersManagementPage() {
 
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Rol</span>
-              <select
+              <Select
                 value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value as typeof USER_ROLES[number])}
-                className="w-full rounded-3xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
-              >
-                {USER_ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {role === 'ALL' ? 'Todos' : role}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setRoleFilter(value as typeof USER_ROLES[number])}
+                options={USER_ROLES.map((role) => ({ value: role, label: role === 'ALL' ? 'Todos' : role }))}
+              />
             </label>
 
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Estado</span>
-              <select
+              <Select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as typeof USER_STATUSES[number])}
-                className="w-full rounded-3xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
-              >
-                {USER_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status === 'ALL' ? 'Todos' : status}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setStatusFilter(value as typeof USER_STATUSES[number])}
+                options={USER_STATUSES.map((status) => ({ value: status, label: status === 'ALL' ? 'Todos' : status }))}
+              />
             </label>
 
             <label className="block space-y-1">
@@ -471,26 +461,20 @@ export default function UsersManagementPage() {
             <div className="mt-6 space-y-3">
               <label className="block space-y-2">
                 <span className="text-sm font-medium text-slate-900">Nuevo rol</span>
-                <select
-                  value={pendingRoleChange.nextRole}
-                  onChange={(event) =>
+                <Select
+                  value={pendingRoleChange?.nextRole ?? ''}
+                  onChange={(value) =>
                     setPendingRoleChange((current) =>
                       current
                         ? {
                           ...current,
-                          nextRole: event.target.value,
+                          nextRole: value,
                         }
                         : current,
                     )
                   }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
-                >
-                  {['USER', 'AUDITOR', 'ADMIN'].map((assignableRole) => (
-                    <option key={assignableRole} value={assignableRole}>
-                      {assignableRole}
-                    </option>
-                  ))}
-                </select>
+                  options={['USER', 'AUDITOR', 'ADMIN'].map((role) => ({ value: role, label: role }))}
+                />
               </label>
             </div>
 
