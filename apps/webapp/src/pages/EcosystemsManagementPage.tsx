@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Eye, EyeOff, House, Plus, RefreshCcw, TreeDeciduous } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff, House, Key, Plus, RefreshCcw, Share2, TreeDeciduous } from 'lucide-react'
+import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { useEcosystemsController } from '../controllers/useEcosystemsController'
@@ -10,6 +11,8 @@ type CreateEcosystemStep = 'form' | 'confirm' | 'result'
 export default function EcosystemsManagementPage() {
   const { authClaims } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
+  const userId = authClaims?.sub
+  const isUser = role === 'USER'
   const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
   const { ecosystems, isLoading, error, isCreating, refreshEcosystems, createEcosystem } = useEcosystemsController()
@@ -24,10 +27,90 @@ export default function EcosystemsManagementPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [revealedApiKey, setRevealedApiKey] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)
+  const [apiKeysByEcosystemId, setApiKeysByEcosystemId] = useState<Record<string, string>>({})
+  const [revealedApiKeysByEcosystemId, setRevealedApiKeysByEcosystemId] = useState<Record<string, boolean>>({})
+  const [apiKeyLoadingByEcosystemId, setApiKeyLoadingByEcosystemId] = useState<Record<string, boolean>>({})
+  const [shareModalEcosystem, setShareModalEcosystem] = useState<AccessMapEcosystem | null>(null)
+  const [shareEmail, setShareEmail] = useState('')
+  const [isSharing, setIsSharing] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
 
   useEffect(() => {
     setVisibleEcosystems(ecosystems)
   }, [ecosystems])
+
+  const fetchEcosystemApiKey = async (ecosystemId: string) => {
+    if (apiKeysByEcosystemId[ecosystemId]) {
+      return apiKeysByEcosystemId[ecosystemId]
+    }
+
+    setApiKeyLoadingByEcosystemId((current) => ({ ...current, [ecosystemId]: true }))
+    try {
+      const response = await apiClient.get<{ apiKey: string }>(`/ecosystems/${ecosystemId}/api-key`)
+      const apiKey = response.data.apiKey
+      setApiKeysByEcosystemId((current) => ({ ...current, [ecosystemId]: apiKey }))
+      return apiKey
+    } catch {
+      return null
+    } finally {
+      setApiKeyLoadingByEcosystemId((current) => ({ ...current, [ecosystemId]: false }))
+    }
+  }
+
+  const toggleApiKeyVisibility = async (ecosystemId: string) => {
+    const nextIsVisible = !revealedApiKeysByEcosystemId[ecosystemId]
+    setRevealedApiKeysByEcosystemId((current) => ({ ...current, [ecosystemId]: nextIsVisible }))
+
+    if (nextIsVisible) {
+      await fetchEcosystemApiKey(ecosystemId)
+    }
+  }
+
+  const copyEcosystemApiKey = async (ecosystemId: string) => {
+    const apiKey = await fetchEcosystemApiKey(ecosystemId)
+    if (apiKey) {
+      await navigator.clipboard.writeText(apiKey)
+      setTimeout(() => {
+        setApiKeysByEcosystemId((current) => ({ ...current, [ecosystemId]: '' }))
+      }, 1500)
+    }
+  }
+
+  const openShareModal = (ecosystem: AccessMapEcosystem) => {
+    setShareModalEcosystem(ecosystem)
+    setShareEmail('')
+    setShareError(null)
+  }
+
+  const closeShareModal = () => {
+    setShareModalEcosystem(null)
+    setShareEmail('')
+    setShareError(null)
+  }
+
+  const handleShareEcosystem = async () => {
+    if (!shareModalEcosystem || !shareEmail.trim()) return
+
+    setIsSharing(true)
+    setShareError(null)
+
+    try {
+      await apiClient.post(`/ecosystems/${shareModalEcosystem.id}/share`, {
+        email: shareEmail.trim(),
+      })
+      closeShareModal()
+      await refreshEcosystems()
+    } catch {
+      setShareError('No se pudo compartir el ecosistema. Verifica el email e intenta de nuevo.')
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
+  const maskApiKey = (key: string) => {
+    if (key.length <= 8) return '••••••••'
+    return key.slice(0, 4) + '••••••••' + key.slice(-4)
+  }
 
   const closeCreateModal = () => {
     setIsCreateModalOpen(false)
@@ -73,18 +156,13 @@ export default function EcosystemsManagementPage() {
     }
   }
 
-  const maskApiKey = (key: string) => {
-    if (key.length <= 8) return '••••••••'
-    return key.slice(0, 4) + '••••••••' + key.slice(-4)
-  }
-
   const sharedEcosystemCount = useMemo(
     () => visibleEcosystems.filter((eco) => eco.isShared).length,
     [visibleEcosystems],
   )
 
-  const geolocatedEcosystemCount = useMemo(
-    () => visibleEcosystems.filter((eco) => typeof eco.lat === 'number' && typeof eco.lng === 'number').length,
+  const totalDevicesCount = useMemo(
+    () => visibleEcosystems.reduce((sum, eco) => sum + (eco.devices?.length ?? 0), 0),
     [visibleEcosystems],
   )
 
@@ -164,8 +242,8 @@ export default function EcosystemsManagementPage() {
             <p className="mt-2 text-3xl font-semibold text-slate-900">{sharedEcosystemCount}</p>
           </div>
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Con coordenadas</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{geolocatedEcosystemCount}</p>
+            <p className="text-sm text-slate-500">Dispositivos totales</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{totalDevicesCount}</p>
           </div>
         </div>
 
@@ -221,13 +299,75 @@ export default function EcosystemsManagementPage() {
                   aria-label={`Abrir ecosistema ${ecosystem.name}`}
                 >
                   <div className="flex items-center justify-between gap-4">
-                    <div>
+                    <div className="flex-1">
                       <p className="font-medium text-primary">{ecosystem.name}</p>
-                      <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                      {isUser && ecosystem.ownerId === userId && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {apiKeysByEcosystemId[ecosystem.id] || revealedApiKeysByEcosystemId[ecosystem.id] ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleApiKeyVisibility(ecosystem.id)
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary"
+                            >
+                              {revealedApiKeysByEcosystemId[ecosystem.id] ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                              {revealedApiKeysByEcosystemId[ecosystem.id]
+                                ? maskApiKey(apiKeysByEcosystemId[ecosystem.id] || '')
+                                : 'Ver API Key'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleApiKeyVisibility(ecosystem.id)
+                              }}
+                              disabled={apiKeyLoadingByEcosystemId[ecosystem.id]}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50 disabled:opacity-50"
+                            >
+                              <Key className="size-3" />
+                              {apiKeyLoadingByEcosystemId[ecosystem.id] ? 'Cargando...' : 'Recuperar API Key'}
+                            </button>
+                          )}
+                          {(apiKeysByEcosystemId[ecosystem.id] || revealedApiKeysByEcosystemId[ecosystem.id]) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                copyEcosystemApiKey(ecosystem.id)
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50"
+                            >
+                              <Copy className="size-3" />
+                              Copiar
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {!isUser && (
+                        <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                      )}
                     </div>
-                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
-                      {ecosystem.isShared ? 'Compartido' : 'Privado'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {isUser && ecosystem.ownerId === userId && !ecosystem.isShared && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openShareModal(ecosystem)
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50"
+                        >
+                          <Share2 className="size-3" />
+                          Compartir
+                        </button>
+                      )}
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
+                        {ecosystem.isShared ? 'Compartido' : 'Privado'}
+                      </span>
+                    </div>
                   </div>
                 </article>
               ))}
@@ -350,6 +490,56 @@ export default function EcosystemsManagementPage() {
                   {isCreating ? 'Creando ecosistema...' : 'Confirmar y generar API key'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shareModalEcosystem && (
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                <Share2 className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Compartir ecosistema</h3>
+                <p className="text-sm leading-6 text-slate-500">
+                  Comparte "{shareModalEcosystem.name}" con otro usuario.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-900">Email del usuario</span>
+                <input
+                  type="email"
+                  value={shareEmail}
+                  onChange={(event) => setShareEmail(event.target.value)}
+                  placeholder="usuario@ejemplo.com"
+                  className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </label>
+              {shareError && <p className="text-xs text-rose-600">{shareError}</p>}
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeShareModal}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isSharing || !shareEmail.trim()}
+                onClick={handleShareEcosystem}
+                className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSharing ? 'Compartiendo...' : 'Compartir'}
+              </button>
             </div>
           </div>
         </div>

@@ -15,6 +15,8 @@ type ApiDevice = {
   type: string
   status: string
   lastSeen: string | null
+  vendor: string | null
+  macAddress: string | null
 }
 
 type CreateEcosystemResponse = {
@@ -33,6 +35,8 @@ const mapApiDeviceToAccessMap = (device: ApiDevice): AccessMapDevice => ({
   status: device.status,
   lastSeen: device.lastSeen,
   isOnline: device.status === 'ONLINE',
+  vendor: device.vendor,
+  macAddress: device.macAddress,
 })
 
 export async function getEcosystems(): Promise<AccessMapEcosystem[]> {

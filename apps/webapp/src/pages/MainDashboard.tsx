@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   Line,
   LineChart,
@@ -54,6 +55,11 @@ export default function MainDashboard() {
 
     return `${value.toFixed(1)} ${units[unitIndex]}`
   }
+
+  const totalDevicesCount = useMemo(
+    () => ecosystems.reduce((sum, eco) => sum + (eco.devices?.length ?? 0), 0),
+    [ecosystems],
+  )
 
   return (
     <div className="min-h-screen p-6">
@@ -157,7 +163,7 @@ export default function MainDashboard() {
                 <a href="/ecosystems" text-decoration="none">
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
                     <p className="text-sm font-medium text-slate-500">Dispositivos conectados</p>
-                    <p className="mt-3 text-4xl font-semibold text-slate-900">{data.totalDevices}</p>
+                    <p className="mt-3 text-4xl font-semibold text-slate-900">{totalDevicesCount}</p>
                   </div>
                 </a>
               </div>

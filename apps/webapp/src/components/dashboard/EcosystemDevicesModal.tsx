@@ -51,7 +51,7 @@ export default function EcosystemDevicesModal({
     setEcosystemError(null)
     setModalError(null)
     setSaveMessage(null)
-  }, [ecosystem, devices])
+  }, [ecosystem.id])
 
   useEffect(() => {
     if (!selectedDeviceId) {
@@ -313,15 +313,15 @@ export default function EcosystemDevicesModal({
                     key={device.id}
                     type="button"
                     onClick={() => handleSelectDevice(device)}
-                    className={`w-full rounded-2xl px-4 py-3 text-left transition-colors ${
-                      device.id === selectedDeviceId ? 'bg-primary/10 text-primary' : 'bg-white text-primary/80 hover:bg-surface/80'
+                    className={`w-full rounded-2xl px-4 py-3 text-left transition-all border-2 ${
+                      device.id === selectedDeviceId ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-transparent bg-white text-primary/80 hover:bg-surface/80'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">{device.name}</span>
                       <span className="text-[0.65rem] uppercase tracking-[0.2em] text-muted">ID</span>
                     </div>
-                    <p className="mt-1 text-xs text-muted">{device.macAddress ?? 'MAC no registrada'}</p>
+                    <p className="mt-1 text-xs text-muted">{device.vendor ?? 'Sin vendor'}</p>
                   </button>
                 ))
               ) : (
@@ -351,7 +351,7 @@ export default function EcosystemDevicesModal({
             {modalError ? <p className="mt-4 text-sm text-rose-600">{modalError}</p> : null}
             {saveMessage ? <p className="mt-4 text-sm text-emerald-700">{saveMessage}</p> : null}
 
-            {isDeviceLoading ? (
+            {isDeviceLoading && !displayedDevice ? (
               <div className="mt-6 rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">Cargando datos del dispositivo...</div>
             ) : displayedDevice ? (
               <div className="mt-6 space-y-4 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
