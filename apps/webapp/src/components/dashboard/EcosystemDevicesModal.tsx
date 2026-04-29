@@ -339,7 +339,7 @@ export default function EcosystemDevicesModal({
               >
                 <option value="">Todas las ubicaciones</option>
                 <option value="SALON">Salón</option>
-                <option value="COMEDOR">Comedor</option>
+                <option value="COCINA">Cocina</option>
                 <option value="HABITACION">Habitación</option>
                 <option value="BAÑO">Baño</option>
                 <option value="OTRO">Otro</option>
@@ -428,7 +428,7 @@ export default function EcosystemDevicesModal({
                       >
                         <option value="">Seleccionar...</option>
                         <option value="SALON">Salón</option>
-                        <option value="COMEDOR">Comedor</option>
+                        <option value="COCINA">Cocina</option>
                         <option value="HABITACION">Habitación</option>
                         <option value="BAÑO">Baño</option>
                         <option value="OTRO">Otro</option>
@@ -494,7 +494,7 @@ export default function EcosystemDevicesModal({
                     onClick={handleSaveDeviceName}
                     className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isSavingDeviceName ? 'Guardando...' : 'Guardar nombre'}
+                    {isSavingDeviceName ? 'Guardando...' : 'Guardar'}
                   </button>
                 </div>
               </div>

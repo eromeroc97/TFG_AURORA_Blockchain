@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Eye, EyeOff, House, Key, Plus, Share2, TreeDeciduous, UserMinus, X } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff, House, Info, Key, Lightbulb, Plus, Share2, Thermometer, TreeDeciduous, UserMinus, Wifi, X } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
@@ -18,6 +18,7 @@ export default function EcosystemsManagementPage() {
   const { ecosystems, isLoading, error, isCreating, refreshEcosystems, createEcosystem } = useEcosystemsController()
   const [visibleEcosystems, setVisibleEcosystems] = useState<AccessMapEcosystem[]>(ecosystems)
   const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
+  const [detailEcosystemId, setDetailEcosystemId] = useState<string | null>(null)
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [createStep, setCreateStep] = useState<CreateEcosystemStep>('form')
@@ -39,6 +40,12 @@ export default function EcosystemsManagementPage() {
   useEffect(() => {
     setVisibleEcosystems(ecosystems)
   }, [ecosystems])
+
+  useEffect(() => {
+    if (!detailEcosystemId && visibleEcosystems.length > 0) {
+      setDetailEcosystemId(visibleEcosystems[0].id)
+    }
+  }, [visibleEcosystems, detailEcosystemId])
 
   const fetchEcosystemApiKey = async (ecosystemId: string) => {
     if (apiKeysByEcosystemId[ecosystemId]) {
@@ -183,6 +190,19 @@ export default function EcosystemsManagementPage() {
     [visibleEcosystems],
   )
 
+  const ROOM_ORDER = ['Salón', 'Dormitorio', 'Cocina', 'Baño', 'Otro']
+
+  const getRoomFromDevice = (device: AccessMapDevice): string => {
+    if (device.room && ROOM_ORDER.includes(device.room)) {
+      return device.room
+    }
+    if (device.location && ROOM_ORDER.slice(0, -1).some((r) => device.location!.toLowerCase().includes(r.toLowerCase()))) {
+      const found = ROOM_ORDER.slice(0, -1).find((r) => device.location!.toLowerCase().includes(r.toLowerCase()))
+      return found || 'Otro'
+    }
+    return 'Otro'
+  }
+
   const canManageEcosystem = role === 'USER'
   const canRevokeEcosystem = role === 'USER' || isAdminOrGlobalAdmin
 
@@ -191,6 +211,31 @@ export default function EcosystemsManagementPage() {
       current?.id === ecosystem.id ? current : ecosystem,
     )
   }
+
+  const handleSelectEcosystem = (ecosystem: AccessMapEcosystem) => {
+    setDetailEcosystemId((current) => (current === ecosystem.id ? null : ecosystem.id))
+  }
+
+  const detailEcosystem = useMemo(
+    () => visibleEcosystems.find((eco) => eco.id === detailEcosystemId) ?? null,
+    [visibleEcosystems, detailEcosystemId],
+  )
+
+  const devicesByRoom = useMemo(() => {
+    if (!detailEcosystem?.devices) return {}
+
+    const grouped: Record<string, AccessMapDevice[]> = {}
+    for (const room of ROOM_ORDER) {
+      grouped[room] = []
+    }
+
+    for (const device of detailEcosystem.devices) {
+      const room = getRoomFromDevice(device)
+      grouped[room].push(device)
+    }
+
+    return grouped
+  }, [detailEcosystem])
 
   const handleCloseEcosystemModal = () => {
     setSelectedEcosystem(null)
@@ -255,179 +300,289 @@ export default function EcosystemsManagementPage() {
             <p className="text-sm text-slate-500">Dispositivos totales</p>
             <p className="mt-2 text-3xl font-semibold text-slate-900">{totalDevicesCount}</p>
           </div>
-        </div>
+</div>
 
-<div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 text-primary">
-              <House className="size-5 text-accent" />
-              <h2 className="font-heading text-xl font-semibold">Ecosistemas Smart Home</h2>
-            </div>
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-emerald-700"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Añadir ecosistema
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-muted">Aquí puedes obtener informacion de tus ecosistemas o añadir nuevos.</p>
-
-          {error ? (
-            <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-              <p className="font-semibold">Error de carga</p>
-              <p className="mt-2">{error}</p>
-            </div>
-          ) : null}
-
-          {isLoading ? (
-            <div className="mt-6 space-y-4">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="h-16 rounded-2xl bg-slate-100" />
-              ))}
-            </div>
-          ) : visibleEcosystems.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
-              <p className="font-medium text-slate-900">No hay ecosistemas disponibles.</p>
-            </div>
-          ) : (
-            <div className="mt-6 space-y-3">
-              {visibleEcosystems.map((ecosystem) => (
-                <article
-                  key={ecosystem.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleOpenEcosystemModal(ecosystem)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      handleOpenEcosystemModal(ecosystem)
-                    }
-                  }}
-                  className="w-full cursor-pointer text-left rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50 focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  aria-label={`Abrir ecosistema ${ecosystem.name}`}
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-5 space-y-6">
+            <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-primary">
+                  <House className="size-5 text-accent" />
+                  <h2 className="font-heading text-xl font-semibold">Ecosistemas Smart Home</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-emerald-700"
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-medium text-primary">{ecosystem.name}</p>
-                      {isUser && ecosystem.ownerId === userId && (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {apiKeysByEcosystemId[ecosystem.id] || revealedApiKeysByEcosystemId[ecosystem.id] ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleApiKeyVisibility(ecosystem.id)
-                              }}
-                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary"
-                            >
-                              {revealedApiKeysByEcosystemId[ecosystem.id] ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
-                              {revealedApiKeysByEcosystemId[ecosystem.id]
-                                ? maskApiKey(apiKeysByEcosystemId[ecosystem.id] || '')
-                                : 'Ver API Key'}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleApiKeyVisibility(ecosystem.id)
-                              }}
-                              disabled={apiKeyLoadingByEcosystemId[ecosystem.id]}
-                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50 disabled:opacity-50"
-                            >
-                              <Key className="size-3" />
-                              {apiKeyLoadingByEcosystemId[ecosystem.id] ? 'Cargando...' : 'Recuperar API Key'}
-                            </button>
+                  <Plus className="h-3.5 w-3.5" />
+                  Añadir ecosistema
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-muted">Aquí puedes obtener informacion de tus ecosistemas o añadir nuevos.</p>
+
+              {error ? (
+                <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
+                  <p className="font-semibold">Error de carga</p>
+                  <p className="mt-2">{error}</p>
+                </div>
+              ) : null}
+
+              {isLoading ? (
+                <div className="mt-6 space-y-4">
+                  {[1, 2, 3].map((item) => (
+                    <div key={item} className="h-16 rounded-2xl bg-slate-100" />
+                  ))}
+                </div>
+              ) : visibleEcosystems.length === 0 ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
+                  <p className="font-medium text-slate-900">No hay ecosistemas disponibles.</p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {visibleEcosystems.map((ecosystem) => (
+                    <article
+                      key={ecosystem.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        handleSelectEcosystem(ecosystem)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          handleSelectEcosystem(ecosystem)
+                        }
+                      }}
+                      className={`w-full cursor-pointer text-left rounded-2xl border p-4 transition ${
+                        detailEcosystemId === ecosystem.id
+                          ? 'border-accent bg-accent/5'
+                          : 'border-border/50 bg-surface/30 hover:border-border hover:bg-surface/50'
+                      }`}
+                      aria-label={`Abrir ecosistema ${ecosystem.name}`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <p className="font-medium text-primary">{ecosystem.name}</p>
+                          {isUser && ecosystem.ownerId === userId && (
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              {apiKeysByEcosystemId[ecosystem.id] || revealedApiKeysByEcosystemId[ecosystem.id] ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleApiKeyVisibility(ecosystem.id)
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary"
+                                >
+                                  {revealedApiKeysByEcosystemId[ecosystem.id] ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                                  {revealedApiKeysByEcosystemId[ecosystem.id]
+                                    ? maskApiKey(apiKeysByEcosystemId[ecosystem.id] || '')
+                                    : 'Ver API Key'}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleApiKeyVisibility(ecosystem.id)
+                                  }}
+                                  disabled={apiKeyLoadingByEcosystemId[ecosystem.id]}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50 disabled:opacity-50"
+                                >
+                                  <Key className="size-3" />
+                                  {apiKeyLoadingByEcosystemId[ecosystem.id] ? 'Cargando...' : 'Recuperar API Key'}
+                                </button>
+                              )}
+                              {(apiKeysByEcosystemId[ecosystem.id] || revealedApiKeysByEcosystemId[ecosystem.id]) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    copyEcosystemApiKey(ecosystem.id)
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50"
+                                >
+                                  <Copy className="size-3" />
+                                  Copiar
+                                </button>
+                              )}
+                            </div>
                           )}
-                          {(apiKeysByEcosystemId[ecosystem.id] || revealedApiKeysByEcosystemId[ecosystem.id]) && (
+                          {!isUser && (
+                            <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isUser && ecosystem.ownerId === userId && !ecosystem.isShared && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                copyEcosystemApiKey(ecosystem.id)
+                                openShareModal(ecosystem)
                               }}
                               className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50"
                             >
-                              <Copy className="size-3" />
-                              Copiar
+                              <Share2 className="size-3" />
+                              Compartir
                             </button>
                           )}
+                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
+                            {ecosystem.isShared ? 'Compartido' : 'Privado'}
+                          </span>
                         </div>
-                      )}
-                      {!isUser && (
-                        <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isUser && ecosystem.ownerId === userId && !ecosystem.isShared && (
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
+              <div className="flex items-center gap-3 text-primary">
+                <Share2 className="size-5 text-accent" />
+                <h2 className="font-heading text-xl font-semibold">Ecosistemas compartidos conmigo</h2>
+              </div>
+              <p className="mt-3 text-xs text-muted">Ecosistemas que otros usuarios han compartido contigo.</p>
+
+              {ecosystemsSharedWithMe.length === 0 ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
+                  <p className="font-medium text-slate-900">No hay ecosistemas compartidos contigo.</p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {ecosystemsSharedWithMe.map((ecosystem) => (
+                    <article
+                      key={ecosystem.id}
+                      className="w-full rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <p className="font-medium text-primary">{ecosystem.name}</p>
+                          <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+                        </div>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openShareModal(ecosystem)
-                          }}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50"
+                          onClick={() => handleRevokeSharing(ecosystem.id)}
+                          disabled={revokingEcosystemId === ecosystem.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600 hover:bg-rose-100 disabled:opacity-50"
                         >
-                          <Share2 className="size-3" />
-                          Compartir
+                          {revokingEcosystemId === ecosystem.id ? (
+                            <>Revocando...</>
+                          ) : (
+                            <>
+                              <UserMinus className="size-3" />
+                              Dejar de compartir
+                            </>
+                          )}
                         </button>
-                      )}
-                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
-                        {ecosystem.isShared ? 'Compartido' : 'Privado'}
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        <div className="mt-6 rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
-          <div className="flex items-center gap-3 text-primary">
-            <Share2 className="size-5 text-accent" />
-            <h2 className="font-heading text-xl font-semibold">Ecosistemas compartidos conmigo</h2>
           </div>
-          <p className="mt-3 text-xs text-muted">Ecosistemas que otros usuarios han compartido contigo.</p>
 
-          {ecosystemsSharedWithMe.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
-              <p className="font-medium text-slate-900">No hay ecosistemas compartidos contigo.</p>
-            </div>
-          ) : (
-            <div className="mt-6 space-y-3">
-              {ecosystemsSharedWithMe.map((ecosystem) => (
-                <article
-                  key={ecosystem.id}
-                  className="w-full rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-medium text-primary">{ecosystem.name}</p>
-                      <p className="text-xs text-muted mt-1">Propietario: {ecosystem.ownerId ?? 'Desconocido'}</p>
+          <div className="col-span-7">
+            <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora h-full">
+              {detailEcosystem ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-primary">
+                      <House className="size-5 text-accent" />
+                      <h2 className="font-heading text-xl font-semibold">Plano del Ecosistema</h2>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleRevokeSharing(ecosystem.id)}
-                      disabled={revokingEcosystemId === ecosystem.id}
-                      className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600 hover:bg-rose-100 disabled:opacity-50"
+                      onClick={() => handleOpenEcosystemModal(detailEcosystem)}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-emerald-700"
                     >
-                      {revokingEcosystemId === ecosystem.id ? (
-                        <>Revocando...</>
-                      ) : (
-                        <>
-                          <UserMinus className="size-3" />
-                          Dejar de compartir
-                        </>
-                      )}
+                      <Info className="h-3.5 w-3.5" />
+                      Ver detalles
                     </button>
                   </div>
-                </article>
-              ))}
+                  <div className="mt-2 -mb-3">
+                    <svg className="w-full h-12" viewBox="0 0 400 60" preserveAspectRatio="none">
+                      <path d="M0 60 L200 0 L400 60 Z" fill="#cbd5e1" />
+                    </svg>
+                    <div className="-mt-4 flex items-center justify-center">
+                      <p className="text-xs font-semibold text-slate-600 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">
+                        {detailEcosystem.name} - {detailEcosystem.devices?.length ?? 0} dispositivos
+                      </p>
+                    </div>
+                    <div className="border-4 border-slate-300 bg-slate-50 rounded-b-3xl rounded-t-sm overflow-hidden">
+                      <div className="grid grid-cols-2 gap-3 p-4">
+                        {ROOM_ORDER.slice(0, -1).map((room) => (
+                          <div
+                            key={room}
+                            className="border-2 border-dashed border-slate-200 bg-white rounded-xl p-3 min-h-[100px]"
+                          >
+                            <p className="text-xs font-semibold text-slate-400 mb-2">{room}</p>
+                            <div className="space-y-1.5">
+                              {devicesByRoom[room]?.map((device) => (
+                                <div
+                                  key={device.id}
+                                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-100 hover:border-accent/30 hover:bg-accent/5 transition cursor-pointer group"
+                                >
+                                  {device.category?.toLowerCase().includes('temperature') ||
+                                  device.category?.toLowerCase().includes('termometro') ? (
+                                    <Thermometer className="size-3 text-rose-400" />
+                                  ) : device.category?.toLowerCase().includes('light') ||
+                                    device.category?.toLowerCase().includes('luz') ? (
+                                    <Lightbulb className="size-3 text-amber-400" />
+                                  ) : device.category?.toLowerCase().includes('wifi') ||
+                                    device.category?.toLowerCase().includes('sensor') ? (
+                                    <Wifi className="size-3 text-blue-400" />
+                                  ) : (
+                                    <Wifi className="size-3 text-slate-400" />
+                                  )}
+                                  <span className="text-xs text-slate-700 truncate flex-1 group-hover:text-slate-900">
+                                    {device.name}
+                                  </span>
+                                  {device.isOnline && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                                </div>
+                              ))}
+                              {(!devicesByRoom[room] || devicesByRoom[room].length === 0) && (
+                                <p className="text-xs text-slate-300 italic">Sin dispositivos</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="border-t-2 border-dashed border-slate-200 bg-slate-50/50 p-3">
+                        <p className="text-xs font-semibold text-slate-400 mb-2">Otro / Exterior</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {devicesByRoom['Otro']?.map((device) => (
+                            <div
+                              key={device.id}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 hover:border-accent/30 hover:bg-accent/5 transition cursor-pointer group"
+                            >
+                              <Wifi className="size-3 text-slate-400" />
+                              <span className="text-xs text-slate-600 truncate max-w-[80px] group-hover:text-slate-900">
+                                {device.name}
+                              </span>
+                              {device.isOnline && <span className="w-1 h-1 rounded-full bg-emerald-400" />}
+                            </div>
+                          ))}
+                          {(!devicesByRoom['Otro'] || devicesByRoom['Otro'].length === 0) && (
+                            <p className="text-xs text-slate-300 italic">Sin dispositivos</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-full min-h-[400px] items-center justify-center">
+                  <div className="text-center">
+                    <House className="mx-auto h-12 w-12 text-slate-300" />
+                    <p className="mt-4 text-slate-500">Selecciona un ecosistema para ver su plano</p>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 

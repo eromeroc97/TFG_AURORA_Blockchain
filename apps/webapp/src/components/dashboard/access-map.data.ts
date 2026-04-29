@@ -8,6 +8,7 @@ export type AccessMapDevice = {
   updatedAt: string
   location?: string
   category?: string
+  room?: string
   status?: string
   lastSeen?: string | null
   isOnline?: boolean
