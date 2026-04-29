@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { RefreshCcw, Search, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCcw, Search, Users } from 'lucide-react'
 import { useUsersController } from '../controllers/useUsersController'
 import { useAuth } from '../context/auth-context'
 
 const USER_ROLES = ['ALL', 'USER', 'AUDITOR', 'ADMIN'] as const
 const USER_STATUSES = ['ALL', 'ACTIVE', 'PENDING', 'PASSBLOCK'] as const
+const PAGE_SIZES = [10, 25, 50, 100] as const
 
 export default function UsersManagementPage() {
   const { users, isLoading, error, refreshUsers } = useUsersController()
@@ -14,6 +15,8 @@ export default function UsersManagementPage() {
   const [roleFilter, setRoleFilter] = useState<(typeof USER_ROLES)[number]>('ALL')
   const [statusFilter, setStatusFilter] = useState<(typeof USER_STATUSES)[number]>('ALL')
   const [searchTerm, setSearchTerm] = useState('')
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const canManageAdministratorUser = (user: { role: string }) => isGlobalAdmin || user.role !== 'ADMIN'
   const canViewUserInfo = (user: { status: string }) => user.status === 'ACTIVE' || user.status === 'PENDING'
@@ -56,6 +59,26 @@ export default function UsersManagementPage() {
       }),
     [users, roleFilter, statusFilter, searchTerm],
   )
+
+  const totalPages = Math.ceil(filteredUsers.length / pageSize)
+  const paginatedUsers = useMemo(
+    () => {
+      const start = (currentPage - 1) * pageSize
+      return filteredUsers.slice(start, start + pageSize)
+    },
+    [filteredUsers, currentPage, pageSize],
+  )
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage)
+    }
+  }
+
+  const handlePageSizeChange = (newSize: (typeof PAGE_SIZES)[number]) => {
+    setPageSize(newSize)
+    setCurrentPage(1)
+  }
 
   return (
     <div className="min-h-screen p-6">
@@ -140,10 +163,54 @@ export default function UsersManagementPage() {
                 ))}
               </select>
             </label>
+
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Resultados</span>
+              <div className="flex gap-1">
+                {PAGE_SIZES.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => handlePageSizeChange(size)}
+                    className={`rounded-lg px-2 py-1 text-xs font-medium transition ${
+                      pageSize === size
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </label>
           </div>
 
-          <div className="mb-3 text-xs text-muted">
-            Mostrando {filteredUsers.length} usuario{filteredUsers.length === 1 ? '' : 's'}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+            <span>
+              Mostrando {paginatedUsers.length} de {filteredUsers.length} usuario
+              {filteredUsers.length === 1 ? '' : 's'}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span>
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {error ? (
@@ -175,7 +242,7 @@ export default function UsersManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
-                  {filteredUsers.map((user) => (
+                  {paginatedUsers.map((user) => (
                     <tr key={user.id}>
                       <td className="px-6 py-4 font-medium text-slate-900">{user.email}</td>
                       <td className="px-6 py-4">
