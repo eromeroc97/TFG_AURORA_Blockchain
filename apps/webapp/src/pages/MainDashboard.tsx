@@ -27,12 +27,10 @@ export default function MainDashboard() {
   const role = (authClaims?.role ?? 'USER').toUpperCase()
   const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
-  const { ecosystems, isLoading: isMapLoading, error: mapError, refreshEcosystems } = useDashboardController()
-  const { data, isLoading: isTelemetryLoading, error: telemetryError, range, changeRange, refreshMetrics } = useTelemetryController()
-  const { users, isLoading: isUsersLoading, refreshUsers } = useUsersController()
-  const { services, isLoading: isServiceHealthLoading, refreshServiceHealth } = useServiceHealthController()
-
-  const isLoading = isMapLoading || isTelemetryLoading || isUsersLoading || isServiceHealthLoading
+  const { ecosystems, isLoading: isMapLoading, error: mapError } = useDashboardController()
+  const { data, error: telemetryError, range, changeRange } = useTelemetryController()
+  const { users } = useUsersController()
+  const { services } = useServiceHealthController()
 
   const ranges: TelemetryRange[] = ['30m', '1h', '12h', '24h', '1w', '1M', '1y']
 
