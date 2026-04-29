@@ -18,3 +18,8 @@ export async function approveUser(userId: string): Promise<User> {
 export async function revokeUser(userId: string): Promise<void> {
   await apiClient.delete(`/users/${userId}`)
 }
+
+export async function changeUserRole(userId: string, newRole: string): Promise<User> {
+  const response = await apiClient.patch<User>(`/users/${userId}/role`, { newRole })
+  return response.data
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getUsers, approveUser as apiApproveUser, revokeUser as apiRevokeUser } from '../services/users.service'
+import { getUsers, approveUser as apiApproveUser, revokeUser as apiRevokeUser, changeUserRole as apiChangeUserRole } from '../services/users.service'
 import type { User } from '../components/dashboard/users.data'
 
 export function useUsersController() {
@@ -47,6 +47,18 @@ export function useUsersController() {
     }
   }
 
+  const changeUserRole = async (userId: string, newRole: string) => {
+    setActionLoading(true)
+    try {
+      await apiChangeUserRole(userId, newRole)
+      await refreshUsers()
+    } catch (err) {
+      throw err
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   useEffect(() => {
     void refreshUsers()
   }, [])
@@ -59,5 +71,6 @@ export function useUsersController() {
     refreshUsers,
     approveUser,
     revokeUser,
+    changeUserRole,
   }
 }

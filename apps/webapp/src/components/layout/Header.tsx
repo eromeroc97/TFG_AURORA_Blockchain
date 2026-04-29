@@ -10,13 +10,18 @@ type HeaderProps = {
 }
 
 const navigationItems = [
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Usuarios', to: '/users' },
-  { label: 'Ecosistemas', to: '/ecosystems' },
+  { label: 'Dashboard', to: '/dashboard', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
+  { label: 'Usuarios', to: '/users', roles: ['ADMIN', 'GLOBAL_ADMIN'] },
+  { label: 'Ecosistemas', to: '/ecosystems', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
 ] as const
 
 export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) {
   const location = useLocation()
+  const role = (userRole ?? 'USER').toUpperCase()
+
+  const visibleNavigationItems = navigationItems.filter((item) =>
+    item.roles.includes(role as typeof item.roles[number]),
+  )
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -79,7 +84,7 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-2 rounded-full bg-white/70 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] md:flex">
-          {navigationItems.map((item) => (
+          {visibleNavigationItems.map((item) => (
             <Link key={item.label} to={item.to} className={getLinkClassName(item.to)}>
               {item.label}
             </Link>

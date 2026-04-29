@@ -9,6 +9,7 @@ import Recover from './pages/Recover'
 import Register from './pages/Register'
 import Reset from './pages/Reset'
 import RequireAuth from './components/routes/RequireAuth'
+import RequireAdmin from './components/routes/RequireAdmin'
 import UsersManagementPage from './pages/UsersManagementPage'
 import MainLayout from './layouts/MainLayout'
 
@@ -43,7 +44,9 @@ function App() {
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<MainDashboard />} />
-              <Route path="/users" element={<UsersManagementPage />} />
+              <Route element={<RequireAdmin />}>
+                <Route path="/users" element={<UsersManagementPage />} />
+              </Route>
               <Route path="/ecosystems" element={<EcosystemsManagementPage />} />
               <Route path="/account" element={<AccountPage />} />
             </Route>

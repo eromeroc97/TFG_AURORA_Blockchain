@@ -8,7 +8,7 @@ const USER_STATUSES = ['ALL', 'ACTIVE', 'PENDING', 'PASSBLOCK'] as const
 const PAGE_SIZES = [10, 25, 50, 100] as const
 
 export default function UsersManagementPage() {
-  const { users, isLoading, error, actionLoading, refreshUsers, approveUser, revokeUser } = useUsersController()
+  const { users, isLoading, error, actionLoading, refreshUsers, approveUser, revokeUser, changeUserRole } = useUsersController()
   const { authClaims } = useAuth()
   const [selectedUserInfo, setSelectedUserInfo] = useState<{ email: string; role: string; status: string } | null>(null)
   const [pendingUserAction, setPendingUserAction] = useState<{
@@ -16,6 +16,11 @@ export default function UsersManagementPage() {
     action: 'approve' | 'revoke'
   } | null>(null)
   const [pendingRoleChange, setPendingRoleChange] = useState<{
+    userEmail: string
+    currentRole: string
+    nextRole: string
+  } | null>(null)
+  const [roleChangeConfirmation, setRoleChangeConfirmation] = useState<{
     userEmail: string
     currentRole: string
     nextRole: string
@@ -77,8 +82,26 @@ export default function UsersManagementPage() {
   const handleConfirmRoleChange = () => {
     if (!pendingRoleChange) return
 
-    window.alert(`Cambio de rol solicitado para ${pendingRoleChange.userEmail}: ${pendingRoleChange.nextRole}`)
+    setRoleChangeConfirmation(pendingRoleChange)
     setPendingRoleChange(null)
+  }
+
+  const handleExecuteRoleChange = async () => {
+    if (!roleChangeConfirmation) return
+
+    const user = users.find((u) => u.email === roleChangeConfirmation.userEmail)
+    if (!user) {
+      setRoleChangeConfirmation(null)
+      return
+    }
+
+    try {
+      await changeUserRole(user.id, roleChangeConfirmation.nextRole)
+    } catch {
+      // Error handling without alert
+    } finally {
+      setRoleChangeConfirmation(null)
+    }
   }
 
   const filteredUsers = useMemo(
@@ -490,9 +513,46 @@ export default function UsersManagementPage() {
               <button
                 type="button"
                 onClick={handleConfirmRoleChange}
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                disabled={actionLoading}
+                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirmar cambio de rol
+                {actionLoading ? 'Procesando...' : 'Confirmar cambio de rol'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {roleChangeConfirmation ? (
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Confirmación requerida</h3>
+                <p className="text-sm leading-6 text-slate-500">
+                  ¿Estás seguro de cambiar el rol de {roleChangeConfirmation.userEmail} de {roleChangeConfirmation.currentRole} a {roleChangeConfirmation.nextRole}?
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setRoleChangeConfirmation(null)}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteRoleChange}
+                disabled={actionLoading}
+                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? 'Procesando...' : 'Confirmar cambio'}
               </button>
             </div>
           </div>
