@@ -102,6 +102,36 @@ export default function UsersManagementPage() {
     setCurrentPage(1)
   }
 
+  const PaginationControls = (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+      <span>
+        Mostrando {paginatedUsers.length} de {filteredUsers.length} usuario
+        {filteredUsers.length === 1 ? '' : 's'}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span>
+          Página {currentPage} de {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
@@ -111,7 +141,7 @@ export default function UsersManagementPage() {
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Gestión de usuarios</h1>
               <p className="text-slate-600 mt-2">
-                Administra el acceso y el estado de los usuarios que interactúan con los ecosistemas.
+                Administra el acceso y el estado de los usuarios.
               </p>
             </div>
           </div>
@@ -194,11 +224,10 @@ export default function UsersManagementPage() {
                     key={size}
                     type="button"
                     onClick={() => handlePageSizeChange(size)}
-                    className={`rounded-lg px-2 py-1 text-xs font-medium transition ${
-                      pageSize === size
+                    className={`rounded-lg px-2 py-1 text-xs font-medium transition ${pageSize === size
                         ? 'bg-slate-800 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     {size}
                   </button>
@@ -207,32 +236,8 @@ export default function UsersManagementPage() {
             </label>
           </div>
 
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-            <span>
-              Mostrando {paginatedUsers.length} de {filteredUsers.length} usuario
-              {filteredUsers.length === 1 ? '' : 's'}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span>
-                Página {currentPage} de {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
+          <div className="mb-3">
+            {PaginationControls}
           </div>
 
           {error ? (
@@ -253,85 +258,90 @@ export default function UsersManagementPage() {
               <p className="font-medium text-slate-900">No se encontraron usuarios para los filtros actuales.</p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-3xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm text-slate-700">
-                <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.2em] text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4">Correo</th>
-                    <th className="px-6 py-4">Rol</th>
-                    <th className="px-6 py-4">Estado</th>
-                    <th className="px-6 py-4">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {paginatedUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 font-medium text-slate-900">{user.email}</td>
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary">
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            user.status === 'ACTIVE'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : user.status === 'PENDING'
-                                ? 'bg-amber-100 text-amber-700'
-                                : user.status === 'PASSBLOCK'
-                                  ? 'bg-slate-100 text-slate-700'
-                                  : 'bg-rose-100 text-rose-700'
-                          }`}
-                        >
-                          {user.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {canViewUserInfo(user) && (
-                            <button
-                              type="button"
-                              onClick={() => handleShowUserInfo(user)}
-                              className="text-xs px-2 py-1 rounded hover:bg-sky-100 hover:text-sky-700 transition-colors text-sky-600"
-                            >
-                              Ver información
-                            </button>
-                          )}
-                          {canChangeUserRole(user) && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenRoleChange(user)}
-                              className="text-xs px-2 py-1 rounded hover:bg-slate-100 hover:text-slate-700 transition-colors text-slate-600"
-                            >
-                              Cambiar rol
-                            </button>
-                          )}
-                          {user.status === 'PENDING' && (
-                            <button
-                              type="button"
-                              onClick={() => handleUserAction(user, 'approve')}
-                              className="text-xs px-2 py-1 rounded hover:bg-emerald-100 hover:text-emerald-700 transition-colors text-emerald-600"
-                            >
-                              Aprobar
-                            </button>
-                          )}
-                          {canRevokeUser(user) && (
-                            <button
-                              type="button"
-                              onClick={() => handleUserAction(user, 'revoke')}
-                              className="text-xs px-2 py-1 rounded hover:bg-rose-100 hover:text-rose-700 transition-colors text-rose-600"
-                            >
-                              Revocar
-                            </button>
-                          )}
-                        </div>
-                      </td>
+            <>
+              <div className="overflow-hidden rounded-3xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm text-slate-700">
+                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.2em] text-slate-500">
+                    <tr>
+                      <th className="px-6 py-4">Correo</th>
+                      <th className="px-6 py-4">Rol</th>
+                      <th className="px-6 py-4">Estado</th>
+                      <th className="px-6 py-4">Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {paginatedUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td className="px-6 py-4 font-medium text-slate-900">{user.email}</td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary">
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`text-xs font-medium px-2 py-1 rounded-full ${user.status === 'ACTIVE'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : user.status === 'PENDING'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : user.status === 'PASSBLOCK'
+                                    ? 'bg-slate-100 text-slate-700'
+                                    : 'bg-rose-100 text-rose-700'
+                              }`}
+                          >
+                            {user.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            {canViewUserInfo(user) && (
+                              <button
+                                type="button"
+                                onClick={() => handleShowUserInfo(user)}
+                                className="text-xs px-2 py-1 rounded hover:bg-sky-100 hover:text-sky-700 transition-colors text-sky-600"
+                              >
+                                Ver información
+                              </button>
+                            )}
+                            {canChangeUserRole(user) && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenRoleChange(user)}
+                                className="text-xs px-2 py-1 rounded hover:bg-slate-100 hover:text-slate-700 transition-colors text-slate-600"
+                              >
+                                Cambiar rol
+                              </button>
+                            )}
+                            {user.status === 'PENDING' && (
+                              <button
+                                type="button"
+                                onClick={() => handleUserAction(user, 'approve')}
+                                className="text-xs px-2 py-1 rounded hover:bg-emerald-100 hover:text-emerald-700 transition-colors text-emerald-600"
+                              >
+                                Aprobar
+                              </button>
+                            )}
+                            {canRevokeUser(user) && (
+                              <button
+                                type="button"
+                                onClick={() => handleUserAction(user, 'revoke')}
+                                className="text-xs px-2 py-1 rounded hover:bg-rose-100 hover:text-rose-700 transition-colors text-rose-600"
+                              >
+                                Revocar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4">
+                {PaginationControls}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -402,11 +412,10 @@ export default function UsersManagementPage() {
               <button
                 type="button"
                 onClick={handleConfirmUserAction}
-                className={`inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-white transition-colors ${
-                  pendingUserAction.action === 'approve'
+                className={`inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-white transition-colors ${pendingUserAction.action === 'approve'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : 'bg-rose-600 hover:bg-rose-700'
-                }`}
+                  }`}
               >
                 {pendingUserAction.action === 'approve' ? 'Confirmar aprobación' : 'Confirmar revocación'}
               </button>
@@ -439,9 +448,9 @@ export default function UsersManagementPage() {
                     setPendingRoleChange((current) =>
                       current
                         ? {
-                            ...current,
-                            nextRole: event.target.value,
-                          }
+                          ...current,
+                          nextRole: event.target.value,
+                        }
                         : current,
                     )
                   }
