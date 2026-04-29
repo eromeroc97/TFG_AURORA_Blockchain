@@ -26,6 +26,7 @@ export default function EcosystemDevicesModal({
   const { authClaims } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
   const isUser = role === 'USER'
+  const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
   const devices = ecosystem.devices ?? []
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(devices[0]?.id ?? null)
@@ -409,18 +410,24 @@ export default function EcosystemDevicesModal({
               <div className="mt-6 space-y-4 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
                 <label className="block space-y-2">
                   <span className="text-sm font-medium text-primary">Nombre del dispositivo</span>
-                  <input
-                    type="text"
-                    value={editedDeviceName}
-                    onChange={(event) => setEditedDeviceName(event.target.value)}
-                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
-                  />
+                  {isUser ? (
+                    <input
+                      type="text"
+                      value={editedDeviceName}
+                      onChange={(event) => setEditedDeviceName(event.target.value)}
+                      className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+                    />
+                  ) : (
+                    <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
+                      {displayedDevice.name}
+                    </div>
+                  )}
                 </label>
 
-                {isUser && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium text-primary">Localización</span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-primary">Localización</span>
+                    {isUser ? (
                       <select
                         value={editedDeviceLocation}
                         onChange={(event) => setEditedDeviceLocation(event.target.value)}
@@ -433,9 +440,15 @@ export default function EcosystemDevicesModal({
                         <option value="BAÑO">Baño</option>
                         <option value="OTRO">Otro</option>
                       </select>
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium text-primary">Categoría</span>
+                    ) : (
+                      <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
+                        {displayedDevice.location || 'No disponible'}
+                      </div>
+                    )}
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-primary">Categoría</span>
+                    {isUser ? (
                       <select
                         value={editedDeviceCategory}
                         onChange={(event) => setEditedDeviceCategory(event.target.value)}
@@ -447,9 +460,13 @@ export default function EcosystemDevicesModal({
                         <option value="ENCHUFE_INTELIGENTE">Enchufe Inteligente</option>
                         <option value="OTRO">Otro</option>
                       </select>
-                    </label>
-                  </div>
-                )}
+                    ) : (
+                      <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
+                        {displayedDevice.category || 'No disponible'}
+                      </div>
+                    )}
+                  </label>
+                </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-border bg-white p-4">
@@ -488,14 +505,16 @@ export default function EcosystemDevicesModal({
                   >
                     Cerrar
                   </button>
-                  <button
-                    type="button"
-                    disabled={isSavingDeviceName || editedDeviceName.trim().length === 0 || editedDeviceName.trim() === displayedDevice.name}
-                    onClick={handleSaveDeviceName}
-                    className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSavingDeviceName ? 'Guardando...' : 'Guardar'}
-                  </button>
+                  {isUser && (
+                    <button
+                      type="button"
+                      disabled={isSavingDeviceName || editedDeviceName.trim().length === 0 || editedDeviceName.trim() === displayedDevice.name}
+                      onClick={handleSaveDeviceName}
+                      className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSavingDeviceName ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
