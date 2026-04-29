@@ -6,6 +6,11 @@ export type AccessMapDevice = {
   ecosystemId: string
   createdAt: string
   updatedAt: string
+  location?: string
+  category?: string
+  status?: string
+  lastSeen?: string | null
+  isOnline?: boolean
 }
 
 export type AccessMapEcosystem = {

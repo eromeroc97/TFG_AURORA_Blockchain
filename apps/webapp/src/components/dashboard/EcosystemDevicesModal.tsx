@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Pencil, X } from 'lucide-react'
 import { apiClient } from '../../api/axios'
+import { useAuth } from '../../context/auth-context'
 import type { AccessMapDevice, AccessMapEcosystem } from './access-map.data'
 
 type EcosystemDevicesModalProps = {
@@ -22,10 +23,16 @@ export default function EcosystemDevicesModal({
   canManageEcosystem,
   canRevokeEcosystem,
 }: EcosystemDevicesModalProps) {
+  const { authClaims } = useAuth()
+  const role = (authClaims?.role ?? 'USER').toUpperCase()
+  const isUser = role === 'USER'
+
   const devices = ecosystem.devices ?? []
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(devices[0]?.id ?? null)
   const [selectedDevice, setSelectedDevice] = useState<AccessMapDevice | null>(devices[0] ?? null)
   const [editedDeviceName, setEditedDeviceName] = useState<string>(devices[0]?.name ?? '')
+  const [editedDeviceLocation, setEditedDeviceLocation] = useState<string>(devices[0]?.location ?? '')
+  const [editedDeviceCategory, setEditedDeviceCategory] = useState<string>(devices[0]?.category ?? '')
   const [editedEcosystemName, setEditedEcosystemName] = useState<string>(ecosystem.name)
   const [isDeviceLoading, setIsDeviceLoading] = useState(false)
   const [isDeviceStatusLoading, setIsDeviceStatusLoading] = useState(false)
@@ -46,6 +53,8 @@ export default function EcosystemDevicesModal({
     setSelectedDeviceId(devices[0]?.id ?? null)
     setSelectedDevice(devices[0] ?? null)
     setEditedDeviceName(devices[0]?.name ?? '')
+    setEditedDeviceLocation(devices[0]?.location ?? '')
+    setEditedDeviceCategory(devices[0]?.category ?? '')
     setEditedEcosystemName(ecosystem.name)
     setIsEditingEcosystemName(false)
     setEcosystemError(null)
@@ -57,6 +66,8 @@ export default function EcosystemDevicesModal({
     if (!selectedDeviceId) {
       setSelectedDevice(null)
       setEditedDeviceName('')
+      setEditedDeviceLocation('')
+      setEditedDeviceCategory('')
       return
     }
 
@@ -70,10 +81,14 @@ export default function EcosystemDevicesModal({
 
         setSelectedDevice(deviceDetails)
         setEditedDeviceName(deviceDetails.name)
+        setEditedDeviceLocation(deviceDetails.location ?? '')
+        setEditedDeviceCategory(deviceDetails.category ?? '')
       } catch {
         const persistedDevice = ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
         setSelectedDevice(persistedDevice)
         setEditedDeviceName(persistedDevice?.name ?? '')
+        setEditedDeviceLocation(persistedDevice?.location ?? '')
+        setEditedDeviceCategory(persistedDevice?.category ?? '')
         setModalError('No se pudo cargar información detallada del dispositivo. Se muestra la información disponible.')
       } finally {
         setIsDeviceLoading(false)
@@ -364,6 +379,40 @@ export default function EcosystemDevicesModal({
                     className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
                   />
                 </label>
+
+                {isUser && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-primary">Localización</span>
+                      <select
+                        value={editedDeviceLocation}
+                        onChange={(event) => setEditedDeviceLocation(event.target.value)}
+                        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+                      >
+                        <option value="">Seleccionar...</option>
+                        <option value="SALON">Salón</option>
+                        <option value="COMEDOR">Comedor</option>
+                        <option value="HABITACION">Habitación</option>
+                        <option value="BAÑO">Baño</option>
+                        <option value="OTRO">Otro</option>
+                      </select>
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-primary">Categoría</span>
+                      <select
+                        value={editedDeviceCategory}
+                        onChange={(event) => setEditedDeviceCategory(event.target.value)}
+                        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+                      >
+                        <option value="">Seleccionar...</option>
+                        <option value="BOMBILLA">Bombilla</option>
+                        <option value="PANEL_INTELIGENTE">Panel Inteligente</option>
+                        <option value="ENCHUFE_INTELIGENTE">Enchufe Inteligente</option>
+                        <option value="OTRO">Otro</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-border bg-white p-4">
