@@ -76,11 +76,16 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
 
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
-          <img
-            src={auroraLogo}
-            alt="AURORA"
-            className="h-11 w-auto drop-shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
-          />
+          <div className="flex flex-col items-center">
+            <img
+              src={auroraLogo}
+              alt="AURORA"
+              className="h-11 w-auto drop-shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
+            />
+            <span className="text-[0.6rem] font-bold tracking-[0.35em] text-primary -mt-1">
+              SMART HOME
+            </span>
+          </div>
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-2 rounded-full bg-white/70 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] md:flex">
