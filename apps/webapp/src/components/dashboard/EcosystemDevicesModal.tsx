@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Bed,
   Cctv,
   Cpu,
   DoorOpen,
+  Droplets,
+  Flame,
+  Home,
   Lightbulb,
   Lock,
   Pencil,
@@ -49,6 +53,14 @@ const DEVICE_CATEGORIES: Record<string, { label: string; icon: React.ComponentTy
   APPLIANCE: { label: 'Electrodomésticos', icon: Refrigerator },
   ROUTER: { label: 'Hub / Router', icon: Router },
   OTHER: { label: 'Otro', icon: Cpu },
+}
+
+const DEVICE_LOCATIONS: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  SALON: { label: 'Salón', icon: Tv },
+  COCINA: { label: 'Cocina', icon: Flame },
+  HABITACION: { label: 'Dormitorio', icon: Bed },
+  BAÑO: { label: 'Baño', icon: Droplets },
+  OTRO: { label: 'Otro', icon: Home },
 }
 
 function CategorySelect({
@@ -109,6 +121,197 @@ function CategorySelect({
               }`}
             >
               <Icon className="size-4 text-slate-500" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LocationSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const selectedLocation = DEVICE_LOCATIONS[value]
+  const SelectedIcon = selectedLocation?.icon
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent flex items-center justify-between disabled:bg-slate-50 disabled:cursor-not-allowed"
+      >
+        <span className="flex items-center gap-2">
+          {SelectedIcon && <SelectedIcon className="size-4 text-slate-500" />}
+          {selectedLocation?.label || 'Seleccionar...'}
+        </span>
+        {!disabled && (
+          <svg className={`size-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-white py-1 shadow-lg max-h-60 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => {
+              onChange('')
+              setIsOpen(false)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-slate-500 hover:bg-slate-50"
+          >
+            Seleccionar...
+          </button>
+          {Object.entries(DEVICE_LOCATIONS).map(([key, { label, icon: Icon }]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                onChange(key)
+                setIsOpen(false)
+              }}
+              className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                value === key ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+              }`}
+            >
+              <Icon className="size-4 text-slate-500" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CompactLocationSelect({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const selectedLocation = DEVICE_LOCATIONS[value]
+  const SelectedIcon = selectedLocation?.icon
+
+  return (
+    <div className="relative flex-1">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full rounded-xl border border-border bg-white px-2 py-1.5 text-xs text-primary outline-none transition-colors focus:border-accent flex items-center justify-between"
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          {SelectedIcon && <SelectedIcon className="size-3 text-slate-500 shrink-0" />}
+          <span className="truncate">{selectedLocation?.label || 'Habitación'}</span>
+        </span>
+        <svg className={`size-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''} shrink-0 ml-1`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-white py-1 shadow-lg max-h-48 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => {
+              onChange('')
+              setIsOpen(false)
+            }}
+            className="w-full px-2 py-1.5 text-left text-xs text-slate-500 hover:bg-slate-50"
+          >
+            Todas las habitaciones
+          </button>
+          {Object.entries(DEVICE_LOCATIONS).map(([key, { label, icon: Icon }]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                onChange(key)
+                setIsOpen(false)
+              }}
+              className={`w-full px-2 py-1.5 text-left text-xs hover:bg-slate-50 flex items-center gap-1.5 ${
+                value === key ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+              }`}
+            >
+              <Icon className="size-3 text-slate-500" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CompactCategorySelect({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const selectedCategory = DEVICE_CATEGORIES[value]
+  const SelectedIcon = selectedCategory?.icon
+
+  return (
+    <div className="relative flex-1">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full rounded-xl border border-border bg-white px-2 py-1.5 text-xs text-primary outline-none transition-colors focus:border-accent flex items-center justify-between"
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          {SelectedIcon && <SelectedIcon className="size-3 text-slate-500 shrink-0" />}
+          <span className="truncate">{selectedCategory?.label || 'Categoría'}</span>
+        </span>
+        <svg className={`size-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''} shrink-0 ml-1`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-white py-1 shadow-lg max-h-48 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => {
+              onChange('')
+              setIsOpen(false)
+            }}
+            className="w-full px-2 py-1.5 text-left text-xs text-slate-500 hover:bg-slate-50"
+          >
+            Todas las categorías
+          </button>
+          {Object.entries(DEVICE_CATEGORIES).map(([key, { label, icon: Icon }]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                onChange(key)
+                setIsOpen(false)
+              }}
+              className={`w-full px-2 py-1.5 text-left text-xs hover:bg-slate-50 flex items-center gap-1.5 ${
+                value === key ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+              }`}
+            >
+              <Icon className="size-3 text-slate-500" />
               {label}
             </button>
           ))}
@@ -440,29 +643,8 @@ export default function EcosystemDevicesModal({
           <div className="rounded-3xl border border-border bg-surface/60 p-4 overflow-hidden">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Lista de dispositivos</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <select
-                value={filterLocation}
-                onChange={(event) => setFilterLocation(event.target.value)}
-                className="flex-1 rounded-xl border border-border bg-white px-2 py-1.5 text-xs text-primary outline-none focus:border-accent"
-              >
-                <option value="">Todas las ubicaciones</option>
-                <option value="SALON">Salón</option>
-                <option value="COCINA">Cocina</option>
-                <option value="HABITACION">Habitación</option>
-                <option value="BAÑO">Baño</option>
-                <option value="OTRO">Otro</option>
-              </select>
-              <select
-                value={filterCategory}
-                onChange={(event) => setFilterCategory(event.target.value)}
-                className="flex-1 rounded-xl border border-border bg-white px-2 py-1.5 text-xs text-primary outline-none focus:border-accent"
-              >
-                <option value="">Todas las categorías</option>
-                <option value="BOMBILLA">Bombilla</option>
-                <option value="PANEL_INTELIGENTE">Panel</option>
-                <option value="ENCHUFE_INTELIGENTE">Enchufe</option>
-                <option value="OTRO">Otro</option>
-              </select>
+              <CompactLocationSelect value={filterLocation} onChange={setFilterLocation} />
+              <CompactCategorySelect value={filterCategory} onChange={setFilterCategory} />
             </div>
             <div className="mt-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2 space-y-2">
               {filteredDevices.length > 0 ? (
@@ -533,23 +715,14 @@ export default function EcosystemDevicesModal({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium text-primary">Localización</span>
+                    <span className="text-sm font-medium text-primary">Habitación</span>
                     {isUser ? (
-                      <select
-                        value={editedDeviceLocation}
-                        onChange={(event) => setEditedDeviceLocation(event.target.value)}
-                        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
-                      >
-                        <option value="">Seleccionar...</option>
-                        <option value="SALON">Salón</option>
-                        <option value="COCINA">Cocina</option>
-                        <option value="HABITACION">Habitación</option>
-                        <option value="BAÑO">Baño</option>
-                        <option value="OTRO">Otro</option>
-                      </select>
+                      <LocationSelect value={editedDeviceLocation} onChange={setEditedDeviceLocation} />
                     ) : (
                       <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
-                        {displayedDevice.location || 'No disponible'}
+                        {displayedDevice.location && DEVICE_LOCATIONS[displayedDevice.location]
+                          ? DEVICE_LOCATIONS[displayedDevice.location].label
+                          : displayedDevice.location || 'No disponible'}
                       </div>
                     )}
                   </label>
