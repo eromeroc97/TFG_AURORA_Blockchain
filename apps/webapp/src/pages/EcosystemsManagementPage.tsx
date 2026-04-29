@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, House, Info, Key, Lightbulb, Plus, Search, Share2, Thermometer, TreeDeciduous, UserMinus, Wifi, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, House, Info, Key, Lightbulb, Plus, Search, Share2, Thermometer, UserMinus, Wifi } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
@@ -26,7 +26,7 @@ export default function EcosystemsManagementPage() {
   const [createStep, setCreateStep] = useState<CreateEcosystemStep>('form')
   const [newEcosystemName, setNewEcosystemName] = useState('')
   const [newEcosystemApiKey, setNewEcosystemApiKey] = useState<string | null>(null)
-  const [newEcosystemId, setNewEcosystemId] = useState<string | null>(null)
+  const [setNewEcosystemId] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [revealedApiKey, setRevealedApiKey] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)

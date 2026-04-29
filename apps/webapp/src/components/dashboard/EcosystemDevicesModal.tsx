@@ -1,5 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, X } from 'lucide-react'
+import {
+  Cctv,
+  Cpu,
+  DoorOpen,
+  Lightbulb,
+  Lock,
+  Pencil,
+  PlugZap,
+  Radar,
+  Refrigerator,
+  Router,
+  Speaker,
+  Tablet,
+  Thermometer,
+  Tv,
+  Wind,
+  X,
+  Zap,
+} from 'lucide-react'
 import { apiClient } from '../../api/axios'
 import { useAuth } from '../../context/auth-context'
 import type { AccessMapDevice, AccessMapEcosystem } from './access-map.data'
@@ -15,6 +33,91 @@ type EcosystemDevicesModalProps = {
   initialDeviceId?: string | null
 }
 
+const DEVICE_CATEGORIES: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  SMART_BULB: { label: 'Bombilla Inteligente', icon: Lightbulb },
+  SMART_PANEL: { label: 'Panel Inteligente', icon: Tablet },
+  SMART_PLUG: { label: 'Enchufe Inteligente', icon: PlugZap },
+  ENERGY_METER: { label: 'Medidor de Consumo', icon: Zap },
+  CAMERA: { label: 'Cámara IP', icon: Cctv },
+  SMART_LOCK: { label: 'Cerradura', icon: Lock },
+  CONTACT_SENSOR: { label: 'Sensor de Contacto', icon: DoorOpen },
+  MOTION_SENSOR: { label: 'Sensor de Movimiento', icon: Radar },
+  THERMOSTAT: { label: 'Termostato', icon: Thermometer },
+  HVAC: { label: 'Climatización', icon: Wind },
+  SMART_SPEAKER: { label: 'Altavoz Inteligente', icon: Speaker },
+  SMART_TV: { label: 'Smart TV', icon: Tv },
+  APPLIANCE: { label: 'Electrodomésticos', icon: Refrigerator },
+  ROUTER: { label: 'Hub / Router', icon: Router },
+  OTHER: { label: 'Otro', icon: Cpu },
+}
+
+function CategorySelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const selectedCategory = DEVICE_CATEGORIES[value]
+  const SelectedIcon = selectedCategory?.icon
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent flex items-center justify-between disabled:bg-slate-50 disabled:cursor-not-allowed"
+      >
+        <span className="flex items-center gap-2">
+          {SelectedIcon && <SelectedIcon className="size-4 text-slate-500" />}
+          {selectedCategory?.label || 'Seleccionar...'}
+        </span>
+        {!disabled && (
+          <svg className={`size-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-white py-1 shadow-lg max-h-60 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => {
+              onChange('')
+              setIsOpen(false)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-slate-500 hover:bg-slate-50"
+          >
+            Seleccionar...
+          </button>
+          {Object.entries(DEVICE_CATEGORIES).map(([key, { label, icon: Icon }]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                onChange(key)
+                setIsOpen(false)
+              }}
+              className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                value === key ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+              }`}
+            >
+              <Icon className="size-4 text-slate-500" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function EcosystemDevicesModal({
   ecosystem,
   onClose,
@@ -28,8 +131,7 @@ export default function EcosystemDevicesModal({
   const { authClaims } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
   const isUser = role === 'USER'
-  const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
-
+  
   const devices = ecosystem.devices ?? []
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(devices[0]?.id ?? null)
   const [selectedDevice, setSelectedDevice] = useState<AccessMapDevice | null>(devices[0] ?? null)
@@ -454,20 +556,12 @@ export default function EcosystemDevicesModal({
                   <label className="block space-y-2">
                     <span className="text-sm font-medium text-primary">Categoría</span>
                     {isUser ? (
-                      <select
-                        value={editedDeviceCategory}
-                        onChange={(event) => setEditedDeviceCategory(event.target.value)}
-                        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
-                      >
-                        <option value="">Seleccionar...</option>
-                        <option value="BOMBILLA">Bombilla</option>
-                        <option value="PANEL_INTELIGENTE">Panel Inteligente</option>
-                        <option value="ENCHUFE_INTELIGENTE">Enchufe Inteligente</option>
-                        <option value="OTRO">Otro</option>
-                      </select>
+                      <CategorySelect value={editedDeviceCategory} onChange={setEditedDeviceCategory} />
                     ) : (
                       <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
-                        {displayedDevice.category || 'No disponible'}
+                        {displayedDevice.category && DEVICE_CATEGORIES[displayedDevice.category]
+                          ? DEVICE_CATEGORIES[displayedDevice.category].label
+                          : displayedDevice.category || 'No disponible'}
                       </div>
                     )}
                   </label>

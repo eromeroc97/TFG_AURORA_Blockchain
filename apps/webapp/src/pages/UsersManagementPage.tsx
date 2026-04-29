@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCcw, Search, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
 import { useUsersController } from '../controllers/useUsersController'
 import { useAuth } from '../context/auth-context'
 
@@ -181,14 +181,6 @@ export default function UsersManagementPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={refreshUsers}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refrescar
-          </button>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
