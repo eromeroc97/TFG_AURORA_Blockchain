@@ -182,6 +182,28 @@ services:
     networks:
       - aurora-secure-net
 
+  firefly-proxy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    # Inyectamos el fallback directamente en la línea de comandos
+    command: caddy reverse-proxy --from :80 --to ${FIREFLY_HOST:-https://number-try-physical-spotlight.trycloudflare.com} --change-host-header
+    labels:
+      - "traefik.enable=true"
+      # 1. Atrapamos la ruta que llama el frontend
+      - "traefik.http.routers.firefly-health.rule=Path(`/api/firefly/health`)"
+      - "traefik.http.routers.firefly-health.entrypoints=web"
+      - "traefik.http.routers.firefly-health.priority=150"
+      
+      # 2. Reescribimos la ruta de forma estricta (sin Regex)
+      - "traefik.http.middlewares.firefly-rewrite.replacepath.path=/api/v1/status"
+      - "traefik.http.routers.firefly-health.middlewares=firefly-rewrite"
+      
+      # 3. Mandamos el tráfico al puerto interno de Caddy
+      - "traefik.http.services.firefly-health.loadbalancer.server.port=80"
+      - "traefik.docker.network=aurora-secure-net"
+    networks:
+      - aurora-secure-net
+
   postgres-db:
     image: postgres:15-alpine
     environment:

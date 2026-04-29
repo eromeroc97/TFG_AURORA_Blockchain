@@ -99,7 +99,7 @@ export default function UsersManagementPage() {
           <div className="mb-6 grid gap-3 md:grid-cols-3">
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Buscar</span>
-              <div className="flex items-center rounded-xl border border-border bg-slate-50 px-3 py-2">
+              <div className="flex items-center rounded-3xl border border-border bg-slate-50 px-3 py-2">
                 <Search className="h-4 w-4 text-slate-400" />
                 <input
                   type="text"
@@ -116,7 +116,7 @@ export default function UsersManagementPage() {
               <select
                 value={roleFilter}
                 onChange={(event) => setRoleFilter(event.target.value as typeof USER_ROLES[number])}
-                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
+                className="w-full rounded-3xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
               >
                 {USER_ROLES.map((role) => (
                   <option key={role} value={role}>
@@ -131,7 +131,7 @@ export default function UsersManagementPage() {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as typeof USER_STATUSES[number])}
-                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
+                className="w-full rounded-3xl border border-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-accent"
               >
                 {USER_STATUSES.map((status) => (
                   <option key={status} value={status}>

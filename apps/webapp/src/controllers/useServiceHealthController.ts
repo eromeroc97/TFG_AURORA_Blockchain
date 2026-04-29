@@ -21,7 +21,7 @@ const serviceDefinitions = [
   },
   {
     id: 'iotManager',
-    name: 'Ingesta y Descubrimiento',
+    name: 'Motor de Telemetría',
     envKey: 'VITE_IOT_MANAGER_HEALTH_URL',
   },
   {
