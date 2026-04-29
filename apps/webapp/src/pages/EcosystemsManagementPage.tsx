@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy, Eye, EyeOff, House, Plus, RefreshCcw, TreeDeciduous } from 'lucide-react'
+import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { useEcosystemsController } from '../controllers/useEcosystemsController'
 import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
@@ -7,6 +8,10 @@ import type { AccessMapEcosystem } from '../components/dashboard/access-map.data
 type CreateEcosystemStep = 'form' | 'confirm' | 'result'
 
 export default function EcosystemsManagementPage() {
+  const { authClaims } = useAuth()
+  const role = (authClaims?.role ?? 'USER').toUpperCase()
+  const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
+
   const { ecosystems, isLoading, error, isCreating, refreshEcosystems, createEcosystem } = useEcosystemsController()
   const [visibleEcosystems, setVisibleEcosystems] = useState<AccessMapEcosystem[]>(ecosystems)
   const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
@@ -83,7 +88,8 @@ export default function EcosystemsManagementPage() {
     [visibleEcosystems],
   )
 
-  const canManageEcosystem = true
+  const canManageEcosystem = role === 'USER'
+  const canRevokeEcosystem = role === 'USER' || isAdminOrGlobalAdmin
 
   const handleOpenEcosystemModal = (ecosystem: AccessMapEcosystem) => {
     setSelectedEcosystem((current) =>
@@ -238,6 +244,7 @@ export default function EcosystemsManagementPage() {
           onEcosystemUpdated={handleEcosystemUpdated}
           onEcosystemRevoked={handleEcosystemRevoked}
           canManageEcosystem={canManageEcosystem}
+          canRevokeEcosystem={canRevokeEcosystem}
         />
       ) : null}
 
