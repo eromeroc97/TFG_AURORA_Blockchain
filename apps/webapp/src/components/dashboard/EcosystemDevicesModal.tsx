@@ -224,7 +224,7 @@ function LocationSelect({
                 value === room ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
               }`}
             >
-              <Plus className="size-4 text-slate-500" />
+              <Home className="size-4 text-slate-500" />
               {room}
             </button>
           ))}
@@ -250,14 +250,33 @@ function LocationSelect({
 function CompactLocationSelect({
   value,
   onChange,
+  customRooms,
 }: {
   value: string
   onChange: (value: string) => void
+  customRooms: string[]
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const selectedLocation = DEVICE_LOCATIONS[value]
   const SelectedIcon = selectedLocation?.icon
+
+  const predefinedOptions = Object.entries(DEVICE_LOCATIONS)
+    .filter(([key]) => key !== 'OTRO')
+    .map(([key, { label, icon: Icon }]) => ({
+      key,
+      label,
+      icon: Icon,
+    }))
+
+  const customOptions = customRooms.map((room) => ({
+    key: room,
+    label: room,
+    icon: Home,
+  }))
+
+  const displayLabel = selectedLocation?.label || customOptions.find(o => o.key === value)?.label || 'Habitación'
+  const DisplayIcon = SelectedIcon || customOptions.find(o => o.key === value)?.icon
 
   return (
     <div className="relative flex-1">
@@ -267,8 +286,8 @@ function CompactLocationSelect({
         className="w-full rounded-xl border border-border bg-white px-2 py-1.5 text-xs text-primary outline-none transition-colors focus:border-accent flex items-center justify-between"
       >
         <span className="flex items-center gap-1.5 truncate">
-          {SelectedIcon && <SelectedIcon className="size-3 text-slate-500 shrink-0" />}
-          <span className="truncate">{selectedLocation?.label || 'Habitación'}</span>
+          {DisplayIcon && <DisplayIcon className="size-3 text-slate-500 shrink-0" />}
+          <span className="truncate">{displayLabel}</span>
         </span>
         <svg className={`size-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''} shrink-0 ml-1`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -287,7 +306,7 @@ function CompactLocationSelect({
           >
             Todas las habitaciones
           </button>
-          {Object.entries(DEVICE_LOCATIONS).map(([key, { label, icon: Icon }]) => (
+          {predefinedOptions.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
@@ -303,6 +322,27 @@ function CompactLocationSelect({
               {label}
             </button>
           ))}
+          {customOptions.length > 0 && (
+            <>
+              <div className="my-1 border-t border-border" />
+              {customOptions.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    onChange(key)
+                    setIsOpen(false)
+                  }}
+                  className={`w-full px-2 py-1.5 text-left text-xs hover:bg-slate-50 flex items-center gap-1.5 ${
+                    value === key ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+                  }`}
+                >
+                  <Home className="size-3 text-slate-500" />
+                  {label}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -507,11 +547,27 @@ export default function EcosystemDevicesModal({
     return selectedDevice ?? devices.find((device) => device.id === selectedDeviceId) ?? null
   }, [devices, selectedDevice, selectedDeviceId])
 
+  const ROOM_KEY_TO_NAME: Record<string, string> = {
+    SALON: 'Salón',
+    COCINA: 'Cocina',
+    HABITACION: 'Dormitorio',
+    BAÑO: 'Baño',
+    EXTERIOR: 'Exterior',
+    OTRO: 'Otro / Exterior',
+  }
+
   const filteredDevices = useMemo(() => {
     return devices.filter((device) => {
-      const matchesLocation = !filterRoom || device.room === filterRoom
-      const matchesCategory = !filterCategory || device.category === filterCategory
-      return matchesLocation && matchesCategory
+      if (filterRoom) {
+        const normalizedFilterRoom = ROOM_KEY_TO_NAME[filterRoom] || filterRoom
+        if (device.room !== normalizedFilterRoom) {
+          return false
+        }
+      }
+      if (filterCategory && device.category !== filterCategory) {
+        return false
+      }
+      return true
     })
   }, [devices, filterRoom, filterCategory])
 
@@ -780,9 +836,13 @@ export default function EcosystemDevicesModal({
         <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
           <div className="rounded-3xl border border-border bg-surface/60 p-4 overflow-hidden">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Lista de dispositivos</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <CompactLocationSelect value={filterRoom} onChange={setFilterRoom} />
-              <CompactCategorySelect value={filterCategory} onChange={setFilterCategory} />
+            <div className="mt-3 flex gap-2">
+              <div className="w-40 shrink-0">
+                <CompactLocationSelect value={filterRoom} onChange={setFilterRoom} customRooms={customRooms} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <CompactCategorySelect value={filterCategory} onChange={setFilterCategory} />
+              </div>
             </div>
             <div className="mt-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2 space-y-2">
               {filteredDevices.length > 0 ? (

@@ -2,6 +2,7 @@ import L from 'leaflet'
 import { useMemo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Brain, House } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAuth } from '../../context/auth-context'
@@ -75,6 +76,7 @@ const centralShieldIcon = L.divIcon({
 
 export default function AccessMap({ ecosystems }: AccessMapProps) {
   const { authClaims } = useAuth()
+  const navigate = useNavigate()
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole
   const currentUserId = authClaims?.sub ?? 'anonymous-user'
   const sourceNodes = ecosystems ?? ACCESS_MAP_ECOSYSTEMS_MOCK
@@ -129,7 +131,7 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
             icon={createHouseIcon(node.ownerId === currentUserId)}
           >
             <Popup>
-              <div className="space-y-2 text-primary">
+              <div className="space-y-2 text-primary" style={{ textAlign: 'center' }}>
                 <p className="text-sm font-semibold">{node.name}</p>
                 <p className="text-xs text-muted">
                   Ubicación: {typeof node.lat === 'number' && typeof node.lng === 'number'
@@ -137,26 +139,23 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
                     : 'No disponible'}
                 </p>
 
-                {canViewDevices(node) ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-                      Dispositivos
-                    </p>
-                    {node.devices.length > 0 ? (
-                      <ul className="mt-1 list-disc pl-4 text-xs text-muted">
-                        {node.devices.map((device) => (
-                          <li key={device.id}>{device.name}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-1 text-xs text-muted">No hay dispositivos registrados.</p>
-                    )}
-                  </div>
-                ) : role === 'ADMIN' || role === 'GLOBAL_ADMIN' ? (
-                  <p className="text-xs font-semibold text-rose-700">Acceso a dispositivos restringido</p>
-                ) : (
-                  <p className="text-xs text-muted">No tienes permisos para ver los dispositivos.</p>
-                )}
+                <button
+                  type="button"
+                  style={{
+                    marginTop: '8px',
+                    borderRadius: '6px',
+                    backgroundColor: '#14B8A6',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => navigate('/ecosystems', { state: { selectedId: node.id }, replace: true })}
+                >
+                  Más información
+                </button>
               </div>
             </Popup>
           </Marker>

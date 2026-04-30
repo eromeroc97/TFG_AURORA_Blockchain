@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Bed, Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Droplets, Eye, EyeOff, Flame, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Tv, UserMinus, Wifi, Wind, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
@@ -12,6 +13,8 @@ type CreateEcosystemStep = 'form' | 'confirm' | 'result'
 
 export default function EcosystemsManagementPage() {
   const { authClaims } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
   const userId = authClaims?.sub
   const isUser = role === 'USER'
@@ -50,6 +53,17 @@ export default function EcosystemsManagementPage() {
   const [sharedSearchTerm, setSharedSearchTerm] = useState('')
   const [sharedCurrentPage, setSharedCurrentPage] = useState(1)
   const [sharedPageSize, setSharedPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+
+  useEffect(() => {
+    const selectedId = location.state?.selectedId as string | undefined
+    if (selectedId && ecosystems.length > 0) {
+      const ecosystem = ecosystems.find((e) => e.id === selectedId)
+      if (ecosystem) {
+        setDetailEcosystemId(selectedId)
+      }
+      navigate('/ecosystems', { replace: true })
+    }
+  }, [location.state, ecosystems, navigate])
 
   useEffect(() => {
     const loadOwnerEmails = async () => {
