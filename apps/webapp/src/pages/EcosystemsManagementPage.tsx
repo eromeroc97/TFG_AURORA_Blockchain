@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Bed, Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Droplets, Eye, EyeOff, Flame, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Tv, UserMinus, Wifi, Wind, Zap } from 'lucide-react'
+import { Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Eye, EyeOff, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, RefreshCw, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Trash2, Tv, UserMinus, Users, Wifi, Wind, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
@@ -8,6 +8,8 @@ import { useEcosystemsController } from '../controllers/useEcosystemsController'
 import { getUserById } from '../services/users.service'
 import Select from '../components/Select'
 import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
+import type { EcosystemAccess } from '../services/ecosystems.service'
+import type { AccessRole } from '../services/ecosystems.service'
 
 type CreateEcosystemStep = 'form' | 'confirm' | 'result'
 
@@ -20,8 +22,8 @@ export default function EcosystemsManagementPage() {
   const isUser = role === 'USER'
   const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
-  const { ecosystems, isLoading, error, isCreating, refreshEcosystems, createEcosystem } = useEcosystemsController()
-  const [visibleEcosystems, setVisibleEcosystems] = useState<AccessMapEcosystem[]>(ecosystems)
+  const { myEcosystems, sharedWithMe, isLoading, error, isCreating, refreshMyEcosystems, refreshSharedWithMe, createEcosystem, addAccess, removeAccess, changeAccessRole, fetchAccesses } = useEcosystemsController()
+  const [visibleEcosystems, setVisibleEcosystems] = useState<AccessMapEcosystem[]>([])
   const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
   const [detailEcosystemId, setDetailEcosystemId] = useState<string | null>(null)
   const [selectedDeviceFromPlan, setSelectedDeviceFromPlan] = useState<string | null>(null)
@@ -30,7 +32,7 @@ export default function EcosystemsManagementPage() {
   const [createStep, setCreateStep] = useState<CreateEcosystemStep>('form')
   const [newEcosystemName, setNewEcosystemName] = useState('')
   const [newEcosystemApiKey, setNewEcosystemApiKey] = useState<string | null>(null)
-  const [setNewEcosystemId] = useState<string | null>(null)
+  const [, setNewEcosystemId] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [revealedApiKey, setRevealedApiKey] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)
@@ -39,9 +41,22 @@ export default function EcosystemsManagementPage() {
   const [apiKeyLoadingByEcosystemId, setApiKeyLoadingByEcosystemId] = useState<Record<string, boolean>>({})
   const [shareModalEcosystem, setShareModalEcosystem] = useState<AccessMapEcosystem | null>(null)
   const [shareEmail, setShareEmail] = useState('')
+  const [shareRole, setShareRole] = useState<AccessRole>('VIEWER')
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
   const [revokingEcosystemId, setRevokingEcosystemId] = useState<string | null>(null)
+
+  const [activeTab, setActiveTab] = useState<'my-ecosystems' | 'shared-with-me'>('my-ecosystems')
+  const ecosystems = activeTab === 'my-ecosystems' ? myEcosystems : sharedWithMe
+
+  useEffect(() => {
+    setVisibleEcosystems(ecosystems)
+    setCurrentPage(1)
+  }, [ecosystems])
+
+  const [sharedUsers, setSharedUsers] = useState<EcosystemAccess[]>([])
+  const [loadingSharedUsers, setLoadingSharedUsers] = useState(false)
+  const [updatingAccessRole, setUpdatingAccessRole] = useState<string | null>(null)
 
   const PAGE_SIZES = [10, 25, 50, 100] as const
 
@@ -132,16 +147,12 @@ export default function EcosystemsManagementPage() {
     }
   }
 
-  const openShareModal = (ecosystem: AccessMapEcosystem) => {
-    setShareModalEcosystem(ecosystem)
-    setShareEmail('')
-    setShareError(null)
-  }
-
   const closeShareModal = () => {
     setShareModalEcosystem(null)
     setShareEmail('')
+    setShareRole('VIEWER')
     setShareError(null)
+    setSharedUsers([])
   }
 
   const handleShareEcosystem = async () => {
@@ -151,11 +162,9 @@ export default function EcosystemsManagementPage() {
     setShareError(null)
 
     try {
-      await apiClient.post(`/ecosystems/${shareModalEcosystem.id}/share`, {
-        email: shareEmail.trim(),
-      })
+      await addAccess(shareModalEcosystem.id, shareEmail.trim(), shareRole)
       closeShareModal()
-      await refreshEcosystems()
+      await refreshMyEcosystems()
     } catch {
       setShareError('No se pudo compartir el ecosistema. Verifica el email e intenta de nuevo.')
     } finally {
@@ -163,16 +172,57 @@ export default function EcosystemsManagementPage() {
     }
   }
 
-  const handleRevokeSharing = async (ecosystemId: string) => {
+  const handleRevokeSharing = async (ecosystemId: string, userId: string) => {
     setRevokingEcosystemId(ecosystemId)
     try {
-      await apiClient.delete(`/ecosystems/${ecosystemId}/share`)
-      await refreshEcosystems()
+      await removeAccess(ecosystemId, userId)
+      await refreshMyEcosystems()
+      const users = await fetchAccesses(ecosystemId)
+      setSharedUsers(users)
     } catch {
+      // Ignore errors
     } finally {
       setRevokingEcosystemId(null)
     }
   }
+
+  const handleUpdateRole = async (ecosystemId: string, userId: string, newRole: AccessRole) => {
+    setUpdatingAccessRole(userId)
+    try {
+      await changeAccessRole(ecosystemId, userId, newRole)
+      const users = await fetchAccesses(ecosystemId)
+      setSharedUsers(users)
+    } catch {
+      // Ignore errors
+    } finally {
+      setUpdatingAccessRole(null)
+    }
+  }
+
+  const openShareModal = async (ecosystem: AccessMapEcosystem) => {
+    setShareModalEcosystem(ecosystem)
+    setShareEmail('')
+    setShareRole('VIEWER')
+    setShareError(null)
+    setLoadingSharedUsers(true)
+    try {
+      const users = await fetchAccesses(ecosystem.id)
+      setSharedUsers(users)
+    } catch {
+      setSharedUsers([])
+    } finally {
+      setLoadingSharedUsers(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'my-ecosystems') {
+      void refreshMyEcosystems()
+    } else {
+      void refreshSharedWithMe()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, refreshMyEcosystems, refreshSharedWithMe])
 
   const maskApiKey = (key: string) => {
     if (key.length <= 8) return '••••••••'
@@ -342,8 +392,6 @@ export default function EcosystemsManagementPage() {
     OTHER: 'text-slate-400',
   }
 
-  const ROOM_ORDER = ['Salón', 'Dormitorio', 'Cocina', 'Baño', 'Otro']
-
   const getRoomFromDevice = (device: AccessMapDevice): string => {
     const validRooms = ['Salón', 'Dormitorio', 'Cocina', 'Baño']
     if (device.room && validRooms.includes(device.room)) {
@@ -490,21 +538,67 @@ export default function EcosystemsManagementPage() {
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-5 space-y-6">
             <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-primary">
-                  <House className="size-5 text-accent" />
-                  <h2 className="font-heading text-xl font-semibold">Ecosistemas Smart Home</h2>
-                </div>
+              <div className="mb-4 flex items-center gap-2 border-b border-border pb-4">
                 <button
                   type="button"
-                  onClick={openCreateModal}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-emerald-700"
+                  onClick={() => setActiveTab('my-ecosystems')}
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                    activeTab === 'my-ecosystems'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  Añadir ecosistema
+                  <Home className="size-4" />
+                  Mis ecosistemas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('shared-with-me')}
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                    activeTab === 'shared-with-me'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <Users className="size-4" />
+                  Compartidos conmigo
                 </button>
               </div>
-              <p className="mt-3 text-xs text-muted">Aquí puedes obtener informacion de tus ecosistemas o añadir nuevos.</p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-primary">
+                  {activeTab === 'my-ecosystems' ? (
+                    <>
+                      <House className="size-5 text-accent" />
+                      <h2 className="font-heading text-xl font-semibold">Ecosistemas Smart Home</h2>
+                    </>
+                  ) : (
+                    <>
+                      <Users className="size-5 text-teal-500" />
+                      <h2 className="font-heading text-xl font-semibold text-teal-600">Ecosistemas compartidos conmigo</h2>
+                    </>
+                  )}
+                </div>
+                {activeTab === 'my-ecosystems' && role === 'USER' && (
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-emerald-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Añadir ecosistema
+                  </button>
+                )}
+                {activeTab === 'shared-with-me' && (
+                  <div className="text-sm text-slate-500">
+                    {sharedWithMe.length} ecosistema{sharedWithMe.length !== 1 ? 's' : ''} compartido{sharedWithMe.length !== 1 ? 's' : ''} contigo
+                  </div>
+                )}
+              </div>
+              <p className="mt-3 text-xs text-muted">
+                {activeTab === 'my-ecosystems'
+                  ? 'Aquí puedes obtener información de tus ecosistemas o añadir nuevos.'
+                  : 'Ecosistemas que otros usuarios han compartido contigo.'}
+              </p>
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
@@ -564,9 +658,13 @@ export default function EcosystemsManagementPage() {
                         }
                       }}
                       className={`w-full cursor-pointer text-left rounded-2xl border p-4 transition ${
-                        detailEcosystemId === ecosystem.id
-                          ? 'border-accent bg-accent/5'
-                          : 'border-border/50 bg-surface/30 hover:border-border hover:bg-surface/50'
+                        ecosystem.accessType === 'DELEGATED'
+                          ? detailEcosystemId === ecosystem.id
+                            ? 'border-teal-500 bg-teal-500/5'
+                            : 'border-teal-500/30 bg-teal-500/5 hover:border-teal-500/50 hover:bg-teal-500/10'
+                          : detailEcosystemId === ecosystem.id
+                            ? 'border-accent bg-accent/5'
+                            : 'border-border/50 bg-surface/30 hover:border-border hover:bg-surface/50'
                       }`}
                       aria-label={`Abrir ecosistema ${ecosystem.name}`}
                     >
@@ -638,9 +736,19 @@ export default function EcosystemsManagementPage() {
                               Compartir
                             </button>
                           )}
-                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
-                            {ecosystem.isShared ? 'Compartido' : 'Privado'}
-                          </span>
+                          {ecosystem.accessType === 'DELEGATED' ? (
+                              <span className="text-xs font-medium px-2 py-1 rounded-full bg-teal-500/10 text-teal-600">
+                                Delegado
+                              </span>
+                            ) : ecosystem.isShared ? (
+                              <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
+                                Compartido
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-600">
+                                Privado
+                              </span>
+                            )}
                         </div>
                       </div>
                     </article>
@@ -1065,9 +1173,9 @@ export default function EcosystemsManagementPage() {
               </div>
             </div>
 
-            <div className="mt-6 space-y-2">
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-900">Email del usuario</span>
+            <div className="mt-6 space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-900">Email del usuario</label>
                 <input
                   type="email"
                   value={shareEmail}
@@ -1075,8 +1183,81 @@ export default function EcosystemsManagementPage() {
                   placeholder="usuario@ejemplo.com"
                   className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 />
-              </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-900">Rol de acceso</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShareRole('VIEWER')}
+                    className={`flex-1 rounded-xl border px-4 py-2 text-sm font-medium transition ${
+                      shareRole === 'VIEWER'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    👁️ Viewer (solo lectura)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShareRole('EDITOR')}
+                    className={`flex-1 rounded-xl border px-4 py-2 text-sm font-medium transition ${
+                      shareRole === 'EDITOR'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    ✏️ Editor (puede modificar)
+                  </button>
+                </div>
+              </div>
+
               {shareError && <p className="text-xs text-rose-600">{shareError}</p>}
+
+              {sharedUsers.length > 0 && (
+                <div className="mt-4 border-t border-border pt-4">
+                  <h4 className="mb-3 text-sm font-medium text-slate-900">Usuarios con acceso</h4>
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
+                    {sharedUsers.map((user) => (
+                      <div key={user.userId} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-900">{user.email}</p>
+                          <p className="text-xs text-slate-500">
+                            {new Date(user.grantedAt).toLocaleDateString('es-ES')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleUpdateRole(shareModalEcosystem.id, user.userId, e.target.value as AccessRole)}
+                            disabled={updatingAccessRole === user.userId}
+                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                          >
+                            <option value="VIEWER">Viewer</option>
+                            <option value="EDITOR">Editor</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeSharing(shareModalEcosystem.id, user.userId)}
+                            disabled={revokingEcosystemId === user.userId}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {loadingSharedUsers && (
+                <div className="mt-4 flex items-center justify-center py-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                  <span className="ml-2 text-sm text-slate-500">Cargando usuarios...</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -1085,7 +1266,7 @@ export default function EcosystemsManagementPage() {
                 onClick={closeShareModal}
                 className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
               >
-                Cancelar
+                Cerrar
               </button>
               <button
                 type="button"

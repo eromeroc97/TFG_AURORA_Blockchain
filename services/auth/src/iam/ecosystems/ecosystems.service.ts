@@ -658,7 +658,31 @@ export class EcosystemsService {
     }));
   }
 
-  async getEcosystemsWithAccessType(userId: string) {
+  async getEcosystemsWithAccessType(userId: string, userRole?: Role) {
+    const isAdminOrAuditor = userRole === Role.ADMIN || userRole === Role.GLOBAL_ADMIN || userRole === Role.AUDITOR;
+
+    if (isAdminOrAuditor) {
+      const allEcosystems = await this.prisma.ecosystem.findMany({
+        where: { status: EcosystemStatus.ACTIVE },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          latitude: true,
+          longitude: true,
+          isOnline: true,
+          lastSeen: true,
+          createdAt: true,
+          updatedAt: true,
+          ownerId: true,
+        },
+      });
+      return allEcosystems.map((eco) => ({
+        ...eco,
+        accessType: 'OWNER' as const,
+      }));
+    }
+
     const ownedEcosystems = await this.prisma.ecosystem.findMany({
       where: { ownerId: userId, status: EcosystemStatus.ACTIVE },
       select: {

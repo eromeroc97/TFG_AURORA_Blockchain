@@ -257,7 +257,10 @@ const buildDefaultApiKeyValidator = (config: AppConfig) => {
       });
 
       if (!response.ok) {
-        throw new Error(`Auth API key validation failed with status ${response.status}`);
+        const errorBody = await response.text();
+        throw new Error(
+          `Auth API key validation failed with status ${response.status} ${response.statusText}: ${errorBody}`,
+        );
       }
 
       const payload = (await response.json()) as ApiKeyValidationResult;
@@ -777,7 +780,10 @@ export const buildApp = (options: AppOptions = {}) => {
         });
 
         if (!signResponse.ok) {
-          throw new Error(`Sign request failed: ${signResponse.status}`);
+          const errorBody = await signResponse.text();
+          throw new Error(
+            `Sign request failed: ${signResponse.status} ${signResponse.statusText}: ${errorBody}`,
+          );
         }
 
         const signResult = await signResponse.json() as { signature: string; publicKey: string };

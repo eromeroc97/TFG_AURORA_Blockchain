@@ -87,7 +87,11 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
 
   const visibleNodes = useMemo(() => {
     if (role === 'USER') {
-      return mapNodes.filter((node) => node.ownerId === currentUserId || node.isShared)
+      return mapNodes.filter((node) => 
+        node.ownerId === currentUserId || 
+        node.isShared ||
+        node.accessType === 'DELEGATED'
+      )
     }
 
     return mapNodes
@@ -99,7 +103,7 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
     }
 
     if (role === 'USER') {
-      return node.ownerId === currentUserId
+      return node.ownerId === currentUserId || node.accessType === 'DELEGATED'
     }
 
     return false
@@ -128,7 +132,7 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
           <Marker
             key={node.id}
             position={[node.lat, node.lng]}
-            icon={createHouseIcon(node.ownerId === currentUserId)}
+            icon={createHouseIcon(node.ownerId === currentUserId || node.accessType === 'OWNER')}
           >
             <Popup>
               <div className="space-y-2 text-primary" style={{ textAlign: 'center' }}>

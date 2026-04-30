@@ -232,7 +232,7 @@ sequenceDiagram
         alt Cache Hit
             REDIS-->>IOT: {ecosystemId}
         else Cache Miss
-            IOT->>AUTH: POST /internal/auth/validate-ecosystem<br/>x-api-key, latitude, longitude, Authorization: Bearer <internal-token>
+            IOT->>AUTH: POST /internal/users/validate-ecosystem<br/>x-api-key, latitude, longitude, Authorization: Bearer <internal-token>
             AUTH->>AUTH: decryptApiKey & compare
             AUTH-->>IOT: {valid: true, ecosystemId}
             IOT->>REDIS: SET cache:hash(apiKey)<br/>TTL=600s
@@ -250,7 +250,7 @@ sequenceDiagram
         
         IOT->>IOT: buildPayloadHash<br/>SHA-256(payload + gps)
         
-        IOT->>AUTH: POST /internal/auth/sign<br/>ecosystemId, hash, Authorization: Bearer <internal-token>
+        IOT->>AUTH: POST /internal/users/sign<br/>ecosystemId, hash, Authorization: Bearer <internal-token>
         AUTH->>AUTH: decryptPrivateKey
         AUTH->>AUTH: sign(hash, Ed25519)
         AUTH-->>IOT: {signature, publicKey}

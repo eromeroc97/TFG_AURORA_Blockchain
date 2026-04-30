@@ -22,6 +22,16 @@ export type AccessMapEcosystem = {
   lng: number | null
   isShared: boolean
   devices: AccessMapDevice[]
+  accessType?: 'OWNER' | 'DELEGATED'
+  accessRole?: 'VIEWER' | 'EDITOR'
+  sharedUsers?: EcosystemAccess[]
+}
+
+export type EcosystemAccess = {
+  userId: string
+  email: string
+  role: 'VIEWER' | 'EDITOR'
+  grantedAt: string
 }
 
 export const ACCESS_MAP_ECOSYSTEMS_MOCK: AccessMapEcosystem[] = [

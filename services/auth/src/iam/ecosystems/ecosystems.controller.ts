@@ -26,18 +26,32 @@ export class EcosystemsController {
     return this.ecosystemsService.create(createEcosystemDto, request.user?.sub);
   }
 
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN, Role.AUDITOR)
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!, request.user?.role);
+  }
+
+  @Get('shared-with-me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN, Role.AUDITOR)
+  getSharedWithMe(@Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getUserAccesses(request.user?.sub!);
+  }
+
+  @Get('my-ecosystems')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN, Role.AUDITOR)
+  getMyEcosystems(@Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!, request.user?.role);
+  }
+
   @Get(':id/api-key')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.USER)
   getApiKey(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.ecosystemsService.getApiKey(id, request.user?.sub);
-  }
-
-  @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.USER)
-  findAll(@Req() request: AuthenticatedRequest) {
-    return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!);
   }
 
   @Get(':id/devices')
@@ -115,19 +129,5 @@ export class EcosystemsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.ecosystemsService.updateAccessRole(id, request.user?.sub!, userId, updateAccessDto.role);
-  }
-
-  @Get('shared-with-me')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.USER)
-  getSharedWithMe(@Req() request: AuthenticatedRequest) {
-    return this.ecosystemsService.getUserAccesses(request.user?.sub!);
-  }
-
-  @Get('my-ecosystems')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.USER)
-  getMyEcosystems(@Req() request: AuthenticatedRequest) {
-    return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!);
   }
 }
