@@ -11,10 +11,12 @@ import {
   Lock,
   Pencil,
   PlugZap,
+  Plus,
   Radar,
   Refrigerator,
   Router,
   Speaker,
+  Sun,
   Tablet,
   Thermometer,
   Tv,
@@ -60,7 +62,8 @@ const DEVICE_LOCATIONS: Record<string, { label: string; icon: React.ComponentTyp
   COCINA: { label: 'Cocina', icon: Flame },
   HABITACION: { label: 'Dormitorio', icon: Bed },
   BAÑO: { label: 'Baño', icon: Droplets },
-  OTRO: { label: 'Otro', icon: Home },
+  EXTERIOR: { label: 'Exterior', icon: Sun },
+  OTRO: { label: 'Otro...', icon: Home },
 }
 
 function CategorySelect({
@@ -134,15 +137,35 @@ function LocationSelect({
   value,
   onChange,
   disabled,
+  onSelectOther,
+  customRooms = [],
 }: {
   value: string
   onChange: (value: string) => void
   disabled?: boolean
+  onSelectOther?: () => void
+  customRooms?: string[]
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const selectedLocation = DEVICE_LOCATIONS[value]
-  const SelectedIcon = selectedLocation?.icon
+  const isCustomValue = !selectedLocation && value
+  const SelectedIcon = selectedLocation?.icon || Home
+
+  const handleSelect = (key: string) => {
+    if (key === 'OTRO' && onSelectOther) {
+      setIsOpen(false)
+      onSelectOther()
+    } else {
+      onChange(key)
+      setIsOpen(false)
+    }
+  }
+
+  const handleSelectCustomRoom = (room: string) => {
+    onChange(room)
+    setIsOpen(false)
+  }
 
   return (
     <div className="relative">
@@ -154,7 +177,7 @@ function LocationSelect({
       >
         <span className="flex items-center gap-2">
           {SelectedIcon && <SelectedIcon className="size-4 text-slate-500" />}
-          {selectedLocation?.label || 'Seleccionar...'}
+          {isCustomValue ? value : (selectedLocation?.label || 'Seleccionar...')}
         </span>
         {!disabled && (
           <svg className={`size-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -175,14 +198,37 @@ function LocationSelect({
           >
             Seleccionar...
           </button>
-          {Object.entries(DEVICE_LOCATIONS).map(([key, { label, icon: Icon }]) => (
+          {Object.entries(DEVICE_LOCATIONS).filter(([key]) => key !== 'OTRO').map(([key, { label, icon: Icon }]) => (
             <button
               key={key}
               type="button"
-              onClick={() => {
-                onChange(key)
-                setIsOpen(false)
-              }}
+              onClick={() => handleSelect(key)}
+              className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                value === key ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+              }`}
+            >
+              <Icon className="size-4 text-slate-500" />
+              {label}
+            </button>
+          ))}
+          {customRooms.map((room) => (
+            <button
+              key={room}
+              type="button"
+              onClick={() => handleSelectCustomRoom(room)}
+              className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                value === room ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+              }`}
+            >
+              <Plus className="size-4 text-slate-500" />
+              {room}
+            </button>
+          ))}
+          {Object.entries(DEVICE_LOCATIONS).filter(([key]) => key === 'OTRO').map(([key, { label, icon: Icon }]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => handleSelect(key)}
               className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 ${
                 value === key ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
               }`}
@@ -336,10 +382,35 @@ export default function EcosystemDevicesModal({
   const isUser = role === 'USER'
   
   const devices = ecosystem.devices ?? []
+
+  const REVERSE_ROOM_MAPPING: Record<string, string> = {
+    'Salón': 'SALON',
+    'Cocina': 'COCINA',
+    'Dormitorio': 'HABITACION',
+    'Baño': 'BAÑO',
+    'Otro / Exterior': 'OTRO',
+    'Exterior': 'EXTERIOR',
+  }
+
+  const predefinedRoomKeys = ['SALON', 'COCINA', 'HABITACION', 'BAÑO', 'EXTERIOR', 'OTRO']
+  const customRooms = useMemo(() => {
+    const rooms = new Set<string>()
+    for (const device of devices) {
+      if (!device.room) continue
+      const roomKey = REVERSE_ROOM_MAPPING[device.room] || null
+      if (roomKey && !predefinedRoomKeys.includes(roomKey)) {
+        rooms.add(device.room)
+      } else if (!roomKey && device.room !== 'Salón' && device.room !== 'Dormitorio' && device.room !== 'Cocina' && device.room !== 'Baño' && device.room !== 'Exterior' && device.room !== 'Otro / Exterior') {
+        rooms.add(device.room)
+      }
+    }
+    return Array.from(rooms).sort()
+  }, [devices])
+
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(devices[0]?.id ?? null)
   const [selectedDevice, setSelectedDevice] = useState<AccessMapDevice | null>(devices[0] ?? null)
   const [editedDeviceName, setEditedDeviceName] = useState<string>(devices[0]?.name ?? '')
-  const [editedDeviceLocation, setEditedDeviceLocation] = useState<string>(devices[0]?.location ?? '')
+  const [editedDeviceRoom, setEditedDeviceRoom] = useState<string>(devices[0]?.room ?? '')
   const [editedDeviceCategory, setEditedDeviceCategory] = useState<string>(devices[0]?.category ?? '')
   const [editedEcosystemName, setEditedEcosystemName] = useState<string>(ecosystem.name)
   const [isDeviceLoading, setIsDeviceLoading] = useState(false)
@@ -356,8 +427,10 @@ export default function EcosystemDevicesModal({
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [ecosystemError, setEcosystemError] = useState<string | null>(null)
   const [ecosystemSaveMessage, setEcosystemSaveMessage] = useState<string | null>(null)
-  const [filterLocation, setFilterLocation] = useState<string>('')
+  const [filterRoom, setFilterRoom] = useState<string>('')
   const [filterCategory, setFilterCategory] = useState<string>('')
+  const [isCustomRoomModalOpen, setIsCustomRoomModalOpen] = useState(false)
+  const [customRoomInput, setCustomRoomInput] = useState('')
 
   useEffect(() => {
     const initialDevice = initialDeviceId
@@ -366,7 +439,9 @@ export default function EcosystemDevicesModal({
     setSelectedDeviceId(initialDevice?.id ?? null)
     setSelectedDevice(initialDevice ?? null)
     setEditedDeviceName(initialDevice?.name ?? '')
-    setEditedDeviceLocation(initialDevice?.location ?? '')
+    const initialRoom = initialDevice?.room ?? ''
+    const mappedRoom = REVERSE_ROOM_MAPPING[initialRoom] || initialRoom
+    setEditedDeviceRoom(mappedRoom)
     setEditedDeviceCategory(initialDevice?.category ?? '')
     setEditedEcosystemName(ecosystem.name)
     setIsEditingEcosystemName(false)
@@ -379,7 +454,7 @@ export default function EcosystemDevicesModal({
     if (!selectedDeviceId) {
       setSelectedDevice(null)
       setEditedDeviceName('')
-      setEditedDeviceLocation('')
+      setEditedDeviceRoom('')
       setEditedDeviceCategory('')
       return
     }
@@ -391,16 +466,19 @@ export default function EcosystemDevicesModal({
       try {
         const response = await apiClient.get<AccessMapDevice>(`/devices/${selectedDeviceId}`)
         const deviceDetails = response.data
+        const mappedRoom = deviceDetails.room ? (REVERSE_ROOM_MAPPING[deviceDetails.room] || deviceDetails.room) : ''
 
         setSelectedDevice(deviceDetails)
         setEditedDeviceName(deviceDetails.name)
-        setEditedDeviceLocation(deviceDetails.location ?? '')
+        setEditedDeviceRoom(mappedRoom)
         setEditedDeviceCategory(deviceDetails.category ?? '')
       } catch {
         const persistedDevice = ecosystem.devices.find((device) => device.id === selectedDeviceId) ?? null
+        const persistedRoom = persistedDevice?.room ?? ''
+        const mappedPersistedRoom = REVERSE_ROOM_MAPPING[persistedRoom] || persistedRoom
         setSelectedDevice(persistedDevice)
         setEditedDeviceName(persistedDevice?.name ?? '')
-        setEditedDeviceLocation(persistedDevice?.location ?? '')
+        setEditedDeviceRoom(mappedPersistedRoom)
         setEditedDeviceCategory(persistedDevice?.category ?? '')
         setModalError('No se pudo cargar información detallada del dispositivo. Se muestra la información disponible.')
       } finally {
@@ -417,11 +495,11 @@ export default function EcosystemDevicesModal({
 
   const filteredDevices = useMemo(() => {
     return devices.filter((device) => {
-      const matchesLocation = !filterLocation || device.location === filterLocation
+      const matchesLocation = !filterRoom || device.room === filterRoom
       const matchesCategory = !filterCategory || device.category === filterCategory
       return matchesLocation && matchesCategory
     })
-  }, [devices, filterLocation, filterCategory])
+  }, [devices, filterRoom, filterCategory])
 
   useEffect(() => {
     if (!selectedDeviceId) {
@@ -482,23 +560,34 @@ export default function EcosystemDevicesModal({
     }
 
     const trimmedName = editedDeviceName.trim()
-    if (trimmedName.length === 0 || trimmedName === displayedDevice.name) {
+    if (trimmedName.length === 0 && !editedDeviceCategory && !editedDeviceRoom) {
       return
     }
 
     setIsSavingDeviceName(true)
     setModalError(null)
 
+    const ROOM_MAPPING: Record<string, string> = {
+      SALON: 'Salón',
+      COCINA: 'Cocina',
+      HABITACION: 'Dormitorio',
+      BAÑO: 'Baño',
+      EXTERIOR: 'Exterior',
+      OTRO: 'Otro / Exterior',
+    }
+
     try {
       const response = await apiClient.patch<AccessMapDevice>(`/devices/${displayedDevice.id}`, {
-        name: trimmedName,
+        ...(trimmedName.length > 0 && trimmedName !== displayedDevice.name && { name: trimmedName }),
+        ...(editedDeviceCategory && { category: editedDeviceCategory }),
+        ...(editedDeviceRoom && { room: ROOM_MAPPING[editedDeviceRoom] || editedDeviceRoom }),
       })
 
       setSelectedDevice(response.data)
       onDeviceUpdated(response.data)
-      setSaveMessage('Nombre actualizado correctamente.')
+      setSaveMessage('Datos actualizados correctamente.')
     } catch {
-      setModalError('No se pudo actualizar el nombre del dispositivo. Inténtalo de nuevo.')
+      setModalError('No se pudo actualizar los datos del dispositivo. Inténtalo de nuevo.')
     } finally {
       setIsSavingDeviceName(false)
     }
@@ -563,6 +652,21 @@ export default function EcosystemDevicesModal({
       : isDeviceOnline === false
         ? 'border border-rose-200 bg-rose-50 text-rose-700'
         : 'border border-slate-200 bg-slate-100 text-slate-700'
+
+  const handleConfirmCustomRoom = () => {
+    const trimmed = customRoomInput.trim()
+    if (trimmed) {
+      const normalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
+      setEditedDeviceRoom(normalized)
+    }
+    setIsCustomRoomModalOpen(false)
+    setCustomRoomInput('')
+  }
+
+  const isCustomRoom = (room: string): boolean => {
+    const predefinedRooms = ['SALON', 'COCINA', 'HABITACION', 'BAÑO', 'EXTERIOR', 'OTRO']
+    return !predefinedRooms.includes(room)
+  }
 
   return (
     <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
@@ -643,7 +747,7 @@ export default function EcosystemDevicesModal({
           <div className="rounded-3xl border border-border bg-surface/60 p-4 overflow-hidden">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Lista de dispositivos</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <CompactLocationSelect value={filterLocation} onChange={setFilterLocation} />
+              <CompactLocationSelect value={filterRoom} onChange={setFilterRoom} />
               <CompactCategorySelect value={filterCategory} onChange={setFilterCategory} />
             </div>
             <div className="mt-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2 space-y-2">
@@ -717,12 +821,12 @@ export default function EcosystemDevicesModal({
                   <label className="block space-y-2">
                     <span className="text-sm font-medium text-primary">Habitación</span>
                     {isUser ? (
-                      <LocationSelect value={editedDeviceLocation} onChange={setEditedDeviceLocation} />
+                      <LocationSelect value={editedDeviceRoom} onChange={setEditedDeviceRoom} onSelectOther={() => setIsCustomRoomModalOpen(true)} customRooms={customRooms} />
                     ) : (
                       <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
-                        {displayedDevice.location && DEVICE_LOCATIONS[displayedDevice.location]
-                          ? DEVICE_LOCATIONS[displayedDevice.location].label
-                          : displayedDevice.location || 'No disponible'}
+                        {displayedDevice.room && DEVICE_LOCATIONS[displayedDevice.room]
+                          ? DEVICE_LOCATIONS[displayedDevice.room].label
+                          : displayedDevice.room || 'No disponible'}
                       </div>
                     )}
                   </label>
@@ -780,7 +884,7 @@ export default function EcosystemDevicesModal({
                   {isUser && (
                     <button
                       type="button"
-                      disabled={isSavingDeviceName || editedDeviceName.trim().length === 0 || editedDeviceName.trim() === displayedDevice.name}
+                      disabled={isSavingDeviceName || (editedDeviceName.trim() === displayedDevice.name && !editedDeviceCategory && !editedDeviceRoom)}
                       onClick={handleSaveDeviceName}
                       className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -831,6 +935,61 @@ export default function EcosystemDevicesModal({
             </div>
           </div>
         ) : null}
+
+        {isCustomRoomModalOpen && (
+          <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
+            <div className="w-full max-w-md rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+                  <Home className="size-5" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-primary">Nueva habitación</h3>
+                  <p className="text-sm leading-6 text-muted">
+                    Introduce el nombre de la nueva habitación o ubicación.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <input
+                  type="text"
+                  value={customRoomInput}
+                  onChange={(e) => setCustomRoomInput(e.target.value)}
+                  placeholder="Ej: Terraza, Trastero, Garaje..."
+                  className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmCustomRoom()
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomRoomModalOpen(false)
+                    setCustomRoomInput('')
+                  }}
+                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCustomRoom}
+                  disabled={!customRoomInput.trim()}
+                  className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
