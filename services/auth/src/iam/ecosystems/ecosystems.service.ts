@@ -48,6 +48,8 @@ export class EcosystemsService {
   private readonly ecosystemDeviceSelect = {
     id: true,
     name: true,
+    category: true,
+    room: true,
     macAddress: true,
     vendor: true,
     ecosystemId: true,
