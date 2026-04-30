@@ -84,7 +84,12 @@ export function useTelemetryController(initialRange: TelemetryRange = '24h') {
         totalDevices: metrics.totalDevices ?? 0,
       })
     } catch (error) {
-      setError('No se pudieron cargar las métricas. Intenta de nuevo más tarde.')
+      const err = error as { response?: { status?: number } }
+      if (err.response?.status === 403) {
+        setError('NO_DATA')
+      } else {
+        setError('No se pudieron cargar las métricas. Intenta de nuevo más tarde.')
+      }
       setData({
         dailyVolume: [],
         rawDailyVolume: [],
