@@ -11,6 +11,7 @@ export type AccessMapDevice = {
   status?: string
   lastSeen?: string | null
   isOnline?: boolean
+  payload?: Record<string, unknown>
 }
 
 export type AccessMapEcosystem = {

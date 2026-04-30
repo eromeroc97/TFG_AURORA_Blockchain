@@ -387,6 +387,28 @@ export const buildApp = (options: AppOptions = {}) => {
   app.get('/iot/devices/:deviceId/last-interaction', readParamLastInteraction);
   app.get('/devices/:deviceId/last-interaction', readParamLastInteraction);
 
+  const readDeviceDetails = async (
+    request: FastifyRequest<{ Querystring: { macAddress?: string; ecosystemId?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const macAddress = request.query.macAddress?.trim();
+    const ecosystemId = request.query.ecosystemId?.trim();
+
+    if (!macAddress || !ecosystemId) {
+      return reply.code(400).send({
+        error: 'INVALID_REQUEST',
+        message: 'macAddress and ecosystemId query parameters are required',
+      });
+    }
+
+    const payload = await telemetryStore.findLatestPayload(macAddress, ecosystemId);
+    return reply.code(200).send({
+      payload,
+    });
+  };
+
+  app.get('/devices/device-details', readDeviceDetails);
+
   const telemetryMetricsHandler = async (request: FastifyRequest<{ Querystring: { range?: string } }>, reply: FastifyReply) => {
     const context = await resolveTelemetryRequestContext(request, reply);
     if (!context) {

@@ -132,6 +132,15 @@ export interface TelemetryStore {
   findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null>;
 
   /**
+   * Obtiene el último payload de un dispositivo.
+   *
+   * @param macAddress - MAC del dispositivo
+   * @param ecosystemId - ID del ecosistema
+   * @returns Promise con el payload o null
+   */
+  findLatestPayload(macAddress: string, ecosystemId: string): Promise<Record<string, unknown> | null>;
+
+  /**
    * Obtiene métricas de telemetría para el dashboard.
    *
    * @param query - Parámetros de consulta de métricas
@@ -313,6 +322,57 @@ export class MongoTelemetryStore implements TelemetryStore {
       .next();
 
     return document?.timestamp ?? null;
+  }
+
+  /**
+   * Obtiene el último payload de un dispositivo.
+   *
+   * @param macAddress - MAC del dispositivo
+   * @param ecosystemId - ID del ecosistema
+   * @returns Promise con el payload o null
+   */
+  async findLatestPayload(macAddress: string, ecosystemId: string): Promise<Record<string, unknown> | null> {
+    const collection = await this.ensureCollection();
+
+    const normalizedMac = macAddress.trim().replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    if (!/^[A-F0-9]{12}$/.test(normalizedMac)) {
+      return null;
+    }
+
+    const macVariants = [
+      normalizedMac,
+      normalizedMac.match(/.{2}/g)?.join(':') ?? normalizedMac,
+      normalizedMac.match(/.{2}/g)?.join('-') ?? normalizedMac,
+      normalizedMac.match(/.{2}/g)?.join('.') ?? normalizedMac,
+    ];
+
+    const query: Record<string, unknown> = {
+      'payload.devices.mac_addr': { $in: macVariants },
+      'metadata.ecosystemId': ecosystemId.trim(),
+    };
+
+    const document = await collection
+      .find(query)
+      .sort({ timestamp: -1 })
+      .limit(1)
+      .project({ payload: 1 })
+      .next();
+
+    if (!document?.payload?.devices) {
+      return null;
+    }
+
+    const devicePayload = document.payload.devices.find((d: { mac_addr: string }) => {
+      const deviceMac = (d.mac_addr || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+      return deviceMac === normalizedMac
+    })
+
+    if (!devicePayload) {
+      return null
+    }
+
+    const { mac_addr, ...rest } = devicePayload as Record<string, unknown>
+    return rest
   }
 
   async getMetrics(query: TelemetryMetricsQuery): Promise<TelemetryMetricsResult> {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Battery,
   Bed,
   Cctv,
   Cpu,
@@ -15,17 +16,20 @@ import {
   Radar,
   Refrigerator,
   Router,
+  Signal,
   Speaker,
   Sun,
   Tablet,
   Thermometer,
   Tv,
+  Wifi,
   Wind,
   X,
   Zap,
 } from 'lucide-react'
 import { apiClient } from '../../api/axios'
 import { useAuth } from '../../context/auth-context'
+import { getDeviceDetails } from '../../services/device-details.service'
 import type { AccessMapDevice, AccessMapEcosystem } from './access-map.data'
 
 type EcosystemDevicesModalProps = {
@@ -468,7 +472,17 @@ export default function EcosystemDevicesModal({
         const deviceDetails = response.data
         const mappedRoom = deviceDetails.room ? (REVERSE_ROOM_MAPPING[deviceDetails.room] || deviceDetails.room) : ''
 
-        setSelectedDevice(deviceDetails)
+        let devicePayload: Record<string, unknown> | undefined = undefined
+        if (deviceDetails.macAddress && ecosystem.id) {
+          try {
+            const payloadResponse = await getDeviceDetails(ecosystem.id, deviceDetails.macAddress)
+            devicePayload = payloadResponse.payload ?? undefined
+          } catch {
+            // Silently fail - payload is optional
+          }
+        }
+
+        setSelectedDevice({ ...deviceDetails, payload: devicePayload })
         setEditedDeviceName(deviceDetails.name)
         setEditedDeviceRoom(mappedRoom)
         setEditedDeviceCategory(deviceDetails.category ?? '')
@@ -652,6 +666,26 @@ export default function EcosystemDevicesModal({
       : isDeviceOnline === false
         ? 'border border-rose-200 bg-rose-50 text-rose-700'
         : 'border border-slate-200 bg-slate-100 text-slate-700'
+
+  const formatPayloadKey = (key: string): string => {
+    return key.replace(/_/g, ' ')
+  }
+
+  const formatPayloadValue = (value: unknown): string => {
+    if (typeof value === 'boolean') {
+      return value ? 'Sí' : 'No'
+    }
+    if (typeof value === 'number') {
+      return value.toString()
+    }
+    if (typeof value === 'string') {
+      return value
+    }
+    if (value === null || value === undefined) {
+      return '-'
+    }
+    return String(value)
+  }
 
   const handleConfirmCustomRoom = () => {
     const trimmed = customRoomInput.trim()
@@ -866,11 +900,20 @@ export default function EcosystemDevicesModal({
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-white p-4 text-sm text-muted">
-                  <p className="font-semibold text-primary">Información adicional</p>
-                  <p className="mt-2">
-                    Para ver datos de telemetría y metadatos extendidos desde Mongo / el microservicio IoT, se requiere una integración de backend adicional.
-                  </p>
+                <div className="rounded-2xl border border-border bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-3">Información adicional</p>
+                  {displayedDevice?.payload && Object.keys(displayedDevice.payload).length > 0 ? (
+                    <div className="grid gap-2">
+                      {Object.entries(displayedDevice.payload).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
+                          <span className="text-xs text-slate-500 capitalize">{formatPayloadKey(key)}</span>
+                          <span className="text-sm font-medium text-primary">{formatPayloadValue(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400 italic">No hay información adicional disponible</p>
+                  )}
                 </div>
 
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">

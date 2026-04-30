@@ -55,6 +55,38 @@ const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryS
       ecosystemUsage: [],
       totalDevices: 0,
     }),
+    findLatestPayload: async (macAddress: string, ecosystemId: string) => {
+      const normalizedMac = macAddress.replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+      const found = savedInputs
+        .slice()
+        .reverse()
+        .find(
+          (input) =>
+            Array.isArray((input.payload as any).devices) &&
+            (input.payload as any).devices.some(
+              (device: any) => {
+                const deviceMac = (device?.mac_addr || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+                return deviceMac === normalizedMac
+              },
+            ),
+        )
+
+      if (!found?.payload?.devices) {
+        return null
+      }
+
+      const devicePayload = (found.payload as any).devices.find((device: any) => {
+        const deviceMac = (device?.mac_addr || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+        return deviceMac === normalizedMac
+      })
+
+      if (!devicePayload) {
+        return null
+      }
+
+      const { mac_addr, ...rest } = devicePayload
+      return rest
+    },
     close: async () => {
       return
     },
