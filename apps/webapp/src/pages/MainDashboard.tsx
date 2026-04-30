@@ -31,12 +31,12 @@ export default function MainDashboard() {
 
   const { ecosystems, isLoading: isMapLoading, error: mapError } = useDashboardController()
   const { data, error: telemetryError, range, changeRange } = useTelemetryController()
-  const { users } = useUsersController()
+  const { users } = useUsersController(canViewUserCount)
   const { services } = useServiceHealthController()
 
   const ranges: TelemetryRange[] = ['30m', '1h', '12h', '24h', '1w', '1M', '1y']
 
-  const totalInformationBytes = data.dailyVolume.reduce((sum, item) => sum + item.tx, 0) * 1024
+  const totalInformationBytes = (data.rawDailyVolume ?? data.dailyVolume).reduce((sum, item) => sum + item.tx, 0)
 
   const formatBytes = (bytes: number) => {
     const absBytes = Math.max(0, bytes)
@@ -154,13 +154,13 @@ export default function MainDashboard() {
                     <p className="mt-3 text-4xl font-semibold text-slate-900">{users.length}</p>
                   </div>
                 )}
-                <a href="/ecosystems" text-decoration="none">
+                <a href="/ecosystems" style={{ textDecoration: 'none' }}>
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
                     <p className="text-sm font-medium text-slate-500">Ecosistemas instanciados</p>
                     <p className="mt-3 text-4xl font-semibold text-slate-900">{ecosystems.length}</p>
                   </div>
                 </a>
-                <a href="/ecosystems" text-decoration="none">
+                <a href="/ecosystems" style={{ textDecoration: 'none' }}>
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
                     <p className="text-sm font-medium text-slate-500">Dispositivos conectados</p>
                     <p className="mt-3 text-4xl font-semibold text-slate-900">{totalDevicesCount}</p>

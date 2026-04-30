@@ -15,6 +15,7 @@ export type EcosystemUsageItem = {
 
 export interface TelemetryMetrics {
   dailyVolume: DailyVolumeItem[]
+  rawDailyVolume?: DailyVolumeItem[]
   successRatio: SuccessRatioItem[]
   ecosystemUsage: EcosystemUsageItem[]
   totalDevices: number

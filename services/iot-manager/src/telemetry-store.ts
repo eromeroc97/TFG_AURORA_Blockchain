@@ -61,6 +61,8 @@ export type SaveTelemetryInput = {
   publicKey?: string;
   /** Timestamp de la lectura */
   timestamp: Date;
+  /** Tamaño en bytes del JSON ingestado */
+  sizeBytes?: number;
 };
 
 /**
@@ -243,6 +245,7 @@ export class MongoTelemetryStore implements TelemetryStore {
       },
       payload: input.payload,
       hash: input.hash,
+      sizeBytes: input.sizeBytes ?? 0,
     });
 
     return {
@@ -399,7 +402,7 @@ export class MongoTelemetryStore implements TelemetryStore {
                       unit: 'minute',
                     },
                   },
-                  tx: { $sum: 1 },
+                  tx: { $sum: { $ifNull: ['$sizeBytes', 0] } },
                 },
               },
               {
@@ -412,7 +415,7 @@ export class MongoTelemetryStore implements TelemetryStore {
                       timezone: 'Europe/Madrid',
                     },
                   },
-                  tx: 1,
+                  tx: '$tx',
                 },
               },
               { $sort: { timestamp: 1 } },

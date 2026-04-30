@@ -456,4 +456,12 @@ export class EcosystemsService {
       throw new InternalServerErrorException('Failed to update heartbeat');
     }
   }
+
+  async findEcosystemsByOwnerId(ownerId: string): Promise<{ ecosystemIds: string[] }> {
+    const ecosystems = await this.prisma.ecosystem.findMany({
+      where: { ownerId },
+      select: { id: true },
+    });
+    return { ecosystemIds: ecosystems.map(e => e.id) };
+  }
 }

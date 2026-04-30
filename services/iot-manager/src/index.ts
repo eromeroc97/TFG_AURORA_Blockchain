@@ -748,6 +748,9 @@ export const buildApp = (options: AppOptions = {}) => {
       // Step 4: Calculate SHA-256 hash (payload + GPS)
       const hash = buildPayloadHash(payload, request.body.latitude, request.body.longitude);
 
+      // Calculate size in bytes of the ingested JSON
+      const rawBodyBytes = Buffer.byteLength(JSON.stringify(request.body));
+
       // Step 3: Persist with PENDING_ANCHOR status
       const savedTelemetry = await telemetryStore.save({
         ecosystemId,
@@ -756,6 +759,7 @@ export const buildApp = (options: AppOptions = {}) => {
         payload,
         hash,
         timestamp: eventTimestamp,
+        sizeBytes: rawBodyBytes,
       });
 
       // Step 5: Request signature from auth-service (KMS)

@@ -55,6 +55,7 @@ const fillTimeRange = (range: TelemetryRange, data: DailyVolumeItem[]): DailyVol
 export function useTelemetryController(initialRange: TelemetryRange = '24h') {
   const [data, setData] = useState<TelemetryMetrics>({
     dailyVolume: [],
+    rawDailyVolume: [],
     successRatio: [],
     ecosystemUsage: [],
     totalDevices: 0,
@@ -74,6 +75,7 @@ export function useTelemetryController(initialRange: TelemetryRange = '24h') {
 
       setData({
         dailyVolume: filledVolume,
+        rawDailyVolume: metrics.dailyVolume ?? [],
         successRatio: (metrics.successRatio ?? []).map<SuccessRatioItem>((metric) => ({
           name: normalizeSuccessName(metric.name),
           value: metric.value,
@@ -85,6 +87,7 @@ export function useTelemetryController(initialRange: TelemetryRange = '24h') {
       setError('No se pudieron cargar las métricas. Intenta de nuevo más tarde.')
       setData({
         dailyVolume: [],
+        rawDailyVolume: [],
         successRatio: [],
         ecosystemUsage: [],
         totalDevices: 0,
