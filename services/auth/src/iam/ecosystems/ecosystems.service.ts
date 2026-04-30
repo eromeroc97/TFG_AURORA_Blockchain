@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EcosystemStatus, Prisma, Role, UserStatus } from '@prisma/client';
+import { AccessRole, EcosystemStatus, Prisma, Role, UserStatus } from '@prisma/client';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { CryptoService } from '../../crypto/crypto.service';
@@ -463,5 +463,260 @@ export class EcosystemsService {
       select: { id: true },
     });
     return { ecosystemIds: ecosystems.map(e => e.id) };
+  }
+
+  async grantAccess(ecosystemId: string, actorId: string, email: string, role?: AccessRole): Promise<void> {
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id: ecosystemId },
+    });
+
+    if (!ecosystem) {
+      throw new NotFoundException('Ecosistema no encontrado');
+    }
+
+    if (ecosystem.ownerId !== actorId) {
+      throw new ForbiddenException('Solo el propietario puede delegar accesos');
+    }
+
+    if (ecosystem.status !== EcosystemStatus.ACTIVE) {
+      throw new BadRequestException('No se puede delegar acceso a un ecosistema inactivo');
+    }
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (targetUser.id === actorId) {
+      throw new BadRequestException('No puedes delegarte acceso a ti mismo');
+    }
+
+    if (targetUser.status !== UserStatus.ACTIVE || !targetUser.isActive) {
+      throw new BadRequestException('El usuario debe estar activo para recibir accesos');
+    }
+
+    const existingAccess = await this.prisma.ecosystemAccess.findUnique({
+      where: {
+        ecosystemId_userId: {
+          ecosystemId,
+          userId: targetUser.id,
+        },
+      },
+    });
+
+    if (existingAccess) {
+      throw new BadRequestException('El usuario ya tiene acceso a este ecosistema');
+    }
+
+    await this.prisma.ecosystemAccess.create({
+      data: {
+        ecosystemId,
+        userId: targetUser.id,
+        role: role ?? AccessRole.VIEWER,
+      },
+    });
+  }
+
+  async revokeAccess(ecosystemId: string, actorId: string, targetUserId: string): Promise<void> {
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id: ecosystemId },
+    });
+
+    if (!ecosystem) {
+      throw new NotFoundException('Ecosistema no encontrado');
+    }
+
+    if (ecosystem.ownerId !== actorId) {
+      throw new ForbiddenException('Solo el propietario puede revocar accesos');
+    }
+
+    if (targetUserId === actorId) {
+      throw new BadRequestException('No puedes revoke tu propio acceso de propietario');
+    }
+
+    const access = await this.prisma.ecosystemAccess.findUnique({
+      where: {
+        ecosystemId_userId: {
+          ecosystemId,
+          userId: targetUserId,
+        },
+      },
+    });
+
+    if (!access) {
+      throw new NotFoundException('El usuario no tiene acceso a este ecosistema');
+    }
+
+    await this.prisma.ecosystemAccess.delete({
+      where: { id: access.id },
+    });
+  }
+
+  async updateAccessRole(ecosystemId: string, actorId: string, targetUserId: string, newRole: AccessRole): Promise<void> {
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id: ecosystemId },
+    });
+
+    if (!ecosystem) {
+      throw new NotFoundException('Ecosistema no encontrado');
+    }
+
+    if (ecosystem.ownerId !== actorId) {
+      throw new ForbiddenException('Solo el propietario puede modificar roles de acceso');
+    }
+
+    const access = await this.prisma.ecosystemAccess.findUnique({
+      where: {
+        ecosystemId_userId: {
+          ecosystemId,
+          userId: targetUserId,
+        },
+      },
+    });
+
+    if (!access) {
+      throw new NotFoundException('El usuario no tiene acceso a este ecosistema');
+    }
+
+    await this.prisma.ecosystemAccess.update({
+      where: { id: access.id },
+      data: { role: newRole },
+    });
+  }
+
+  async getEcosystemAccesses(ecosystemId: string, actorId: string) {
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id: ecosystemId },
+    });
+
+    if (!ecosystem) {
+      throw new NotFoundException('Ecosistema no encontrado');
+    }
+
+    if (ecosystem.ownerId !== actorId) {
+      throw new ForbiddenException('Solo el propietario puede ver los accesos');
+    }
+
+    const accesses = await this.prisma.ecosystemAccess.findMany({
+      where: { ecosystemId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            status: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    return accesses.map((access) => ({
+      id: access.id,
+      userId: access.user.id,
+      userEmail: access.user.email,
+      userStatus: access.user.status,
+      userIsActive: access.user.isActive,
+      role: access.role,
+      createdAt: access.createdAt,
+      updatedAt: access.updatedAt,
+    }));
+  }
+
+  async getUserAccesses(userId: string) {
+    const accesses = await this.prisma.ecosystemAccess.findMany({
+      where: { userId },
+      include: {
+        ecosystem: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            latitude: true,
+            longitude: true,
+            isOnline: true,
+            lastSeen: true,
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    return accesses.map((access) => ({
+      ecosystemId: access.ecosystem.id,
+      ecosystemName: access.ecosystem.name,
+      ecosystemStatus: access.ecosystem.status,
+      ecosystemLatitude: access.ecosystem.latitude,
+      ecosystemLongitude: access.ecosystem.longitude,
+      ecosystemIsOnline: access.ecosystem.isOnline,
+      ecosystemLastSeen: access.ecosystem.lastSeen,
+      role: access.role,
+      accessType: 'DELEGATED' as const,
+    }));
+  }
+
+  async getEcosystemsWithAccessType(userId: string) {
+    const ownedEcosystems = await this.prisma.ecosystem.findMany({
+      where: { ownerId: userId, status: EcosystemStatus.ACTIVE },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        latitude: true,
+        longitude: true,
+        isOnline: true,
+        lastSeen: true,
+        createdAt: true,
+        updatedAt: true,
+        ownerId: true,
+      },
+    });
+
+    const delegatedEcosystems = await this.prisma.ecosystemAccess.findMany({
+      where: { userId },
+      include: {
+        ecosystem: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            latitude: true,
+            longitude: true,
+            isOnline: true,
+            lastSeen: true,
+            createdAt: true,
+            updatedAt: true,
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    const ownerResult = ownedEcosystems.map((eco) => ({
+      ...eco,
+      accessType: 'OWNER' as const,
+    }));
+
+    const delegatedResult = delegatedEcosystems
+      .filter((access) => access.ecosystem.status === EcosystemStatus.ACTIVE)
+      .map((access) => ({
+        id: access.ecosystem.id,
+        name: access.ecosystem.name,
+        status: access.ecosystem.status,
+        latitude: access.ecosystem.latitude,
+        longitude: access.ecosystem.longitude,
+        isOnline: access.ecosystem.isOnline,
+        lastSeen: access.ecosystem.lastSeen,
+        createdAt: access.ecosystem.createdAt,
+        updatedAt: access.ecosystem.updatedAt,
+        ownerId: access.ecosystem.ownerId,
+        accessType: 'DELEGATED' as const,
+        accessRole: access.role,
+      }));
+
+    return [...ownerResult, ...delegatedResult];
   }
 }

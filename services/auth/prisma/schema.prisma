@@ -49,6 +49,11 @@ enum DeviceCategory {
   OTHER
 }
 
+enum AccessRole {
+  VIEWER
+  EDITOR
+}
+
 model Identity {
   id String @id @default(uuid()) @db.Uuid
   type IdentityType
@@ -64,6 +69,23 @@ model Identity {
 
   user User?
   ecosystem Ecosystem?
+}
+
+model EcosystemAccess {
+  id          String      @id @default(uuid()) @db.Uuid
+  ecosystemId String      @db.Uuid
+  userId      String      @db.Uuid
+  role        AccessRole @default(VIEWER)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  ecosystem   Ecosystem   @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ecosystemId, userId])
+  @@index([ecosystemId])
+  @@index([userId])
 }
 
 model User {
@@ -83,6 +105,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   ecosystems Ecosystem[]
+  accesses   EcosystemAccess[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([identityId])
@@ -126,6 +149,7 @@ model Ecosystem {
   updatedAt DateTime @updatedAt
 
   devices Device[]
+  accesses EcosystemAccess[]
 
   @@index([ownerId])
 }

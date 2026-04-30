@@ -3,6 +3,9 @@ import { Role } from '@prisma/client';
 import { EcosystemsService } from './ecosystems.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
+import { GrantAccessDto } from './dto/grant-access.dto';
+import { RevokeAccessDto } from './dto/revoke-access.dto';
+import { UpdateAccessDto } from './dto/update-access.dto';
 import { Roles, JwtAuthGuard, RolesGuard } from '../auth';
 
 type AuthenticatedRequest = {
@@ -31,8 +34,10 @@ export class EcosystemsController {
   }
 
   @Get()
-  findAll() {
-    return this.ecosystemsService.findAll();
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!);
   }
 
   @Get(':id/devices')
@@ -69,5 +74,60 @@ export class EcosystemsController {
   @Roles(Role.USER)
   remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.ecosystemsService.remove(id, request.user?.sub);
+  }
+
+  @Post(':id/accesses')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  grantAccess(
+    @Param('id') id: string,
+    @Body() grantAccessDto: GrantAccessDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.ecosystemsService.grantAccess(id, request.user?.sub!, grantAccessDto.email, grantAccessDto.role);
+  }
+
+  @Get(':id/accesses')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  getAccesses(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getEcosystemAccesses(id, request.user?.sub!);
+  }
+
+  @Delete(':id/accesses/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  revokeAccess(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.ecosystemsService.revokeAccess(id, request.user?.sub!, userId);
+  }
+
+  @Patch(':id/accesses/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  updateAccessRole(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() updateAccessDto: UpdateAccessDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.ecosystemsService.updateAccessRole(id, request.user?.sub!, userId, updateAccessDto.role);
+  }
+
+  @Get('shared-with-me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  getSharedWithMe(@Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getUserAccesses(request.user?.sub!);
+  }
+
+  @Get('my-ecosystems')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  getMyEcosystems(@Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!);
   }
 }
