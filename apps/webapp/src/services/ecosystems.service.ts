@@ -12,6 +12,8 @@ type ApiEcosystem = {
 type ApiDevice = {
   id: string
   name: string
+  category: string | null
+  room: string | null
   type: string
   status: string
   lastSeen: string | null
@@ -31,6 +33,8 @@ type CreateEcosystemResponse = {
 const mapApiDeviceToAccessMap = (device: ApiDevice): AccessMapDevice => ({
   id: device.id,
   name: device.name,
+  category: device.category ?? undefined,
+  room: device.room ?? undefined,
   type: device.type,
   status: device.status,
   lastSeen: device.lastSeen,

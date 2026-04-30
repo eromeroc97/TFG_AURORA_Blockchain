@@ -6,7 +6,6 @@ export type AccessMapDevice = {
   ecosystemId: string
   createdAt: string
   updatedAt: string
-  location?: string
   category?: string
   room?: string
   status?: string

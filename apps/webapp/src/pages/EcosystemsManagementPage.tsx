@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, House, Info, Key, Lightbulb, Plus, Search, Share2, Thermometer, UserMinus, Wifi } from 'lucide-react'
+import { Bed, Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Droplets, Eye, EyeOff, Flame, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Tv, UserMinus, Wifi, Wind, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
@@ -288,17 +288,58 @@ export default function EcosystemsManagementPage() {
     setCurrentPage(1)
   }, [searchTerm, sharedStatusFilter])
 
+  useEffect(() => {
+    setVisibleEcosystems(ecosystems)
+  }, [ecosystems])
+
+  const DEVICE_CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+    SMART_BULB: Lightbulb,
+    SMART_PANEL: Tablet,
+    SMART_PLUG: PlugZap,
+    ENERGY_METER: Zap,
+    CAMERA: Cctv,
+    SMART_LOCK: Lock,
+    CONTACT_SENSOR: DoorOpen,
+    MOTION_SENSOR: Radar,
+    THERMOSTAT: Thermometer,
+    HVAC: Wind,
+    SMART_SPEAKER: Speaker,
+    SMART_TV: Tv,
+    APPLIANCE: Refrigerator,
+    ROUTER: Router,
+    OTHER: Cpu,
+  }
+
+  const DEVICE_CATEGORY_COLORS: Record<string, string> = {
+    SMART_BULB: 'text-amber-400',
+    SMART_PANEL: 'text-blue-400',
+    SMART_PLUG: 'text-emerald-400',
+    ENERGY_METER: 'text-yellow-400',
+    CAMERA: 'text-rose-400',
+    SMART_LOCK: 'text-purple-400',
+    CONTACT_SENSOR: 'text-slate-400',
+    MOTION_SENSOR: 'text-cyan-400',
+    THERMOSTAT: 'text-orange-400',
+    HVAC: 'text-teal-400',
+    SMART_SPEAKER: 'text-indigo-400',
+    SMART_TV: 'text-violet-400',
+    APPLIANCE: 'text-amber-500',
+    ROUTER: 'text-blue-500',
+    OTHER: 'text-slate-400',
+  }
+
   const ROOM_ORDER = ['Salón', 'Dormitorio', 'Cocina', 'Baño', 'Otro']
 
   const getRoomFromDevice = (device: AccessMapDevice): string => {
-    if (device.room && ROOM_ORDER.includes(device.room)) {
+    const validRooms = ['Salón', 'Dormitorio', 'Cocina', 'Baño']
+    if (device.room && validRooms.includes(device.room)) {
       return device.room
     }
-    if (device.location && ROOM_ORDER.slice(0, -1).some((r) => device.location!.toLowerCase().includes(r.toLowerCase()))) {
-      const found = ROOM_ORDER.slice(0, -1).find((r) => device.location!.toLowerCase().includes(r.toLowerCase()))
-      return found || 'Otro'
+    if (device.room && validRooms.some((r) => device.room!.toLowerCase().includes(r.toLowerCase()))) {
+      const found = validRooms.find((r) => device.room!.toLowerCase().includes(r.toLowerCase()))
+      return found || device.room
     }
-    return 'Otro'
+    return device.room || 'Sin categoría'
   }
 
   const canManageEcosystem = role === 'USER'
@@ -320,20 +361,40 @@ export default function EcosystemsManagementPage() {
   )
 
   const devicesByRoom = useMemo(() => {
-    if (!detailEcosystem?.devices) return {}
-
+    const fixedRooms = ['Salón', 'Dormitorio', 'Cocina', 'Baño']
     const grouped: Record<string, AccessMapDevice[]> = {}
-    for (const room of ROOM_ORDER) {
+
+    for (const room of fixedRooms) {
       grouped[room] = []
     }
+    grouped['Sin categoría'] = []
+
+    if (!detailEcosystem?.devices) return grouped
 
     for (const device of detailEcosystem.devices) {
       const room = getRoomFromDevice(device)
+      if (!grouped[room]) {
+        grouped[room] = []
+      }
       grouped[room].push(device)
     }
 
     return grouped
   }, [detailEcosystem])
+
+  const availableRooms = useMemo(() => {
+    const fixedRooms = ['Salón', 'Dormitorio', 'Cocina', 'Baño']
+    const existingRooms = Object.keys(devicesByRoom).filter((room) => room !== 'Sin categoría')
+    const allRooms = new Set([...fixedRooms, ...existingRooms])
+    return Array.from(allRooms).sort((a, b) => {
+      const aIndex = fixedRooms.indexOf(a)
+      const bIndex = fixedRooms.indexOf(b)
+      if (aIndex === -1 && bIndex === -1) return a.localeCompare(b)
+      if (aIndex === -1) return 1
+      if (bIndex === -1) return -1
+      return aIndex - bIndex
+    })
+  }, [devicesByRoom])
 
   const handleCloseEcosystemModal = () => {
     setSelectedEcosystem(null)
@@ -353,11 +414,11 @@ export default function EcosystemsManagementPage() {
     }
   }
 
-  const handleDeviceUpdated = (device: { id: string }) => {
-    if (!selectedEcosystem) return
+  const handleDeviceUpdated = (device: AccessMapDevice) => {
+    const deviceEcosystemId = device.ecosystemId
     setVisibleEcosystems((current) =>
       current.map((ecosystem) =>
-        ecosystem.id === selectedEcosystem.id
+        ecosystem.id === deviceEcosystemId
           ? {
               ...ecosystem,
               devices: ecosystem.devices.map((existingDevice) =>
@@ -367,6 +428,18 @@ export default function EcosystemsManagementPage() {
           : ecosystem,
       ),
     )
+    if (deviceEcosystemId === detailEcosystemId) {
+      setSelectedEcosystem((current) =>
+        current
+          ? {
+              ...current,
+              devices: current.devices.map((existingDevice) =>
+                existingDevice.id === device.id ? { ...existingDevice, ...device } : existingDevice,
+              ),
+            }
+          : null,
+      )
+    }
   }
 
   return (
@@ -424,7 +497,7 @@ export default function EcosystemsManagementPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Buscar por nombre o propietario..."
+                    placeholder={isUser ? 'Buscar por nombre...' : 'Buscar por nombre o propietario...'}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
@@ -615,7 +688,7 @@ export default function EcosystemsManagementPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Buscar por nombre o propietario..."
+                    placeholder={isUser ? 'Buscar por nombre...' : 'Buscar por nombre o propietario...'}
                     value={sharedSearchTerm}
                     onChange={(e) => setSharedSearchTerm(e.target.value)}
                     className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
@@ -734,9 +807,9 @@ export default function EcosystemsManagementPage() {
                         {detailEcosystem.name} - {detailEcosystem.devices?.length ?? 0} dispositivos
                       </p>
                     </div>
-                    <div className="border-4 border-slate-300 bg-slate-50 rounded-b-3xl rounded-t-sm overflow-hidden">
-                      <div className="grid grid-cols-2 gap-3 p-4">
-                        {ROOM_ORDER.slice(0, -1).map((room) => (
+                    <div className="border-4 border-slate-300 bg-slate-50 rounded-b-3xl rounded-t-sm overflow-x-auto">
+                      <div className="grid grid-cols-2 gap-3 p-4 min-w-[500px]">
+                        {availableRooms.map((room) => (
                           <div
                             key={room}
                             className="border-2 border-dashed border-slate-200 bg-white rounded-xl p-3 min-h-[100px]"
@@ -761,18 +834,15 @@ export default function EcosystemsManagementPage() {
                                   }}
                                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-100 hover:border-accent/30 hover:bg-accent/5 transition cursor-pointer group"
                                 >
-                                  {device.category?.toLowerCase().includes('temperature') ||
-                                  device.category?.toLowerCase().includes('termometro') ? (
-                                    <Thermometer className="size-3 text-rose-400" />
-                                  ) : device.category?.toLowerCase().includes('light') ||
-                                    device.category?.toLowerCase().includes('luz') ? (
-                                    <Lightbulb className="size-3 text-amber-400" />
-                                  ) : device.category?.toLowerCase().includes('wifi') ||
-                                    device.category?.toLowerCase().includes('sensor') ? (
-                                    <Wifi className="size-3 text-blue-400" />
-                                  ) : (
-                                    <Wifi className="size-3 text-slate-400" />
-                                  )}
+                                  {(() => {
+                                    const IconComponent = device.category ? DEVICE_CATEGORY_ICONS[device.category] : null
+                                    const iconColor = device.category ? DEVICE_CATEGORY_COLORS[device.category] : 'text-slate-400'
+                                    return IconComponent ? (
+                                      <IconComponent className={`size-3 ${iconColor}`} />
+                                    ) : (
+                                      <Wifi className="size-3 text-slate-400" />
+                                    )
+                                  })()}
                                   <span className="text-xs text-slate-700 truncate flex-1 group-hover:text-slate-900">
                                     {device.name}
                                   </span>
@@ -787,9 +857,9 @@ export default function EcosystemsManagementPage() {
                         ))}
                       </div>
                       <div className="border-t-2 border-dashed border-slate-200 bg-slate-50/50 p-3">
-                        <p className="text-xs font-semibold text-slate-400 mb-2">Otro / Exterior</p>
+                        <p className="text-xs font-semibold text-slate-400 mb-2">Sin categoría</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {devicesByRoom['Otro']?.map((device) => (
+                          {devicesByRoom['Sin categoría']?.map((device) => (
                             <div
                               key={device.id}
                               role="button"
@@ -807,14 +877,22 @@ export default function EcosystemsManagementPage() {
                               }}
                               className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 hover:border-accent/30 hover:bg-accent/5 transition cursor-pointer group"
                             >
-                              <Wifi className="size-3 text-slate-400" />
+                              {(() => {
+                                const IconComponent = device.category ? DEVICE_CATEGORY_ICONS[device.category] : null
+                                const iconColor = device.category ? DEVICE_CATEGORY_COLORS[device.category] : 'text-slate-400'
+                                return IconComponent ? (
+                                  <IconComponent className={`size-3 ${iconColor}`} />
+                                ) : (
+                                  <Wifi className="size-3 text-slate-400" />
+                                )
+                              })()}
                               <span className="text-xs text-slate-600 truncate max-w-[80px] group-hover:text-slate-900">
                                 {device.name}
                               </span>
                               {device.isOnline && <span className="w-1 h-1 rounded-full bg-emerald-400" />}
                             </div>
                           ))}
-                          {(!devicesByRoom['Otro'] || devicesByRoom['Otro'].length === 0) && (
+                          {(!devicesByRoom['Sin categoría'] || devicesByRoom['Sin categoría'].length === 0) && (
                             <p className="text-xs text-slate-300 italic">Sin dispositivos</p>
                           )}
                         </div>
