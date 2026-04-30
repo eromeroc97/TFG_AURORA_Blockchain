@@ -31,6 +31,24 @@ enum EcosystemStatus {
   REVOKED
 }
 
+enum DeviceCategory {
+  SMART_BULB
+  SMART_PANEL
+  SMART_PLUG
+  ENERGY_METER
+  CAMERA
+  SMART_LOCK
+  CONTACT_SENSOR
+  MOTION_SENSOR
+  THERMOSTAT
+  HVAC
+  SMART_SPEAKER
+  SMART_TV
+  APPLIANCE
+  ROUTER
+  OTHER
+}
+
 model Identity {
   id String @id @default(uuid()) @db.Uuid
   type IdentityType
@@ -119,6 +137,8 @@ model Device {
   ecosystem Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
 
   name String
+  category DeviceCategory?
+  room String?
   macAddress String? @db.VarChar(255)
   vendor String?
 

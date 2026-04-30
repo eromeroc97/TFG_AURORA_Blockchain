@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { DeviceCategory } from '@prisma/client';
 
 export class CreateDeviceDto {
   @ApiProperty({
@@ -17,7 +18,25 @@ export class CreateDeviceDto {
   @IsUUID('4')
   ecosystemId!: string;
 
-  @ApiPropertyOptional({    description: 'Dirección MAC del dispositivo.',
+  @ApiPropertyOptional({
+    description: 'Categoría del dispositivo.',
+    enum: DeviceCategory,
+    example: 'SMART_BULB',
+  })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @ApiPropertyOptional({
+    description: 'Habitación o ubicación del dispositivo.',
+    example: 'Salón',
+  })
+  @IsOptional()
+  @IsString()
+  room?: string;
+
+  @ApiPropertyOptional({
+    description: 'Dirección MAC del dispositivo.',
     example: 'AA:BB:CC:DD:EE:FF',
   })
   @IsOptional()
