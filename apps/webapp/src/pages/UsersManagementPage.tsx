@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
 import Select from '../components/Select'
@@ -23,7 +23,7 @@ const formatBytes = (bytes: number): string => {
 }
 
 export default function UsersManagementPage() {
-  const { users, isLoading, error, actionLoading, refreshUsers, approveUser, revokeUser, changeUserRole } = useUsersController()
+  const { users, isLoading, error, actionLoading, approveUser, revokeUser, changeUserRole } = useUsersController()
   const { authClaims } = useAuth()
   const navigate = useNavigate()
   const [selectedUserInfo, setSelectedUserInfo] = useState<User | null>(null)

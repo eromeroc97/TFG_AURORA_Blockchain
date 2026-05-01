@@ -5,7 +5,7 @@ import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { useEcosystemsController } from '../controllers/useEcosystemsController'
-import { getUserById } from '../services/users.service'
+import { getCurrentUser, getUserById } from '../services/users.service'
 import Select from '../components/Select'
 import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
 import type { EcosystemAccess } from '../services/ecosystems.service'
@@ -84,9 +84,17 @@ export default function EcosystemsManagementPage() {
     const loadOwnerEmails = async () => {
       const uniqueOwnerIds = [...new Set(visibleEcosystems.map((eco) => eco.ownerId).filter(Boolean))]
       const newEmails: Record<string, string> = {}
+
+      const currentUser = await getCurrentUser()
+
       for (const ownerId of uniqueOwnerIds) {
         if (ownerId && !ownerEmails[ownerId]) {
-          const user = await getUserById(ownerId)
+          let user = null
+          if (ownerId === userId) {
+            user = currentUser
+          } else {
+            user = await getUserById(ownerId)
+          }
           if (user?.email) {
             newEmails[ownerId] = user.email
           }
@@ -98,7 +106,7 @@ export default function EcosystemsManagementPage() {
     }
     loadOwnerEmails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleEcosystems.map((e) => e.ownerId).join(',')])
+  }, [visibleEcosystems.map((e) => e.ownerId).join(','), userId])
 
   useEffect(() => {
     setVisibleEcosystems(ecosystems)

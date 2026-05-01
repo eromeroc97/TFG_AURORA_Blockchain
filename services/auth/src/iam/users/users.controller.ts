@@ -25,6 +25,12 @@ type AuthenticatedRequest = {
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  findMe(@Req() request: AuthenticatedRequest) {
+    return this.usersService.findMe(request.user?.sub ?? '');
+  }
+
   @Post()
   @ApiOperation({ summary: 'Registrar un nuevo usuario (solo USER, PENDING)' })
   @ApiCreatedResponse({

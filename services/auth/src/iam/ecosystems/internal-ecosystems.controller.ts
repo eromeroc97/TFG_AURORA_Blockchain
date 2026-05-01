@@ -64,6 +64,7 @@ export class InternalUsersController {
       throw new BadRequestException('userId is required');
     }
 
-    return this.ecosystemsService.findAllEcosystemsByUserId(userId.trim());
+    const ecosystems = await this.ecosystemsService.findAllEcosystemsByUserId(userId.trim());
+    return { ecosystemIds: ecosystems.map(e => e.id) };
   }
 }

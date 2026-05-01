@@ -630,6 +630,23 @@ export class UsersService {
     return user;
   }
 
+  async findMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: this.userSelect,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status === UserStatus.REVOKED) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
   async findAuthUserById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
