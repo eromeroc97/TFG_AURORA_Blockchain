@@ -118,4 +118,25 @@ export class MailService {
 
     this.logger.log(`Account deleted email sent to ${email}`);
   }
+
+  async sendEcosystemDelegationRequestEmail(
+    email: string,
+    ecosystemName: string,
+    ownerEmail: string,
+    role: string,
+  ): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Petición de acceso a ecosistema en AURORA',
+      template: './ecosystem-delegation-request',
+      context: {
+        ecosystem_name: ecosystemName,
+        owner_email: ownerEmail,
+        role,
+        requested_at: new Date().toLocaleDateString('es-ES'),
+      },
+    });
+
+    this.logger.log(`Ecosystem delegation request email sent to ${email}`);
+  }
 }

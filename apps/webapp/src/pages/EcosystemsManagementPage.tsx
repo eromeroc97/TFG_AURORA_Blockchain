@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Eye, EyeOff, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, RefreshCw, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Trash2, Tv, UserMinus, Users, Wifi, Wind, Zap } from 'lucide-react'
+import { Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Edit3, Eye, EyeOff, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, RefreshCw, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Trash2, Tv, UserMinus, Users, Wifi, Wind, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
@@ -1205,7 +1205,8 @@ export default function EcosystemsManagementPage() {
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    👁️ Viewer (solo lectura)
+                    <Eye className="mr-2 inline h-4 w-4" />
+                    Viewer (solo lectura)
                   </button>
                   <button
                     type="button"
@@ -1216,7 +1217,8 @@ export default function EcosystemsManagementPage() {
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    ✏️ Editor (puede modificar)
+                    <Edit3 className="mr-2 inline h-4 w-4" />
+                    Editor (puede modificar)
                   </button>
                 </div>
               </div>

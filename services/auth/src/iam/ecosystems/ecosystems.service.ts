@@ -9,6 +9,7 @@ import { AccessRole, EcosystemStatus, Prisma, Role, UserStatus } from '@prisma/c
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { CryptoService } from '../../crypto/crypto.service';
+import { MailService } from '../../shared/mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
@@ -30,6 +31,7 @@ export class EcosystemsService {
     private readonly prisma: PrismaService,
     private readonly fireflyService: FireflyService,
     private readonly cryptoService: CryptoService,
+    private readonly mailService: MailService,
   ) {}
 
   private readonly ecosystemSelect = {
@@ -560,6 +562,15 @@ export class EcosystemsService {
       throw new BadRequestException('El usuario debe estar activo para recibir accesos');
     }
 
+    if (targetUser.role === Role.AUDITOR) {
+      throw new BadRequestException('No puedes compartir ecosistemas con auditores');
+    }
+
+    const owner = await this.prisma.user.findUnique({
+      where: { id: actorId },
+      select: { email: true },
+    });
+
     const existingAccess = await this.prisma.ecosystemAccess.findUnique({
       where: {
         ecosystemId_userId: {
@@ -580,6 +591,13 @@ export class EcosystemsService {
         role: role ?? AccessRole.VIEWER,
       },
     });
+
+    await this.mailService.sendEcosystemDelegationRequestEmail(
+      targetUser.email,
+      ecosystem.name,
+      owner?.email ?? '',
+      role ?? AccessRole.VIEWER,
+    );
   }
 
   async revokeAccess(ecosystemId: string, actorId: string, targetUserId: string): Promise<void> {
