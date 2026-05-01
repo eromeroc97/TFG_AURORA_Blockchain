@@ -64,6 +64,6 @@ export class InternalUsersController {
       throw new BadRequestException('userId is required');
     }
 
-    return this.ecosystemsService.findEcosystemsByOwnerId(userId.trim());
+    return this.ecosystemsService.findAllEcosystemsByUserId(userId.trim());
   }
 }

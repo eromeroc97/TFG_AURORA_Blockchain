@@ -1,17 +1,37 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
 import Select from '../components/Select'
 import { useUsersController } from '../controllers/useUsersController'
 import { useAuth } from '../context/auth-context'
+import { getUserEcosystems, type UserEcosystem } from '../services/ecosystems.service'
+import { getUserById } from '../services/users.service'
+import { getUserTelemetryVolume } from '../services/users.service'
+import type { User } from '../components/dashboard/users.data'
 
 const USER_ROLES = ['ALL', 'USER', 'AUDITOR', 'ADMIN'] as const
 const USER_STATUSES = ['ALL', 'ACTIVE', 'PENDING', 'PASSBLOCK'] as const
 const PAGE_SIZES = [10, 25, 50, 100] as const
+const ECOSYSTEMS_PAGE_SIZE = 5
+
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+}
 
 export default function UsersManagementPage() {
   const { users, isLoading, error, actionLoading, refreshUsers, approveUser, revokeUser, changeUserRole } = useUsersController()
   const { authClaims } = useAuth()
-  const [selectedUserInfo, setSelectedUserInfo] = useState<{ email: string; role: string; status: string } | null>(null)
+  const navigate = useNavigate()
+  const [selectedUserInfo, setSelectedUserInfo] = useState<User | null>(null)
+  const [userEcosystems, setUserEcosystems] = useState<UserEcosystem[]>([])
+  const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({})
+  const [telemetryVolume, setTelemetryVolume] = useState<number>(0)
+  const [ecosystemsPage, setEcosystemsPage] = useState(1)
+  const [loadingEcosystems, setLoadingEcosystems] = useState(false)
   const [pendingUserAction, setPendingUserAction] = useState<{
     userEmail: string
     action: 'approve' | 'revoke'
@@ -39,8 +59,45 @@ export default function UsersManagementPage() {
   const canRevokeUser = (user: { status: string; role: string }) => user.status !== 'REVOKED' && canManageAdministratorUser(user)
   const canChangeUserRole = (user: { status: string; role: string }) => user.status === 'ACTIVE' && canManageAdministratorUser(user)
 
-  const handleShowUserInfo = (user: { email: string; role: string; status: string }) => {
+  const handleShowUserInfo = async (user: User) => {
     setSelectedUserInfo(user)
+    setUserEcosystems([])
+    setOwnerEmails({})
+    setTelemetryVolume(0)
+    setEcosystemsPage(1)
+    setLoadingEcosystems(true)
+
+    try {
+      const ecosystems = await getUserEcosystems(user.id)
+      setUserEcosystems(ecosystems)
+
+      const ownedEcosystems = ecosystems.filter((e) => e.accessType === 'OWNER')
+      if (ownedEcosystems.length > 0) {
+        const volume = await getUserTelemetryVolume(user.id)
+        setTelemetryVolume(volume)
+      }
+
+      const delegatedEcosystems = ecosystems.filter((e) => e.accessType === 'DELEGATED' && e.ownerId)
+      const uniqueOwnerIds = [...new Set(delegatedEcosystems.map((e) => e.ownerId))]
+      const emails: Record<string, string> = {}
+      for (const ownerId of uniqueOwnerIds) {
+        if (ownerId) {
+          try {
+            const ownerResponse = await getUserById(ownerId)
+            if (ownerResponse) {
+              emails[ownerId] = ownerResponse.email
+            }
+          } catch {
+            // Ignore errors
+          }
+        }
+      }
+      setOwnerEmails(emails)
+    } catch {
+      // Ignore errors
+    } finally {
+      setLoadingEcosystems(false)
+    }
   }
 
   const handleOpenRoleChange = (user: { email: string; role: string }) => {
@@ -365,8 +422,8 @@ export default function UsersManagementPage() {
       </div>
 
       {selectedUserInfo ? (
-        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm overflow-auto">
+          <div className="w-full max-w-2xl rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl my-8">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
                 <Users className="h-5 w-5" />
@@ -387,6 +444,117 @@ export default function UsersManagementPage() {
               <p>
                 <span className="font-semibold">Estado:</span> {selectedUserInfo.status}
               </p>
+              <p>
+                <span className="font-semibold">Fecha de registro:</span> {selectedUserInfo.createdAt ? new Date(selectedUserInfo.createdAt).toLocaleDateString('es-ES') : '-'}
+              </p>
+              <p>
+                <span className="font-semibold">Volumen de telemetría:</span> {formatBytes(telemetryVolume)}
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-slate-900 mb-3">Ecosistemas asociados</h4>
+              {loadingEcosystems ? (
+                <p className="text-sm text-slate-500">Cargando ecosistemas...</p>
+              ) : userEcosystems.length === 0 ? (
+                <p className="text-sm text-slate-500">No hay ecosistemas asociados a este usuario.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-slate-700">Ecosistema</th>
+                          <th className="px-3 py-2 text-left font-semibold text-slate-700">Rol</th>
+                          <th className="px-3 py-2 text-left font-semibold text-slate-700">Propietario</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {userEcosystems
+                          .slice((ecosystemsPage - 1) * ECOSYSTEMS_PAGE_SIZE, ecosystemsPage * ECOSYSTEMS_PAGE_SIZE)
+                          .map((eco) => (
+                            <tr key={eco.id} className="border-t border-slate-200">
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <span>{eco.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate('/ecosystems', { state: { selectedId: eco.id } })}
+                                    className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                    title="Ver ecosistema"
+                                  >
+                                    <Search className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2">
+                                {eco.accessType === 'OWNER' ? (
+                                  'OWNER'
+                                ) : (
+                                  `DELEGATED-${eco.accessRole ?? 'VIEWER'}`
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {eco.accessType === 'DELEGATED' && eco.ownerId ? (
+                                  <div className="flex items-center gap-2">
+                                    <span>Propietario: {ownerEmails[eco.ownerId] ?? eco.ownerId}</span>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        const ownerEmail = ownerEmails[eco.ownerId]
+                                        if (ownerEmail) {
+                                          const owner = users.find((u) => u.email === ownerEmail)
+                                          if (owner) {
+                                            handleShowUserInfo(owner)
+                                          }
+                                        }
+                                      }}
+                                      className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                      title="Ver propietario"
+                                    >
+                                      <Search className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  '-'
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {userEcosystems.length > ECOSYSTEMS_PAGE_SIZE && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                      <span>
+                        Mostrando {Math.min((ecosystemsPage - 1) * ECOSYSTEMS_PAGE_SIZE + 1, userEcosystems.length)} -{' '}
+                        {Math.min(ecosystemsPage * ECOSYSTEMS_PAGE_SIZE, userEcosystems.length)} de {userEcosystems.length}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEcosystemsPage((p) => Math.max(1, p - 1))}
+                          disabled={ecosystemsPage === 1}
+                          className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <span>
+                          Página {ecosystemsPage} de {Math.ceil(userEcosystems.length / ECOSYSTEMS_PAGE_SIZE)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEcosystemsPage((p) => Math.min(Math.ceil(userEcosystems.length / ECOSYSTEMS_PAGE_SIZE), p + 1))}
+                          disabled={ecosystemsPage >= Math.ceil(userEcosystems.length / ECOSYSTEMS_PAGE_SIZE)}
+                          className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end">

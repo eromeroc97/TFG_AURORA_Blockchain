@@ -47,6 +47,13 @@ export class EcosystemsController {
     return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!, request.user?.role);
   }
 
+  @Get('by-user/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  getEcosystemsByUserId(@Param('userId') userId: string) {
+    return this.ecosystemsService.findAllEcosystemsByUserId(userId);
+  }
+
   @Get(':id/api-key')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.USER)

@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createHash } from 'crypto';
+import { createHash, createVerify, createPublicKey, type Verify } from 'crypto';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { buildApiKeyCache, type ApiKeyCache } from './api-key-cache';
 import { loadConfig, type AppConfig } from './config';
@@ -441,6 +441,64 @@ export const buildApp = (options: AppOptions = {}) => {
   app.get('/v1/metrics', telemetryMetricsHandler);
   app.get('/api/telemetry/v1/metrics', telemetryMetricsHandler);
 
+  const telemetryVolumeHandler = async (
+    request: FastifyRequest<{ Querystring: { ecosystemIds?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const iotManagerInternalToken = config.iotManagerInternalToken;
+    const token = getBearerTokenFromHeader(request);
+
+    let context: TelemetryRequestContext | null = null;
+
+    if (token && iotManagerInternalToken && token === iotManagerInternalToken) {
+      context = {
+        role: 'ADMIN',
+        userId: 'internal',
+        ecosystemIds: null,
+      };
+    } else {
+      context = await resolveTelemetryRequestContext(request, reply);
+    }
+
+    if (!context) {
+      return;
+    }
+
+    const ecosystemIdsParam = request.query.ecosystemIds?.trim();
+    if (!ecosystemIdsParam) {
+      return reply.code(400).send({
+        error: 'INVALID_REQUEST',
+        message: 'ecosystemIds query parameter is required',
+      });
+    }
+
+    const ecosystemIds = ecosystemIdsParam.split(',').map((id) => id.trim()).filter(Boolean);
+    if (ecosystemIds.length === 0) {
+      return reply.code(400).send({
+        error: 'INVALID_REQUEST',
+        message: 'At least one ecosystemId is required',
+      });
+    }
+
+    const validEcosystemIds = context.role === 'GLOBAL_ADMIN' || context.role === 'ADMIN'
+      ? ecosystemIds
+      : ecosystemIds.filter((id) => context.ecosystemIds?.includes(id));
+
+    if (validEcosystemIds.length === 0) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        message: 'No access to the specified ecosystems',
+      });
+    }
+
+    const volume = await telemetryStore.getVolumeByEcosystemIds(validEcosystemIds);
+
+    return reply.code(200).send({ volume });
+  };
+
+  app.get('/v1/volume', telemetryVolumeHandler);
+  app.get('/api/telemetry/v1/volume', telemetryVolumeHandler);
+
   const authenticateApiKey = async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply: FastifyReply) => {
     const apiKey = getApiKeyFromHeader(request);
 
@@ -529,14 +587,58 @@ export const buildApp = (options: AppOptions = {}) => {
     return value.replace(/-/g, '+').replace(/_/g, '/').padEnd(value.length + (4 - (value.length % 4)) % 4, '=');
   };
 
+  const convertPublicKeyToSpki = (key: string): string => {
+    try {
+      let pem = key;
+      
+      if (!pem.includes('-----BEGIN')) {
+        const keyBuffer = Buffer.from(key, 'base64');
+        pem = keyBuffer.toString('utf8');
+      }
+      
+      if (!pem.includes('-----BEGIN')) {
+        return key;
+      }
+      
+      const publicKey = createPublicKey(pem);
+      return publicKey.export({ type: 'spki', format: 'pem' }) as string;
+    } catch (err) {
+      console.error('Key conversion error:', err);
+      return key;
+    }
+  };
+
   const decodeJwtPayload = (token: string): TelemetrySessionClaims | null => {
     const parts = token.split('.');
     if (parts.length !== 3) {
       return null;
     }
 
+    const [headerSegment, payloadSegment, signatureSegment] = parts;
+    let jwtPublicKey = config.jwtPublicKey;
+
+    if (jwtPublicKey) {
+      jwtPublicKey = convertPublicKeyToSpki(jwtPublicKey);
+
+      try {
+        const message = `${headerSegment}.${payloadSegment}`;
+        const signature = parseBase64Url(signatureSegment);
+        
+        const verifier = createVerify('RSA-SHA256');
+        verifier.update(message, 'utf8');
+        const isValid = verifier.verify(jwtPublicKey, signature, 'base64');
+        
+        if (!isValid) {
+          console.error('JWT signature verification failed');
+          return null;
+        }
+      } catch (err) {
+        console.error('JWT verification error:', err);
+        return null;
+      }
+    }
+
     try {
-      const payloadSegment = parts[1];
       const decoded = Buffer.from(parseBase64Url(payloadSegment), 'base64').toString('utf8');
       return JSON.parse(decoded) as TelemetrySessionClaims;
     } catch {
@@ -614,7 +716,9 @@ export const buildApp = (options: AppOptions = {}) => {
 
     let ecosystemIds: string[] | null = null;
 
-    if (role === 'USER') {
+    const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN';
+
+    if (!isAdminOrGlobalAdmin) {
       ecosystemIds = claimEcosystemIds ?? null;
 
       if (!ecosystemIds || ecosystemIds.length === 0) {
@@ -656,14 +760,14 @@ export const buildApp = (options: AppOptions = {}) => {
           });
           return null;
         }
-      }
 
-      if (!ecosystemIds || ecosystemIds.length === 0) {
-        reply.code(403).send({
-          error: 'NO_ECOSYSTEM_ACCESS',
-          message: 'User has no associated ecosystems',
-        });
-        return null;
+        if (!isAdminOrGlobalAdmin && (!ecosystemIds || ecosystemIds.length === 0)) {
+          reply.code(403).send({
+            error: 'NO_ECOSYSTEM_ACCESS',
+            message: 'User has no associated ecosystems',
+          });
+          return null;
+        }
       }
     }
 
@@ -691,9 +795,9 @@ export const buildApp = (options: AppOptions = {}) => {
       publicKey: publicKey.slice(0, 20) + '...',
       ecosystemId,
       txId,
-    });
-    return { txId };
-  };
+});
+  return { txId };
+};
 
   app.post(
     '/v1/ingest',

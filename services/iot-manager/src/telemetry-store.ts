@@ -39,6 +39,8 @@ export type TelemetryDocument = {
   payload: Record<string, unknown>;
   /** Hash SHA-256 del payload */
   hash: string;
+  /** Tamaño en bytes del payload */
+  sizeBytes: number;
 };
 
 /**
@@ -148,6 +150,14 @@ export interface TelemetryStore {
    * @param query - Parámetros de consulta de métricas
    */
   getMetrics(query: TelemetryMetricsQuery): Promise<TelemetryMetricsResult>;
+
+  /**
+   * Obtiene el volumen total de telemetría para ecosistemas específicos.
+   *
+   * @param ecosystemIds - IDs de los ecosistemas
+   * @returns Volumen total en bytes
+   */
+  getVolumeByEcosystemIds(ecosystemIds: string[]): Promise<number>;
 
   /**
    * Cierra la conexión al armazenamento.
@@ -500,5 +510,30 @@ export class MongoTelemetryStore implements TelemetryStore {
    */
   async close(): Promise<void> {
     await this.client.close();
+  }
+
+  /**
+   * Obtiene el volumen total de telemetría para ecosistemas específicos.
+   *
+   * @param ecosystemIds - IDs de los ecosistema
+   * @returns Volumen total en bytes
+   */
+  async getVolumeByEcosystemIds(ecosystemIds: string[]): Promise<number> {
+    if (!this.collection) {
+      await this.ensureCollection();
+    }
+
+    if (!this.collection) {
+      return 0;
+    }
+
+    const result = await this.collection
+      .aggregate([
+        { $match: { 'metadata.ecosystemId': { $in: ecosystemIds } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$sizeBytes', 0] } } } },
+      ])
+      .toArray();
+
+    return result[0]?.total ?? 0;
   }
 }

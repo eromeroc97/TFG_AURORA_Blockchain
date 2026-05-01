@@ -90,6 +90,11 @@ const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryS
     close: async () => {
       return
     },
+    getVolumeByEcosystemIds: async (ecosystemIds: string[]) => {
+      return savedInputs
+        .filter((input) => ecosystemIds.includes(input.ecosystemId))
+        .reduce((sum, input) => sum + (input.sizeBytes ?? 0), 0)
+    },
   }
 }
 

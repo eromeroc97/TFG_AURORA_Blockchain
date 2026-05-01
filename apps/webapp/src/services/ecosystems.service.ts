@@ -199,3 +199,22 @@ export async function getMyEcosystems(): Promise<AccessMapEcosystem[]> {
     return []
   }
 }
+
+export type UserEcosystem = {
+  id: string
+  name: string
+  ownerId: string
+  latitude: number | null
+  longitude: number | null
+  accessType: 'OWNER' | 'DELEGATED'
+  accessRole?: 'VIEWER' | 'EDITOR'
+}
+
+export async function getUserEcosystems(userId: string): Promise<UserEcosystem[]> {
+  try {
+    const response = await apiClient.get<UserEcosystem[]>(`/ecosystems/by-user/${userId}`)
+    return response.data
+  } catch {
+    return []
+  }
+}

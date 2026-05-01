@@ -26,6 +26,10 @@ export type AppConfig = {
 	authUserEcosystemsUrl?: string;
 	/** Token interno para llamadas al Auth Service */
 	authInternalToken?: string;
+	/** Token interno para llamadas desde Auth Service */
+	iotManagerInternalToken?: string;
+	/** Clave pública JWT para validar tokens */
+	jwtPublicKey?: string;
 	/** Mapa estático de API keys (.Format: key1:id1,key2:id2) */
 	iotApiKeyStaticMap?: string;
 	/** TTL para cache positivo de API keys (ms) */
@@ -96,6 +100,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     authSignUrl: env.AUTH_SIGN_URL?.trim() || undefined,
     authUserEcosystemsUrl: env.AUTH_USER_ECOSYSTEMS_URL?.trim() || undefined,
     authInternalToken: env.AUTH_INTERNAL_TOKEN?.trim() || undefined,
+    iotManagerInternalToken: env.IOT_MANAGER_INTERNAL_TOKEN?.trim() || undefined,
     iotApiKeyStaticMap: env.IOT_API_KEY_STATIC_MAP,
     iotApiKeyPositiveTtlMs: parsePositiveNumber(
       env.IOT_API_KEY_POSITIVE_TTL_MS,
@@ -107,5 +112,6 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
       15_000,
       'IOT_API_KEY_NEGATIVE_TTL_MS',
     ),
+    jwtPublicKey: env.JWT_PUBLIC_KEY?.trim() || undefined,
   };
 };

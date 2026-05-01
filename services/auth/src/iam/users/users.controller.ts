@@ -45,6 +45,13 @@ export class UsersController {
     return this.usersService.findAll(request.user?.role, request.user?.sub);
   }
 
+  @Get('by-email/:email')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  findByEmail(@Param('email') email: string) {
+    return this.usersService.findByEmail(email);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
@@ -88,5 +95,12 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.usersService.remove(id, request.user?.sub ?? id, request.user?.role);
+  }
+
+  @Get(':id/telemetry-volume')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  getUserTelemetryVolume(@Param('id') id: string) {
+    return this.usersService.getUserTelemetryVolume(id);
   }
 }

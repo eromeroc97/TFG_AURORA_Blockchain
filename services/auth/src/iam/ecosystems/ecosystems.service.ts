@@ -465,6 +465,68 @@ export class EcosystemsService {
     return { ecosystemIds: ecosystems.map(e => e.id) };
   }
 
+  async findAllEcosystemsByUserId(userId: string) {
+    const ownedEcosystems = await this.prisma.ecosystem.findMany({
+      where: { ownerId: userId, status: EcosystemStatus.ACTIVE },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        latitude: true,
+        longitude: true,
+        isOnline: true,
+        lastSeen: true,
+        createdAt: true,
+        updatedAt: true,
+        ownerId: true,
+      },
+    });
+
+    const delegatedEcosystems = await this.prisma.ecosystemAccess.findMany({
+      where: { userId },
+      include: {
+        ecosystem: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            latitude: true,
+            longitude: true,
+            isOnline: true,
+            lastSeen: true,
+            createdAt: true,
+            updatedAt: true,
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    const ownerResult = ownedEcosystems.map((eco) => ({
+      ...eco,
+      accessType: 'OWNER' as const,
+    }));
+
+    const delegatedResult = delegatedEcosystems
+      .filter((access) => access.ecosystem.status === EcosystemStatus.ACTIVE)
+      .map((access) => ({
+        id: access.ecosystem.id,
+        name: access.ecosystem.name,
+        status: access.ecosystem.status,
+        latitude: access.ecosystem.latitude,
+        longitude: access.ecosystem.longitude,
+        isOnline: access.ecosystem.isOnline,
+        lastSeen: access.ecosystem.lastSeen,
+        createdAt: access.ecosystem.createdAt,
+        updatedAt: access.ecosystem.updatedAt,
+        ownerId: access.ecosystem.ownerId,
+        accessType: 'DELEGATED' as const,
+        accessRole: access.role,
+      }));
+
+    return [...ownerResult, ...delegatedResult];
+  }
+
   async grantAccess(ecosystemId: string, actorId: string, email: string, role?: AccessRole): Promise<void> {
     const ecosystem = await this.prisma.ecosystem.findUnique({
       where: { id: ecosystemId },

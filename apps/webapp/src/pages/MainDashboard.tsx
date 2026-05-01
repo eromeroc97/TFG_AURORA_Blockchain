@@ -145,7 +145,7 @@ export default function MainDashboard() {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 {canViewUserCount && isAdminOrGlobalAdmin && (
-                  <a href="/users" className="sm:col-span-2" text-decoration="none">
+                  <a href="/users" className="sm:col-span-2" style={{ textDecoration: 'none' }}>
                     <div className="sm:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
                       <p className="text-sm font-medium text-slate-500">Usuarios existentes</p>
                       <p className="mt-3 text-4xl font-semibold text-slate-900">{users.length}</p>
