@@ -10,6 +10,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { CryptoService } from '../../crypto/crypto.service';
 import { MailService } from '../../shared/mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationCategory, NotificationType, ReferenceType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
@@ -32,6 +34,7 @@ export class EcosystemsService {
     private readonly fireflyService: FireflyService,
     private readonly cryptoService: CryptoService,
     private readonly mailService: MailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private readonly ecosystemSelect = {
@@ -580,24 +583,37 @@ export class EcosystemsService {
       },
     });
 
-    if (existingAccess) {
-      throw new BadRequestException('El usuario ya tiene acceso a este ecosistema');
-    }
-
-    await this.prisma.ecosystemAccess.create({
-      data: {
-        ecosystemId,
+    const existingPendingNotification = await this.prisma.notification.findFirst({
+      where: {
         userId: targetUser.id,
-        role: role ?? AccessRole.VIEWER,
+        referenceId: ecosystemId,
+        type: NotificationType.ECOSYSTEM_DELEGATION_REQUEST,
+        status: { in: ['PENDING', 'ACCEPTED', 'REJECTED'] },
       },
     });
 
-    await this.mailService.sendEcosystemDelegationRequestEmail(
-      targetUser.email,
-      ecosystem.name,
-      owner?.email ?? '',
-      role ?? AccessRole.VIEWER,
-    );
+    if (existingPendingNotification) {
+      throw new BadRequestException('Ya existe una petición pendiente para este ecosistema');
+    }
+
+    await this.notificationsService.create({
+      category: NotificationCategory.ACTION_EXPECTED,
+      type: NotificationType.ECOSYSTEM_DELEGATION_REQUEST,
+      targetType: 'INDIVIDUAL',
+      actorType: 'USER',
+      actorId: actorId,
+      actorEmail: owner?.email,
+      userId: targetUser.id,
+      referenceId: ecosystemId,
+      referenceType: ReferenceType.ECOSYSTEM,
+      title: 'Petición de acceso a ecosistema',
+      message: `${owner?.email ?? 'Un usuario'} te ha invitado a gestionar el ecosistema "${ecosystem.name}"`,
+      metadata: {
+        ecosystemId,
+        targetUserId: targetUser.id,
+        role: role ?? AccessRole.VIEWER,
+      },
+    });
   }
 
   async revokeAccess(ecosystemId: string, actorId: string, targetUserId: string): Promise<void> {
