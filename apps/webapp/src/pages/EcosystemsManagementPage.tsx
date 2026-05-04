@@ -68,6 +68,7 @@ export default function EcosystemsManagementPage() {
   const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({})
   const [sharedSearchTerm, setSharedSearchTerm] = useState('')
   const [sharedRoleFilter, setSharedRoleFilter] = useState<'ALL' | 'VIEWER' | 'EDITOR'>('ALL')
+  const [isPlanCollapsed, setIsPlanCollapsed] = useState(false)
 
   useEffect(() => {
     const selectedId = location.state?.selectedId as string | undefined
@@ -537,7 +538,7 @@ export default function EcosystemsManagementPage() {
 </div>
 
         <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-5 space-y-6">
+          <div className={`${isPlanCollapsed ? 'col-span-11' : 'col-span-5'} space-y-6 transition-all duration-300`}>
             <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
               <div className="mb-4 flex items-center gap-2 border-b border-border pb-4">
                 <button
@@ -813,24 +814,33 @@ export default function EcosystemsManagementPage() {
 
           </div>
 
-          <div className="col-span-7">
-            <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
+          <div className={`${isPlanCollapsed ? 'col-span-1' : 'col-span-7'} transition-all duration-300`}>
+            <div className={`rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora ${isPlanCollapsed ? 'py-3 px-2' : ''}`}>
               {detailEcosystem ? (
                 <>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-primary">
+                  <div className={`flex ${isPlanCollapsed ? 'flex-col gap-2 items-center' : 'items-center justify-between'}`}>
+                    <div className={`flex items-center gap-3 text-primary ${isPlanCollapsed ? 'flex-col' : ''}`}>
                       <House className="size-5 text-accent" />
-                      <h2 className="font-heading text-xl font-semibold">Plano del Ecosistema</h2>
+                      {!isPlanCollapsed && <h2 className="font-heading text-xl font-semibold">Plano del Ecosistema</h2>}
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleOpenEcosystemModal(detailEcosystem)}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-emerald-700"
+                      onClick={() => setIsPlanCollapsed(!isPlanCollapsed)}
+                      className={`inline-flex items-center justify-center rounded-full border transition hover:bg-slate-100 ${isPlanCollapsed ? 'p-1.5 border-slate-300 text-slate-600' : 'p-1.5 border-slate-200 text-slate-500'}`}
+                      title={isPlanCollapsed ? 'Mostrar plano' : 'Ocultar plano'}
                     >
-                      <Info className="h-3.5 w-3.5" />
-                      Ver detalles
+                      {isPlanCollapsed ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEcosystemModal(detailEcosystem)}
+                      className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-emerald-600 text-white shadow-sm transition hover:bg-emerald-700 ${isPlanCollapsed ? 'p-1.5' : 'px-3 py-1.5 text-xs font-medium'}`}
+                    >
+                      <Info className={isPlanCollapsed ? 'size-4' : 'h-3.5 w-3.5'} />
+                      {!isPlanCollapsed && 'Ver detalles'}
                     </button>
                   </div>
+                  {!isPlanCollapsed && (
                   <div className="mt-2 -mb-3">
                     <svg className="w-full h-12" viewBox="0 0 400 60" preserveAspectRatio="none">
                       <path d="M0 60 L200 0 L400 60 Z" fill="#cbd5e1" />
@@ -932,6 +942,7 @@ export default function EcosystemsManagementPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </>
               ) : (
                 <div className="flex h-full min-h-[400px] items-center justify-center">
