@@ -10,6 +10,7 @@ import Select from '../components/Select'
 import type { AccessMapEcosystem, AccessMapDevice } from '../services/ecosystems.service'
 import type { EcosystemAccess } from '../services/ecosystems.service'
 import type { AccessRole } from '../services/ecosystems.service'
+import { leaveSharedEcosystem } from '../services/ecosystems.service'
 
 type CreateEcosystemStep = 'form' | 'confirm' | 'result'
 
@@ -407,8 +408,15 @@ export default function EcosystemsManagementPage() {
     return device.room || 'Sin categoría'
   }
 
-  const canManageEcosystem = role === 'USER'
-  const canRevokeEcosystem = role === 'USER' || isAdminOrGlobalAdmin
+  const isSharedEcosystem = selectedEcosystem?.isShared ?? false
+  const accessRole = selectedEcosystem?.accessRole
+  const canManageEcosystem = isSharedEcosystem 
+    ? accessRole === 'EDITOR' || accessRole === 'OWNER'
+    : role === 'USER' || isAdminOrGlobalAdmin
+  
+  const canRevokeEcosystem = isSharedEcosystem
+    ? false
+    : role === 'USER' || isAdminOrGlobalAdmin
 
   const handleOpenEcosystemModal = (ecosystem: AccessMapEcosystem) => {
     setSelectedEcosystem((current) =>
@@ -476,6 +484,19 @@ export default function EcosystemsManagementPage() {
     setVisibleEcosystems((current) => current.filter((ecosystem) => ecosystem.id !== ecosystemId))
     if (selectedEcosystem?.id === ecosystemId) {
       setSelectedEcosystem(null)
+    }
+  }
+
+  const handleLeaveSharedEcosystem = async (ecosystemId: string) => {
+    setVisibleEcosystems((current) => current.filter((ecosystem) => ecosystem.id !== ecosystemId))
+    if (selectedEcosystem?.id === ecosystemId) {
+      setSelectedEcosystem(null)
+    }
+    try {
+      await leaveSharedEcosystem(ecosystemId)
+      await refreshSharedWithMe()
+    } catch (error) {
+      console.error('Error leaving shared ecosystem:', error)
     }
   }
 
@@ -1071,6 +1092,7 @@ export default function EcosystemsManagementPage() {
           onDeviceUpdated={handleDeviceUpdated}
           onEcosystemUpdated={handleEcosystemUpdated}
           onEcosystemRevoked={handleEcosystemRevoked}
+          onLeaveShared={handleLeaveSharedEcosystem}
           canManageEcosystem={canManageEcosystem}
           canRevokeEcosystem={canRevokeEcosystem}
           initialDeviceId={selectedDeviceFromPlan}

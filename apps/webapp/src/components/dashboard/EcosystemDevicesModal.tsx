@@ -19,6 +19,7 @@ import {
   Tablet,
   Thermometer,
   Tv,
+  UserMinus,
   Wind,
   X,
   Zap,
@@ -34,6 +35,7 @@ type EcosystemDevicesModalProps = {
   onDeviceUpdated: (device: AccessMapDevice) => void
   onEcosystemUpdated: (ecosystem: AccessMapEcosystem) => void
   onEcosystemRevoked: (ecosystemId: string) => void
+  onLeaveShared: (ecosystemId: string) => Promise<void>
   canManageEcosystem: boolean
   canRevokeEcosystem: boolean
   initialDeviceId?: string | null
@@ -413,6 +415,7 @@ export default function EcosystemDevicesModal({
   onDeviceUpdated,
   onEcosystemUpdated,
   onEcosystemRevoked,
+  onLeaveShared,
   canManageEcosystem,
   canRevokeEcosystem,
   initialDeviceId,
@@ -462,7 +465,9 @@ export default function EcosystemDevicesModal({
   const [isEditingEcosystemName, setIsEditingEcosystemName] = useState(false)
   const [isSavingEcosystemName, setIsSavingEcosystemName] = useState(false)
   const [isConfirmingRevoke, setIsConfirmingRevoke] = useState(false)
+  const [isConfirmingLeave, setIsConfirmingLeave] = useState(false)
   const [isRevoking, setIsRevoking] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [ecosystemError, setEcosystemError] = useState<string | null>(null)
@@ -703,6 +708,20 @@ export default function EcosystemDevicesModal({
     }
   }
 
+  const handleLeaveShared = async () => {
+    if (!ecosystem.id) return
+    setIsLeaving(true)
+    try {
+      await onLeaveShared(ecosystem.id)
+      setIsConfirmingLeave(false)
+      onClose()
+    } catch {
+      setModalError('No se pudo abandonar el ecosistema. Inténtalo de nuevo.')
+    } finally {
+      setIsLeaving(false)
+    }
+  }
+
   const deviceStatusLabel = isDeviceStatusLoading
     ? 'Verificando estado'
     : isDeviceOnline === true
@@ -807,6 +826,15 @@ export default function EcosystemDevicesModal({
                     className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
                   >
                     Dar de baja ecosistema
+                  </button>
+                )}
+                {ecosystem.isShared && (
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingLeave(true)}
+                    className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                  >
+                    Quiero dejar de ver este ecosistema
                   </button>
                 )}
               </div>
@@ -1024,6 +1052,42 @@ export default function EcosystemDevicesModal({
                   className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isRevoking ? 'Dando de baja...' : 'Confirmar baja'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {isConfirmingLeave ? (
+          <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
+            <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <UserMinus className="size-5" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-primary">Dejar de ver el ecosistema</h3>
+                  <p className="text-sm leading-6 text-muted">
+                    ¿Estás seguro de que quieres dejar de ver el ecosistema <strong>{ecosystem.name}</strong>? El propietario será notificado de tu decisión.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingLeave(false)}
+                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLeaveShared}
+                  disabled={isLeaving}
+                  className="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLeaving ? 'Abandonando...' : 'Confirmar'}
                 </button>
               </div>
             </div>

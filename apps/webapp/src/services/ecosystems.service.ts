@@ -143,6 +143,10 @@ export async function getEcosystemAccesses(ecosystemId: string): Promise<Ecosyst
   return response.data
 }
 
+export async function leaveSharedEcosystem(ecosystemId: string): Promise<void> {
+  await apiClient.delete(`/ecosystems/${ecosystemId}/leave`)
+}
+
 export async function getSharedWithMe(): Promise<AccessMapEcosystem[]> {
   try {
     const response = await apiClient.get<Array<{

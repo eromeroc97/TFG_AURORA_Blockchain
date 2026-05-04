@@ -15,6 +15,7 @@ import { NotificationCategory, NotificationType, ReferenceType } from '@prisma/c
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { UpdateEcosystemDto } from './dto/update-ecosystem.dto';
+import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 
 /**
  * Servicio de gestión de ecosistemas.
@@ -838,5 +839,68 @@ export class EcosystemsService {
       }));
 
     return [...ownerResult, ...delegatedResult];
+  }
+
+  async leaveSharedEcosystem(ecosystemId: string, userId: string): Promise<void> {
+    const access = await this.prisma.ecosystemAccess.findUnique({
+      where: {
+        ecosystemId_userId: {
+          ecosystemId,
+          userId,
+        },
+      },
+      include: {
+        ecosystem: true,
+      },
+    });
+
+    if (!access) {
+      throw new NotFoundException('No tienes acceso a este ecosistema');
+    }
+
+    if (access.ecosystem.ownerId === userId) {
+      throw new BadRequestException('No puedes abandonar tu propio ecosistema');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    const owner = await this.prisma.user.findUnique({
+      where: { id: access.ecosystem.ownerId },
+      select: { email: true },
+    });
+
+    await this.prisma.ecosystemAccess.delete({
+      where: { id: access.id },
+    });
+
+    await this.notificationsService.create({
+      category: NotificationCategory.READ_ONLY,
+      type: NotificationType.ECOSYSTEM_DELEGATION_RESPONSE,
+      targetType: 'INDIVIDUAL',
+      actorType: 'USER',
+      actorId: userId,
+      userId: access.ecosystem.ownerId,
+      referenceId: ecosystemId,
+      referenceType: ReferenceType.ECOSYSTEM,
+      title: 'Usuario ha dejado de ver el ecosistema',
+      message: `${user?.email ?? 'Un usuario'} ha decidido dejar de ver el ecosistema "${access.ecosystem.name}"`,
+      metadata: {
+        ecosystemId,
+        ecosystemName: access.ecosystem.name,
+        responderId: userId,
+        responderEmail: user?.email,
+        result: 'DELEGATE_LEFT',
+      },
+    } as CreateNotificationDto);
+
+    if (owner?.email) {
+      await this.mailService.sendNewNotificationEmail(
+        owner.email,
+        'Un usuario ha dejado de ver tu ecosistema',
+      );
+    }
   }
 }

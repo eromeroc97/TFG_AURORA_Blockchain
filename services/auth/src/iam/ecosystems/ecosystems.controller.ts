@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { EcosystemsService } from './ecosystems.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
@@ -136,5 +137,16 @@ export class EcosystemsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.ecosystemsService.updateAccessRole(id, request.user?.sub!, userId, updateAccessDto.role);
+  }
+
+  @Delete(':id/leave')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN, Role.AUDITOR)
+  @ApiOperation({ summary: 'Abandonar un ecosistema compartido (dejar de verlo)' })
+  leaveSharedEcosystem(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.ecosystemsService.leaveSharedEcosystem(id, request.user?.sub!);
   }
 }
