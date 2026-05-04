@@ -829,7 +829,14 @@ export default function EcosystemsManagementPage() {
                       className={`inline-flex items-center justify-center rounded-full border transition hover:bg-slate-100 ${isPlanCollapsed ? 'p-1.5 border-slate-300 text-slate-600' : 'p-1.5 border-slate-200 text-slate-500'}`}
                       title={isPlanCollapsed ? 'Mostrar plano' : 'Ocultar plano'}
                     >
-                      {isPlanCollapsed ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                      {isPlanCollapsed ? (
+                        <Eye className="size-4" />
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <EyeOff className="size-4" />
+                          <span className="text-xs">Ocultar plano</span>
+                        </span>
+                      )}
                     </button>
                     <button
                       type="button"
