@@ -8,6 +8,10 @@ export type AppConfig = {
 	mongoUri: string;
 	/** URL de la API de FireFly (blockchain) */
 	fireflyApiUrl: string;
+	/** ID del contrato (chaincode) desplegado en FireFly */
+	fireflyContractId?: string;
+	/** Namespace de FireFly (por defecto: default) */
+	fireflyNamespace?: string;
 	/** URL de conexión a Redis (opcional) */
 	redisUrl?: string;
 	/** URL base de la API de lookup de vendors MAC */
@@ -91,6 +95,8 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     port: parsePositiveNumber(env.PORT, 3002, 'PORT'),
     mongoUri,
     fireflyApiUrl,
+    fireflyContractId: env.FIREFLY_CONTRACT_ID?.trim() || undefined,
+    fireflyNamespace: env.FIREFLY_NAMESPACE?.trim() || 'default',
     redisUrl: env.REDIS_URL?.trim() || undefined,
     macVendorApiBaseUrl: env.MAC_VENDOR_API_BASE_URL?.trim() || 'https://api.macvendors.com',
     authDeviceLookupUrl: env.AUTH_DEVICE_LOOKUP_URL?.trim() || undefined,

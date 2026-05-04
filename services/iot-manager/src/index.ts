@@ -5,6 +5,7 @@ import { buildApiKeyCache, type ApiKeyCache } from './api-key-cache';
 import { loadConfig, type AppConfig } from './config';
 import { DeviceDiscoveryService } from './device-discovery';
 import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
+import { FireFlyService } from './firefly-service';
 
 /**
  * Resultado de validación de API key.
@@ -303,6 +304,7 @@ export const buildApp = (options: AppOptions = {}) => {
   const telemetryStore = options.telemetryStore ?? new MongoTelemetryStore(config.mongoUri);
   const shouldCloseStore = !options.telemetryStore;
   const deviceDiscovery = new DeviceDiscoveryService(config);
+  const fireflyService = new FireFlyService(config);
 
   const apiKeyValidator = options.apiKeyValidator ?? buildDefaultApiKeyValidator(config);
   const positiveTtlMs = options.positiveTtlMs ?? config.iotApiKeyPositiveTtlMs ?? DEFAULT_POSITIVE_TTL_MS;
@@ -778,27 +780,6 @@ export const buildApp = (options: AppOptions = {}) => {
     };
   };
 
-  const broadcastTelemetryMock = async (
-    hash: string,
-    signature: string,
-    publicKey: string,
-    ecosystemId: string,
-  ): Promise<{ txId: string }> => {
-    // TODO: Replace with actual FireFly communication
-    // This is a temporary mock that simulates network delay and returns success
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const txId = `mock-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    app.log.info({
-      msg: '[MOCK] Broadcast to FireFly',
-      hash,
-      signature: signature.slice(0, 20) + '...',
-      publicKey: publicKey.slice(0, 20) + '...',
-      ecosystemId,
-      txId,
-});
-  return { txId };
-};
-
   app.post(
     '/v1/ingest',
     {
@@ -902,19 +883,24 @@ export const buildApp = (options: AppOptions = {}) => {
         });
       }
 
-      // Step 7: Broadcast to FireFly (mock)
-      let txId: string;
-      try {
-        const broadcastResult = await broadcastTelemetryMock(hash, signature, signingPublicKey, ecosystemId);
-        txId = broadcastResult.txId;
-      } catch (broadcastError) {
-        request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly');
-        await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
-        return reply.code(500).send({
-          error: 'BROADCAST_FAILED',
-          message: 'Failed to broadcast telemetry to blockchain',
-        });
-      }
+  // Step 7: Invocar FireFly para anclar en Fabric (reemplaza el mock)
+  let txId: string;
+  try {
+    txId = await fireflyService.anchorTelemetry({
+      ingestId: savedTelemetry.id,
+      ecosystemId,
+      telemetryHash: hash,
+      signature,
+      publicKey: signingPublicKey,
+    });
+  } catch (broadcastError) {
+    request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly/Fabric');
+    await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
+    return reply.code(500).send({
+      error: 'BROADCAST_FAILED',
+      message: 'Failed to broadcast telemetry to blockchain',
+    });
+  }
 
       // Step 8: Update status to ANCHORED
       await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'ANCHORED', signature, signingPublicKey, txId);
