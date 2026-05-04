@@ -197,7 +197,7 @@ export class NotificationsService {
       userId: user.id,
       title,
       message,
-      status: NotificationStatus.PENDING as const,
+      status: NotificationStatus.PENDING,
     }));
 
     if (notifications.length > 0) {
