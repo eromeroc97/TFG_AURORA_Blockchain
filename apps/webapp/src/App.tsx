@@ -5,6 +5,7 @@ import EcosystemsManagementPage from './pages/EcosystemsManagementPage'
 import ErrorPage from './pages/Error'
 import Login from './pages/Login'
 import MainDashboard from './pages/MainDashboard'
+import NotificationsPage from './pages/NotificationsPage'
 import Recover from './pages/Recover'
 import Register from './pages/Register'
 import Reset from './pages/Reset'
@@ -49,6 +50,7 @@ function App() {
               </Route>
               <Route path="/ecosystems" element={<EcosystemsManagementPage />} />
               <Route path="/account" element={<AccountPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
