@@ -139,4 +139,18 @@ export class MailService {
 
     this.logger.log(`Ecosystem delegation request email sent to ${email}`);
   }
+
+  async sendNewNotificationEmail(email: string, notificationTitle: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Nueva notificación - AURORA',
+      template: './new-notification',
+      context: {
+        notification_title: notificationTitle,
+        action_url: 'http://localhost/notifications',
+      },
+    });
+
+    this.logger.log(`New notification email sent to ${email}`);
+  }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Param, Query, Req, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { NotificationsService } from './notifications.service';
@@ -87,11 +87,15 @@ export class NotificationsController {
     @Body() dto: SendToUserDto,
     @Req() request: AuthenticatedRequest,
   ) {
+    const senderId = request.user?.sub ?? ''
+    if (dto.userId === senderId) {
+      throw new BadRequestException('No puedes enviarte una notificación a ti mismo')
+    }
     return this.notificationsService.sendToUser(
       dto.userId,
       dto.title,
       dto.message,
-      request.user?.sub ?? '',
+      senderId,
       request.user?.role ? `${request.user.role}@uclm.es` : 'admin@uclm.es',
     );
   }
@@ -104,11 +108,21 @@ export class NotificationsController {
     @Body() dto: SendToRolesDto,
     @Req() request: AuthenticatedRequest,
   ) {
+    const senderId = request.user?.sub ?? ''
+    const senderRole = request.user?.role
+    const rolesToSend = senderRole 
+      ? dto.roles.filter(r => r !== senderRole)
+      : dto.roles
+    
+    if (rolesToSend.length === 0) {
+      throw new BadRequestException('No puedes enviar notificaciones a tu propio rol')
+    }
+    
     return this.notificationsService.sendToRoles(
-      dto.roles,
+      rolesToSend,
       dto.title,
       dto.message,
-      request.user?.sub ?? '',
+      senderId,
       request.user?.role ? `${request.user.role}@uclm.es` : 'admin@uclm.es',
     );
   }

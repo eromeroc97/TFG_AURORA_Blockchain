@@ -8,6 +8,7 @@ import {
   type Notification,
 } from '../services/notifications.service'
 import Select from '../components/Select'
+import { useRefreshNotificationCount } from '../layouts/MainLayout'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 const DEFAULT_PAGE_SIZE = 10
@@ -61,6 +62,7 @@ export default function NotificationsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const refreshNotificationCount = useRefreshNotificationCount()
 const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_SIZE)
 
   const loadNotifications = async () => {
@@ -81,6 +83,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, status: 'READ' as const, readAt: result.readAt } : n)),
       )
+      refreshNotificationCount()
     }
     setActionLoading(null)
   }
@@ -92,6 +95,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, status: 'ACCEPTED' as const, respondedAt: result.respondedAt } : n)),
       )
+      refreshNotificationCount()
     }
     setActionLoading(null)
   }
@@ -103,6 +107,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, status: 'REJECTED' as const, respondedAt: result.respondedAt } : n)),
       )
+      refreshNotificationCount()
     }
     setActionLoading(null)
   }

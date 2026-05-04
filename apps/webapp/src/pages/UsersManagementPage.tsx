@@ -876,8 +876,11 @@ export default function UsersManagementPage() {
                         message: notificationForm.message,
                       })
                     } else if (notificationModal.type === 'global') {
+                      const roles = notificationForm.roles.includes('ADMIN') 
+                        ? [...new Set([...notificationForm.roles, 'ADMIN', 'GLOBAL_ADMIN'])]
+                        : notificationForm.roles
                       await sendNotificationToRoles({
-                        roles: notificationForm.roles,
+                        roles,
                         title: notificationForm.title,
                         message: notificationForm.message,
                       })

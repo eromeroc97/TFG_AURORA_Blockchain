@@ -19,7 +19,6 @@ const navigationItems = [
 export default function Header({ onSignOut, userEmail, userRole, pendingCount = 0 }: HeaderProps) {
   const location = useLocation()
   const role = (userRole ?? 'USER').toUpperCase()
-  const hasPendingNotifications = pendingCount > 0
 
   const visibleNavigationItems = navigationItems.filter((item) =>
     item.roles.some((r) => r === role),

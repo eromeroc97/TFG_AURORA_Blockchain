@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../../shared/mail/mail.service';
 import {
   NotificationCategory,
   NotificationType,
@@ -12,11 +13,14 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   async create(createNotificationDto: CreateNotificationDto): Promise<Notification> {
     const metadata = createNotificationDto.metadata as Prisma.InputJsonValue | undefined;
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         category: createNotificationDto.category,
         type: createNotificationDto.type,
@@ -34,6 +38,19 @@ export class NotificationsService {
         status: NotificationStatus.PENDING,
       },
     });
+
+    if (createNotificationDto.userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: createNotificationDto.userId },
+        select: { email: true },
+      });
+
+      if (user?.email) {
+        await this.mailService.sendNewNotificationEmail(user.email, createNotificationDto.title);
+      }
+    }
+
+    return notification;
   }
 
   async findAllForUser(userId: string, includeRead: boolean = false): Promise<Notification[]> {
@@ -156,7 +173,7 @@ export class NotificationsService {
     actorId: string,
     actorEmail: string,
   ): Promise<Notification> {
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         category: NotificationCategory.READ_ONLY,
         type: NotificationType.ADMINISTRATOR_NOTIFICATION,
@@ -170,6 +187,17 @@ export class NotificationsService {
         status: NotificationStatus.PENDING,
       },
     });
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    if (user?.email) {
+      await this.mailService.sendNewNotificationEmail(user.email, title);
+    }
+
+    return notification;
   }
 
   async sendToRoles(
@@ -184,7 +212,7 @@ export class NotificationsService {
         role: { in: roles as any[] },
         status: 'ACTIVE',
       },
-      select: { id: true },
+      select: { id: true, email: true },
     });
 
     const notifications = users.map((user) => ({
@@ -204,6 +232,12 @@ export class NotificationsService {
       await this.prisma.notification.createMany({
         data: notifications,
       });
+
+      for (const user of users) {
+        if (user.email) {
+          await this.mailService.sendNewNotificationEmail(user.email, title);
+        }
+      }
     }
 
     return notifications.length;
