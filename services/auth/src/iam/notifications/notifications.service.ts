@@ -27,7 +27,6 @@ export class NotificationsService {
         targetType: createNotificationDto.targetType ?? 'INDIVIDUAL',
         actorType: createNotificationDto.actorType ?? 'USER',
         actorId: createNotificationDto.actorId,
-        actorEmail: createNotificationDto.actorEmail,
         userId: createNotificationDto.userId,
         referenceId: createNotificationDto.referenceId,
         referenceType: createNotificationDto.referenceType,
@@ -154,6 +153,63 @@ export class NotificationsService {
       }
     }
 
+    if (notification.type === NotificationType.ECOSYSTEM_DELEGATION_REQUEST && notification.actorId) {
+      const ecosystem = await this.prisma.ecosystem.findUnique({
+        where: { id: notification.referenceId ?? '' },
+        select: { name: true },
+      });
+
+      const responder = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      const responseTitle = response === 'ACCEPTED'
+        ? 'Solicitud aceptada'
+        : 'Solicitud rechazada'
+
+      const responseMessage = response === 'ACCEPTED'
+        ? `${responder?.email ?? 'Un usuario'} ha aceptado tu invitación para acceder a '${ecosystem?.name ?? 'un ecosistema'}'`
+        : `${responder?.email ?? 'Un usuario'} ha rechazado tu invitación para acceder a '${ecosystem?.name ?? 'un ecosistema'}'`
+
+await this.prisma.notification.create({
+          data: {
+            category: NotificationCategory.READ_ONLY,
+            type: NotificationType.ECOSYSTEM_DELEGATION_RESPONSE,
+            targetType: 'INDIVIDUAL',
+            actorType: 'USER',
+            actorId: userId,
+            userId: notification.actorId,
+            referenceId: notification.referenceId,
+            referenceType: notification.referenceType,
+            title: responseTitle,
+            message: responseMessage,
+            status: NotificationStatus.PENDING,
+            metadata: {
+              originalNotificationId: id,
+              ecosystemId: notification.referenceId,
+              ecosystemName: ecosystem?.name,
+              responderId: userId,
+              responderEmail: responder?.email,
+              result: response,
+            } as Prisma.InputJsonValue,
+          },
+        })
+
+      const actorUser = notification.actorId 
+        ? await this.prisma.user.findUnique({ where: { id: notification.actorId }, select: { email: true } })
+        : null
+
+      if (responder?.email && actorUser?.email) {
+        await this.mailService.sendEcosystemDelegationResponseEmail(
+          actorUser.email,
+          ecosystem?.name ?? 'un ecosistema',
+          responder.email,
+          response === 'ACCEPTED' ? 'aceptada' : 'rechazada',
+        )
+      }
+    }
+
     return updatedNotification;
   }
 
@@ -171,7 +227,6 @@ export class NotificationsService {
     title: string,
     message: string,
     actorId: string,
-    actorEmail: string,
   ): Promise<Notification> {
     const notification = await this.prisma.notification.create({
       data: {
@@ -180,7 +235,6 @@ export class NotificationsService {
         targetType: 'INDIVIDUAL',
         actorType: 'USER',
         actorId,
-        actorEmail,
         userId,
         title,
         message,
@@ -205,7 +259,6 @@ export class NotificationsService {
     title: string,
     message: string,
     actorId: string,
-    actorEmail: string,
   ): Promise<number> {
     const users = await this.prisma.user.findMany({
       where: {
@@ -221,7 +274,6 @@ export class NotificationsService {
       targetType: 'INDIVIDUAL' as const,
       actorType: 'USER' as const,
       actorId,
-      actorEmail,
       userId: user.id,
       title,
       message,

@@ -61,6 +61,7 @@ enum NotificationCategory {
 
 enum NotificationType {
   ECOSYSTEM_DELEGATION_REQUEST
+  ECOSYSTEM_DELEGATION_RESPONSE
   ADMINISTRATOR_NOTIFICATION
 }
 
@@ -217,7 +218,6 @@ model Notification {
 
   actorType ActorType @default(USER)
   actorId String? @db.Uuid
-  actorEmail String?
 
   userId String? @db.Uuid
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)

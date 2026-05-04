@@ -602,7 +602,6 @@ export class EcosystemsService {
       targetType: 'INDIVIDUAL',
       actorType: 'USER',
       actorId: actorId,
-      actorEmail: owner?.email,
       userId: targetUser.id,
       referenceId: ecosystemId,
       referenceType: ReferenceType.ECOSYSTEM,

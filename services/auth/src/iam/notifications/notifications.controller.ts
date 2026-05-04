@@ -96,7 +96,6 @@ export class NotificationsController {
       dto.title,
       dto.message,
       senderId,
-      request.user?.role ? `${request.user.role}@uclm.es` : 'admin@uclm.es',
     );
   }
 
@@ -123,7 +122,6 @@ export class NotificationsController {
       dto.title,
       dto.message,
       senderId,
-      request.user?.role ? `${request.user.role}@uclm.es` : 'admin@uclm.es',
     );
   }
 }

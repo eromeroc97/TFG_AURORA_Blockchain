@@ -21,10 +21,6 @@ export class CreateNotificationDto {
   actorId?: string;
 
   @IsOptional()
-  @IsEmail()
-  actorEmail?: string;
-
-  @IsOptional()
   @IsString()
   userId?: string;
 

@@ -153,4 +153,25 @@ export class MailService {
 
     this.logger.log(`New notification email sent to ${email}`);
   }
+
+  async sendEcosystemDelegationResponseEmail(
+    email: string,
+    ecosystemName: string,
+    responderEmail: string,
+    result: 'aceptada' | 'rechazada',
+  ): Promise<void> {
+    const notificationTitle = result === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud rechazada'
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Nueva notificación - AURORA',
+      template: './new-notification',
+      context: {
+        notification_title: notificationTitle,
+        action_url: 'http://localhost/notifications',
+      },
+    });
+
+    this.logger.log(`Ecosystem delegation response notification email sent to ${email}`);
+  }
 }
