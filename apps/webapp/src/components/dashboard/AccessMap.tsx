@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAuth } from '../../context/auth-context'
-import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem } from './access-map.data'
+import type { AccessMapEcosystem } from '../../services/ecosystems.service'
 
 /**
  * Rol de acceso a ecosistema.
@@ -79,7 +79,7 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
   const navigate = useNavigate()
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole
   const currentUserId = authClaims?.sub ?? 'anonymous-user'
-  const sourceNodes = ecosystems ?? ACCESS_MAP_ECOSYSTEMS_MOCK
+  const sourceNodes = ecosystems ?? []
   const mapNodes = sourceNodes.filter(
     (node): node is AccessMapEcosystem & { lat: number; lng: number } =>
       node.lat != null && node.lng != null,
@@ -96,18 +96,6 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
 
     return mapNodes
   }, [currentUserId, mapNodes, role])
-
-  const canViewDevices = (node: AccessMapEcosystem) => {
-    if (role === 'AUDITOR') {
-      return true
-    }
-
-    if (role === 'USER') {
-      return node.ownerId === currentUserId || node.accessType === 'DELEGATED'
-    }
-
-    return false
-  }
 
   return (
     <div className="relative z-0 mt-5 h-[520px] w-full overflow-hidden rounded-[1.25rem] border border-primary/10 bg-white shadow-aurora">

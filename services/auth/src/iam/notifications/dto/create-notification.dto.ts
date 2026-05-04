@@ -19,3 +19,15 @@ export class CreateNotificationDto {
 export class UpdateNotificationStatusDto {
   status!: 'READ' | 'ACCEPTED' | 'REJECTED';
 }
+
+export class SendToUserDto {
+  userId!: string;
+  title!: string;
+  message!: string;
+}
+
+export class SendToRolesDto {
+  roles!: string[];
+  title!: string;
+  message!: string;
+}

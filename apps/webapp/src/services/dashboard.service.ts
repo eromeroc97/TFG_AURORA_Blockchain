@@ -1,5 +1,5 @@
 import { apiClient } from '../api/axios'
-import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem, type AccessMapDevice } from '../components/dashboard/access-map.data'
+import type { AccessMapEcosystem, AccessMapDevice } from './ecosystems.service'
 
 type ApiEcosystem = {
   id: string
@@ -31,38 +31,34 @@ const mapApiDeviceToAccessMap = (device: ApiDevice): AccessMapDevice => ({
 })
 
 export async function getMapEcosystems(): Promise<AccessMapEcosystem[]> {
-  try {
-    const response = await apiClient.get<ApiEcosystem[]>('/ecosystems')
+  const response = await apiClient.get<ApiEcosystem[]>('/ecosystems')
 
-    const ecosystemsWithDevices = await Promise.all(
-      response.data.map(async (ecosystem) => {
-        try {
-          const devicesResponse = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystem.id}/devices`)
-          return {
-            id: ecosystem.id,
-            name: ecosystem.name,
-            ownerId: ecosystem.ownerId,
-            lat: ecosystem.latitude,
-            lng: ecosystem.longitude,
-            isShared: false,
-            devices: devicesResponse.data.map(mapApiDeviceToAccessMap),
-          }
-        } catch {
-          return {
-            id: ecosystem.id,
-            name: ecosystem.name,
-            ownerId: ecosystem.ownerId,
-            lat: ecosystem.latitude,
-            lng: ecosystem.longitude,
-            isShared: false,
-            devices: [],
-          }
+  const ecosystemsWithDevices = await Promise.all(
+    response.data.map(async (ecosystem) => {
+      try {
+        const devicesResponse = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystem.id}/devices`)
+        return {
+          id: ecosystem.id,
+          name: ecosystem.name,
+          ownerId: ecosystem.ownerId,
+          lat: ecosystem.latitude,
+          lng: ecosystem.longitude,
+          isShared: false,
+          devices: devicesResponse.data.map(mapApiDeviceToAccessMap),
         }
-      }),
-    )
+      } catch {
+        return {
+          id: ecosystem.id,
+          name: ecosystem.name,
+          ownerId: ecosystem.ownerId,
+          lat: ecosystem.latitude,
+          lng: ecosystem.longitude,
+          isShared: false,
+          devices: [],
+        }
+      }
+    }),
+  )
 
-    return ecosystemsWithDevices
-  } catch {
-    return ACCESS_MAP_ECOSYSTEMS_MOCK
-  }
+  return ecosystemsWithDevices
 }

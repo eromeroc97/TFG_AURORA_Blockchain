@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, ChevronLeft, ChevronRight, Check, X, Search, Calendar } from 'lucide-react'
+import { Bell, ChevronLeft, ChevronRight, Check, X, Search } from 'lucide-react'
 import {
   acceptNotification,
   getNotifications,
@@ -61,105 +61,7 @@ export default function NotificationsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_SIZE)
-
-  const mockNotifications: Notification[] = [
-    {
-      id: '1',
-      category: 'ACTION_EXPECTED',
-      type: 'ECOSYSTEM_DELEGATION_REQUEST',
-      targetType: 'INDIVIDUAL',
-      actorType: 'USER',
-      actorId: 'user-1',
-      actorEmail: 'juan.perez@uclm.es',
-      userId: 'user-2',
-      title: 'Solicitud de acceso al ecosistema',
-      message: 'Juan Pérez te ha solicitado acceso al ecosistema "Casa Principal" con rol de Editor.',
-      status: 'PENDING',
-      actionUrl: null,
-      metadata: { ecosystemId: 'eco-1', targetUserId: 'user-2', role: 'EDITOR' },
-      readAt: null,
-      respondedAt: null,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: '2',
-      category: 'READ_ONLY',
-      type: 'ECOSYSTEM_DELEGATION_REQUEST',
-      targetType: 'INDIVIDUAL',
-      actorType: 'SYSTEM',
-      actorId: null,
-      actorEmail: null,
-      userId: 'user-2',
-      title: 'Acceso concedido',
-      message: 'Se ha confirmado tu acceso al ecosistema "Oficina" con rol de Viewer.',
-      status: 'READ',
-      actionUrl: null,
-      metadata: null,
-      readAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-      respondedAt: null,
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: '3',
-      category: 'ACTION_EXPECTED',
-      type: 'ECOSYSTEM_DELEGATION_REQUEST',
-      targetType: 'INDIVIDUAL',
-      actorType: 'USER',
-      actorId: 'user-3',
-      actorEmail: 'maria.garcia@uclm.es',
-      userId: 'user-2',
-      title: 'Solicitud de delegación',
-      message: 'María García te solicita delegarte la gestión del ecosistema "Laboratorio IoT".',
-      status: 'ACCEPTED',
-      actionUrl: null,
-      metadata: { ecosystemId: 'eco-2' },
-      readAt: null,
-      respondedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: '4',
-      category: 'READ_ONLY',
-      type: 'ECOSYSTEM_DELEGATION_REQUEST',
-      targetType: 'INDIVIDUAL',
-      actorType: 'SYSTEM',
-      actorId: null,
-      actorEmail: null,
-      userId: 'user-2',
-      title: 'Ecosistema eliminado',
-      message: 'El ecosistema "Prueba Temporal" ha sido eliminado por su propietario.',
-      status: 'REJECTED',
-      actionUrl: null,
-      metadata: null,
-      readAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-      respondedAt: null,
-      createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: '5',
-      category: 'ACTION_EXPECTED',
-      type: 'ECOSYSTEM_DELEGATION_REQUEST',
-      targetType: 'INDIVIDUAL',
-      actorType: 'USER',
-      actorId: 'user-4',
-      actorEmail: 'admin@uclm.es',
-      userId: 'user-2',
-      title: 'Invitación a ecosistema',
-      message: 'El administrador te invita a unirte al ecosistema "Edificio Central" como Administrador.',
-      status: 'PENDING',
-      actionUrl: null,
-      metadata: { ecosystemId: 'eco-3', role: 'ADMIN' },
-      readAt: null,
-      respondedAt: null,
-      createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-]
+const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_SIZE)
 
   const loadNotifications = async () => {
     setIsLoading(true)
@@ -243,16 +145,6 @@ export default function NotificationsPage() {
   const totalPages = Math.ceil(filteredNotifications.length / pageSize)
   const startIndex = (currentPage - 1) * pageSize
   const paginatedNotifications = filteredNotifications.slice(startIndex, startIndex + pageSize)
-
-  const canShowActionButtons = (notification: Notification): boolean => {
-    if (notification.category === 'READ_ONLY') {
-      return notification.status === 'PENDING'
-    }
-    if (notification.category === 'ACTION_EXPECTED') {
-      return notification.status === 'PENDING'
-    }
-    return false
-  }
 
   if (isLoading) {
     return (

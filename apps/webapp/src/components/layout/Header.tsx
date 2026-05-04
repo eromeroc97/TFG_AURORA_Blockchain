@@ -22,7 +22,7 @@ export default function Header({ onSignOut, userEmail, userRole, pendingCount = 
   const hasPendingNotifications = pendingCount > 0
 
   const visibleNavigationItems = navigationItems.filter((item) =>
-    item.roles.includes(role as typeof item.roles[number]),
+    item.roles.some((r) => r === role),
   )
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)

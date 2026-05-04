@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { getEcosystems, getMyEcosystems, getSharedWithMe, createEcosystem as apiCreateEcosystem, grantAccess, revokeAccess, updateAccessRole, getEcosystemAccesses, type AccessRole, type EcosystemAccess } from '../services/ecosystems.service'
-import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
+import { getEcosystems, getMyEcosystems, getSharedWithMe, createEcosystem as apiCreateEcosystem, grantAccess, revokeAccess, updateAccessRole, getEcosystemAccesses, type AccessRole, type EcosystemAccess, type AccessMapEcosystem } from '../services/ecosystems.service'
 
 export function useEcosystemsController() {
   const [ecosystems, setEcosystems] = useState<AccessMapEcosystem[]>([])

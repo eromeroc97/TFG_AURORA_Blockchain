@@ -1,5 +1,41 @@
 import { apiClient } from '../api/axios'
-import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem, type AccessMapDevice } from '../components/dashboard/access-map.data'
+
+export type AccessMapDevice = {
+  id: string
+  name: string
+  macAddress?: string | null
+  vendor?: string | null
+  ecosystemId?: string
+  createdAt?: string
+  updatedAt?: string
+  category?: string
+  room?: string
+  status?: string
+  lastSeen?: string | null
+  isOnline?: boolean
+  payload?: Record<string, unknown>
+  type?: string
+}
+
+export type AccessMapEcosystem = {
+  id: string
+  name: string
+  ownerId: string
+  lat: number | null
+  lng: number | null
+  isShared: boolean
+  devices: AccessMapDevice[]
+  accessType?: 'OWNER' | 'DELEGATED'
+  accessRole?: 'VIEWER' | 'EDITOR'
+  sharedUsers?: EcosystemAccess[]
+}
+
+export type EcosystemAccess = {
+  userId: string
+  email: string
+  role: 'VIEWER' | 'EDITOR'
+  grantedAt: string
+}
 
 type ApiEcosystem = {
   id: string
@@ -46,45 +82,41 @@ const mapApiDeviceToAccessMap = (device: ApiDevice): AccessMapDevice => ({
 })
 
 export async function getEcosystems(): Promise<AccessMapEcosystem[]> {
-  try {
-    const response = await apiClient.get<ApiEcosystem[]>('/ecosystems')
+  const response = await apiClient.get<ApiEcosystem[]>('/ecosystems')
 
-    const ecosystemsWithDevices = await Promise.all(
-      response.data.map(async (ecosystem) => {
-        const isDelegated = ecosystem.accessType === 'DELEGATED'
-        try {
-          const devicesResponse = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystem.id}/devices`)
-          return {
-            id: ecosystem.id,
-            name: ecosystem.name,
-            ownerId: ecosystem.ownerId,
-            lat: ecosystem.latitude,
-            lng: ecosystem.longitude,
-            isShared: isDelegated,
-            accessType: ecosystem.accessType,
-            accessRole: ecosystem.accessRole,
-            devices: devicesResponse.data.map(mapApiDeviceToAccessMap),
-          }
-        } catch {
-          return {
-            id: ecosystem.id,
-            name: ecosystem.name,
-            ownerId: ecosystem.ownerId,
-            lat: ecosystem.latitude,
-            lng: ecosystem.longitude,
-            isShared: isDelegated,
-            accessType: ecosystem.accessType,
-            accessRole: ecosystem.accessRole,
-            devices: [],
-          }
+  const ecosystemsWithDevices = await Promise.all(
+    response.data.map(async (ecosystem) => {
+      const isDelegated = ecosystem.accessType === 'DELEGATED'
+      try {
+        const devicesResponse = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystem.id}/devices`)
+        return {
+          id: ecosystem.id,
+          name: ecosystem.name,
+          ownerId: ecosystem.ownerId,
+          lat: ecosystem.latitude,
+          lng: ecosystem.longitude,
+          isShared: isDelegated,
+          accessType: ecosystem.accessType,
+          accessRole: ecosystem.accessRole,
+          devices: devicesResponse.data.map(mapApiDeviceToAccessMap),
         }
-      }),
-    )
+      } catch {
+        return {
+          id: ecosystem.id,
+          name: ecosystem.name,
+          ownerId: ecosystem.ownerId,
+          lat: ecosystem.latitude,
+          lng: ecosystem.longitude,
+          isShared: isDelegated,
+          accessType: ecosystem.accessType,
+          accessRole: ecosystem.accessRole,
+          devices: [],
+        }
+      }
+    }),
+  )
 
-    return ecosystemsWithDevices
-  } catch {
-    return ACCESS_MAP_ECOSYSTEMS_MOCK
-  }
+  return ecosystemsWithDevices
 }
 
 export async function createEcosystem(name: string): Promise<CreateEcosystemResponse> {
@@ -93,13 +125,6 @@ export async function createEcosystem(name: string): Promise<CreateEcosystemResp
 }
 
 export type AccessRole = 'VIEWER' | 'EDITOR'
-
-export type EcosystemAccess = {
-  userId: string
-  email: string
-  role: AccessRole
-  grantedAt: string
-}
 
 export async function grantAccess(ecosystemId: string, email: string, role: AccessRole = 'VIEWER'): Promise<void> {
   await apiClient.post(`/ecosystems/${ecosystemId}/accesses`, { email, role })

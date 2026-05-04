@@ -148,4 +148,64 @@ export class NotificationsService {
       },
     });
   }
+
+  async sendToUser(
+    userId: string,
+    title: string,
+    message: string,
+    actorId: string,
+    actorEmail: string,
+  ): Promise<Notification> {
+    return this.prisma.notification.create({
+      data: {
+        category: NotificationCategory.READ_ONLY,
+        type: NotificationType.ADMINISTRATOR_NOTIFICATION,
+        targetType: 'INDIVIDUAL',
+        actorType: 'SYSTEM',
+        actorId,
+        actorEmail,
+        userId,
+        title,
+        message,
+        status: NotificationStatus.PENDING,
+      },
+    });
+  }
+
+  async sendToRoles(
+    roles: string[],
+    title: string,
+    message: string,
+    actorId: string,
+    actorEmail: string,
+  ): Promise<number> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: { in: roles as any[] },
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+
+    const notifications = users.map((user) => ({
+      category: NotificationCategory.READ_ONLY,
+      type: NotificationType.ADMINISTRATOR_NOTIFICATION,
+      targetType: 'INDIVIDUAL' as const,
+      actorType: 'SYSTEM' as const,
+      actorId,
+      actorEmail,
+      userId: user.id,
+      title,
+      message,
+      status: NotificationStatus.PENDING as const,
+    }));
+
+    if (notifications.length > 0) {
+      await this.prisma.notification.createMany({
+        data: notifications,
+      });
+    }
+
+    return notifications.length;
+  }
 }

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Edit3, Eye, EyeOff, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, RefreshCw, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Trash2, Tv, UserMinus, Users, Wifi, Wind, Zap } from 'lucide-react'
+import { Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Edit3, Eye, EyeOff, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Trash2, Tv, UserMinus, Users, Wifi, Wind, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
 import { useEcosystemsController } from '../controllers/useEcosystemsController'
 import { getCurrentUser, getUserById } from '../services/users.service'
 import Select from '../components/Select'
-import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
+import type { AccessMapEcosystem, AccessMapDevice } from '../services/ecosystems.service'
 import type { EcosystemAccess } from '../services/ecosystems.service'
 import type { AccessRole } from '../services/ecosystems.service'
 
@@ -847,7 +847,7 @@ export default function EcosystemsManagementPage() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleRevokeSharing(ecosystem.id)}
+                            onClick={() => handleRevokeSharing(ecosystem.id, '')}
                             disabled={revokingEcosystemId === ecosystem.id}
                             className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600 hover:bg-rose-100 disabled:opacity-50"
                           >

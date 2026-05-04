@@ -2,7 +2,7 @@ import { apiClient } from '../api/axios'
 
 export type NotificationCategory = 'READ_ONLY' | 'ACTION_EXPECTED'
 export type NotificationStatus = 'PENDING' | 'READ' | 'ACCEPTED' | 'REJECTED'
-export type NotificationType = 'ECOSYSTEM_DELEGATION_REQUEST'
+export type NotificationType = 'ECOSYSTEM_DELEGATION_REQUEST' | 'ADMINISTRATOR_NOTIFICATION'
 export type TargetType = 'INDIVIDUAL' | 'GLOBAL'
 export type ActorType = 'USER' | 'SYSTEM'
 
@@ -75,4 +75,34 @@ export async function rejectNotification(id: string): Promise<Notification | nul
   } catch {
     return null
   }
+}
+
+export interface SendToUserPayload {
+  userId: string
+  title: string
+  message: string
+}
+
+export interface SendToRolesPayload {
+  roles: string[]
+  title: string
+  message: string
+}
+
+export interface SendNotificationResponse {
+  id: string
+}
+
+export interface SendToRolesResponse {
+  count: number
+}
+
+export async function sendNotificationToUser(payload: SendToUserPayload): Promise<SendNotificationResponse> {
+  const response = await apiClient.post<SendNotificationResponse>('/notifications/send-to-user', payload)
+  return response.data
+}
+
+export async function sendNotificationToRoles(payload: SendToRolesPayload): Promise<SendToRolesResponse> {
+  const response = await apiClient.post<SendToRolesResponse>('/notifications/send-to-roles', payload)
+  return response.data
 }

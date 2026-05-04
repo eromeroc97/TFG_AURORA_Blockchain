@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getMapEcosystems } from '../services/dashboard.service'
-import type { AccessMapEcosystem } from '../components/dashboard/access-map.data'
+import type { AccessMapEcosystem } from '../services/ecosystems.service'
 
 export function useDashboardController() {
   const [ecosystems, setEcosystems] = useState<AccessMapEcosystem[]>([])

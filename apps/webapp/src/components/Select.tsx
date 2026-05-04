@@ -1,12 +1,12 @@
 import { useState } from 'react'
 
 interface SelectOption {
-  value: string
+  value: string | number
   label: string
 }
 
 interface SelectProps {
-  value: string
+  value: string | number
   onChange: (value: string) => void
   options: SelectOption[]
   placeholder?: string
@@ -17,7 +17,7 @@ interface SelectProps {
 export default function Select({ value, onChange, options, placeholder, className = '', disabled }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const selectedOption = options.find((opt) => opt.value === value)
+  const selectedOption = options.find((opt) => String(opt.value) === String(value))
 
   return (
     <div className={`relative ${className}`}>
@@ -51,14 +51,14 @@ export default function Select({ value, onChange, options, placeholder, classNam
           )}
           {options.map((opt) => (
             <button
-              key={opt.value}
+              key={String(opt.value)}
               type="button"
               onClick={() => {
-                onChange(opt.value)
+                onChange(String(opt.value))
                 setIsOpen(false)
               }}
               className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                value === opt.value ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
+                String(value) === String(opt.value) ? 'bg-accent/10 text-primary font-medium' : 'text-primary'
               }`}
             >
               {opt.label}

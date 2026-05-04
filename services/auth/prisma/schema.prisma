@@ -61,6 +61,7 @@ enum NotificationCategory {
 
 enum NotificationType {
   ECOSYSTEM_DELEGATION_REQUEST
+  ADMINISTRATOR_NOTIFICATION
 }
 
 enum NotificationStatus {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Battery,
   Bed,
   Cctv,
   Cpu,
@@ -12,25 +11,22 @@ import {
   Lock,
   Pencil,
   PlugZap,
-  Plus,
   Radar,
   Refrigerator,
   Router,
-  Signal,
   Speaker,
   Sun,
   Tablet,
   Thermometer,
   Tv,
-  Wifi,
   Wind,
   X,
   Zap,
 } from 'lucide-react'
 import { apiClient } from '../../api/axios'
 import { useAuth } from '../../context/auth-context'
+import type { AccessMapDevice, AccessMapEcosystem } from '../../services/ecosystems.service'
 import { getDeviceDetails } from '../../services/device-details.service'
-import type { AccessMapDevice, AccessMapEcosystem } from './access-map.data'
 
 type EcosystemDevicesModalProps = {
   ecosystem: AccessMapEcosystem
@@ -753,11 +749,6 @@ export default function EcosystemDevicesModal({
     setCustomRoomInput('')
   }
 
-  const isCustomRoom = (room: string): boolean => {
-    const predefinedRooms = ['SALON', 'COCINA', 'HABITACION', 'BAÑO', 'EXTERIOR', 'OTRO']
-    return !predefinedRooms.includes(room)
-  }
-
   return (
     <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
       <div className="w-full max-w-6xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
@@ -956,7 +947,7 @@ export default function EcosystemDevicesModal({
                   </div>
                   <div className="rounded-2xl border border-border bg-white p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-muted">Última actualización</p>
-                    <p className="mt-2 text-sm text-primary">{new Date(displayedDevice.updatedAt).toLocaleString()}</p>
+                    <p className="mt-2 text-sm text-primary">{displayedDevice.updatedAt ? new Date(displayedDevice.updatedAt).toLocaleString() : '-'}</p>
                   </div>
                 </div>
 

@@ -1,8 +1,9 @@
-import { Controller, Get, Patch, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth';
+import { SendToUserDto, SendToRolesDto } from './dto/create-notification.dto';
 
 type AuthenticatedRequest = {
   user?: {
@@ -76,5 +77,39 @@ export class NotificationsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.notificationsService.respondToNotification(id, request.user?.sub ?? '', 'REJECTED');
+  }
+
+  @Post('send-to-user')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'GLOBAL_ADMIN')
+  @ApiOperation({ summary: 'Enviar notificación a un usuario específico' })
+  sendToUser(
+    @Body() dto: SendToUserDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.notificationsService.sendToUser(
+      dto.userId,
+      dto.title,
+      dto.message,
+      request.user?.sub ?? '',
+      request.user?.role ? `${request.user.role}@uclm.es` : 'admin@uclm.es',
+    );
+  }
+
+  @Post('send-to-roles')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'GLOBAL_ADMIN')
+  @ApiOperation({ summary: 'Enviar notificación a usuarios de roles específicos' })
+  sendToRoles(
+    @Body() dto: SendToRolesDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.notificationsService.sendToRoles(
+      dto.roles,
+      dto.title,
+      dto.message,
+      request.user?.sub ?? '',
+      request.user?.role ? `${request.user.role}@uclm.es` : 'admin@uclm.es',
+    );
   }
 }
