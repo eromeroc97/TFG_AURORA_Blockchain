@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Edit3, Eye, EyeOff, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Trash2, Tv, UserMinus, Users, Wifi, Wind, Zap } from 'lucide-react'
+import { Cctv, Check, ChevronLeft, ChevronRight, Copy, Cpu, DoorOpen, Edit3, Eye, EyeOff, Home, House, Info, Key, Lightbulb, Lock, Plus, PlugZap, Radar, Refrigerator, Router, Search, Share2, Speaker, Tablet, Thermometer, Trash2, Tv, Users, Wifi, Wind, Zap } from 'lucide-react'
 import { apiClient } from '../api/axios'
 import { useAuth } from '../context/auth-context'
 import EcosystemDevicesModal from '../components/dashboard/EcosystemDevicesModal'
@@ -67,8 +67,6 @@ export default function EcosystemsManagementPage() {
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
   const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({})
   const [sharedSearchTerm, setSharedSearchTerm] = useState('')
-  const [sharedCurrentPage, setSharedCurrentPage] = useState(1)
-  const [sharedPageSize, setSharedPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
   const [sharedRoleFilter, setSharedRoleFilter] = useState<'ALL' | 'VIEWER' | 'EDITOR'>('ALL')
 
   useEffect(() => {
@@ -288,35 +286,6 @@ export default function EcosystemsManagementPage() {
     [visibleEcosystems],
   )
 
-  const filteredSharedEcosystems = useMemo(
-    () =>
-      sharedWithMe.filter((eco) => {
-        const matchesSearch = eco.name.toLowerCase().includes(sharedSearchTerm.toLowerCase())
-        const matchesRole = sharedRoleFilter === 'ALL' || eco.accessRole === sharedRoleFilter
-        return matchesSearch && matchesRole
-      }),
-    [sharedWithMe, sharedSearchTerm, sharedRoleFilter],
-  )
-
-  const sharedTotalPages = Math.ceil(filteredSharedEcosystems.length / sharedPageSize)
-  const paginatedSharedEcosystems = useMemo(
-    () => {
-      const start = (sharedCurrentPage - 1) * sharedPageSize
-      return filteredSharedEcosystems.slice(start, start + sharedPageSize)
-    },
-    [filteredSharedEcosystems, sharedCurrentPage, sharedPageSize],
-  )
-
-  const handleSharedPageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= sharedTotalPages) {
-      setSharedCurrentPage(newPage)
-    }
-  }
-
-  useEffect(() => {
-    setSharedCurrentPage(1)
-  }, [sharedSearchTerm])
-
   const totalDevicesCount = useMemo(
     () => visibleEcosystems.reduce((sum, eco) => sum + (eco.devices?.length ?? 0), 0),
     [visibleEcosystems],
@@ -325,16 +294,24 @@ export default function EcosystemsManagementPage() {
   const filteredEcosystems = useMemo(
     () =>
       visibleEcosystems.filter((eco) => {
+        const isSharedTab = activeTab === 'shared-with-me'
+        const currentSearch = isSharedTab ? sharedSearchTerm : searchTerm
         const matchesSearch =
-          eco.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (eco.ownerId && eco.ownerId.toLowerCase().includes(searchTerm.toLowerCase()))
+          eco.name.toLowerCase().includes(currentSearch.toLowerCase()) ||
+          (eco.ownerId && eco.ownerId.toLowerCase().includes(currentSearch.toLowerCase()))
+        
+        if (isSharedTab) {
+          const matchesRole = sharedRoleFilter === 'ALL' || eco.accessRole === sharedRoleFilter
+          return matchesSearch && matchesRole
+        }
+        
         const matchesSharedStatus =
           sharedStatusFilter === 'ALL' ||
           (sharedStatusFilter === 'SHARED' && eco.isShared) ||
           (sharedStatusFilter === 'PRIVATE' && !eco.isShared)
         return matchesSearch && matchesSharedStatus
       }),
-    [visibleEcosystems, searchTerm, sharedStatusFilter],
+    [visibleEcosystems, searchTerm, sharedSearchTerm, sharedRoleFilter, activeTab, sharedStatusFilter],
   )
 
   const totalPages = Math.ceil(filteredEcosystems.length / pageSize)
@@ -354,7 +331,7 @@ export default function EcosystemsManagementPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, sharedStatusFilter])
+  }, [searchTerm, sharedSearchTerm, sharedStatusFilter, sharedRoleFilter])
 
   useEffect(() => {
     setVisibleEcosystems(ecosystems)
@@ -630,8 +607,8 @@ export default function EcosystemsManagementPage() {
                   <input
                     type="text"
                     placeholder={isUser ? 'Buscar por nombre...' : 'Buscar por nombre o propietario...'}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    value={activeTab === 'shared-with-me' ? sharedSearchTerm : searchTerm}
+                    onChange={(e) => activeTab === 'shared-with-me' ? setSharedSearchTerm(e.target.value) : setSearchTerm(e.target.value)}
                     className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
                   />
                 </div>
@@ -833,119 +810,6 @@ export default function EcosystemsManagementPage() {
                 </>
               )}
             </div>
-
-            {isUser && (
-            <div className="rounded-[1.75rem] border border-border bg-white p-6 shadow-aurora">
-              <div className="flex items-center gap-3 text-primary">
-                <Share2 className="size-5 text-accent" />
-                <h2 className="font-heading text-xl font-semibold">Ecosistemas compartidos conmigo</h2>
-              </div>
-              <p className="mt-3 text-xs text-muted">Ecosistemas que otros usuarios han compartido contigo.</p>
-
-              <div className="mt-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder={isUser ? 'Buscar por nombre...' : 'Buscar por nombre o propietario...'}
-                    value={sharedSearchTerm}
-                    onChange={(e) => setSharedSearchTerm(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
-                  />
-                </div>
-                <Select
-                  value={sharedRoleFilter}
-                  onChange={(value) => setSharedRoleFilter(value as 'ALL' | 'VIEWER' | 'EDITOR')}
-                  options={[
-                    { value: 'ALL', label: 'Todos los roles' },
-                    { value: 'VIEWER', label: 'Viewer' },
-                    { value: 'EDITOR', label: 'Editor' },
-                  ]}
-                  className="w-40"
-                />
-              </div>
-
-              {filteredSharedEcosystems.length === 0 ? (
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
-                  <p className="font-medium text-slate-900">No hay ecosistemas compartidos contigo.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="mt-6 space-y-3">
-                    {paginatedSharedEcosystems.map((ecosystem) => (
-                      <article
-                        key={ecosystem.id}
-                        className="w-full rounded-2xl border border-border/50 bg-surface/30 p-4 transition hover:border-border hover:bg-surface/50"
-                      >
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <p className="font-medium text-primary">{ecosystem.name}</p>
-                            <p className="text-xs text-muted mt-1">
-                              Rol: <span className="font-medium text-teal-600">{ecosystem.accessRole === 'EDITOR' ? 'Editor' : 'Viewer'}</span>
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRevokeSharing(ecosystem.id, '')}
-                            disabled={revokingEcosystemId === ecosystem.id}
-                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600 hover:bg-rose-100 disabled:opacity-50"
-                          >
-                            {revokingEcosystemId === ecosystem.id ? (
-                              <>Revocando...</>
-                            ) : (
-                              <>
-                                <UserMinus className="size-3" />
-                                Dejar de compartir
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  {filteredSharedEcosystems.length > 0 && (
-                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-500">Mostrar</span>
-                        <Select
-                          value={String(sharedPageSize)}
-                          onChange={(value) => {
-                            setSharedPageSize(Number(value) as typeof sharedPageSize)
-                            setSharedCurrentPage(1)
-                          }}
-                          options={PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))}
-                          className="w-20"
-                        />
-                        <span className="text-sm text-slate-500">resultados</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSharedPageChange(sharedCurrentPage - 1)}
-                          disabled={sharedCurrentPage === 1}
-                          className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <ChevronLeft className="size-4" />
-                        </button>
-                        <span className="text-sm text-slate-600">
-                          Página {sharedCurrentPage} de {sharedTotalPages}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleSharedPageChange(sharedCurrentPage + 1)}
-                          disabled={sharedCurrentPage === sharedTotalPages}
-                          className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <ChevronRight className="size-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            )}
 
           </div>
 
