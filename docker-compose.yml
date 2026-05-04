@@ -12,7 +12,7 @@ services:
       - seq
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`) || PathPrefix(`/api/devices`)"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`) || PathPrefix(`/api/devices`) || PathPrefix(`/api/notifications`)"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
       - "traefik.http.services.auth.loadbalancer.server.port=3001"

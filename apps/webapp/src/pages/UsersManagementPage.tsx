@@ -731,7 +731,7 @@ export default function UsersManagementPage() {
 
       {notificationModal && !notificationConfirm && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-white p-6 shadow-2xl">
+          <div className="w-[70%] max-w-4xl rounded-2xl border border-border bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex size-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
@@ -775,8 +775,8 @@ export default function UsersManagementPage() {
                   value={notificationForm.message}
                   onChange={(e) => setNotificationForm((prev) => ({ ...prev, message: e.target.value }))}
                   placeholder="Escribe el mensaje de la notificación..."
-                  rows={4}
-                  className="mt-1 w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent resize-none"
+                  rows={8}
+                  className="mt-1 w-full max-h-60 rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent resize-none overflow-y-auto"
                 />
               </div>
 

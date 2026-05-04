@@ -108,11 +108,7 @@ export default function Header({ onSignOut, userEmail, userRole, pendingCount = 
             className="inline-flex items-center gap-3 rounded-full bg-white/85 px-3 py-2 text-left shadow-[0_10px_24px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-md transition-colors hover:bg-white"
           >
             <div className="relative flex size-9 items-center justify-center rounded-full bg-primary text-surface">
-              {hasPendingNotifications ? (
-                <Bell className="size-5 text-red-500" />
-              ) : (
-                <UserCircle2 className="size-5" />
-              )}
+              <UserCircle2 className="size-5" />
               {pendingCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-bold text-white">
                   {pendingCount > 9 ? '9+' : pendingCount}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import Header from '../components/layout/Header'
 import { useAuth } from '../context/auth-context'
@@ -7,20 +7,15 @@ import { getPendingCount } from '../services/notifications.service'
 
 export default function MainLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { authClaims, clearSession } = useAuth()
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    const fetchPendingCount = async () => {
-      if (authClaims?.sub) {
-        const count = await getPendingCount()
-        setPendingCount(count)
-      }
+    if (authClaims?.sub) {
+      getPendingCount().then(setPendingCount)
     }
-    fetchPendingCount()
-    const interval = setInterval(fetchPendingCount, 30000)
-    return () => clearInterval(interval)
-  }, [authClaims?.sub])
+  }, [authClaims?.sub, location.pathname])
 
   const handleSignOut = async () => {
     try {

@@ -43,8 +43,8 @@ export async function getNotifications(includeRead = true): Promise<Notification
 
 export async function getPendingCount(): Promise<number> {
   try {
-    const response = await apiClient.get<NotificationCount>('/notifications/count')
-    return response.data.count ?? 0
+    const response = await apiClient.get<number>('/notifications/count')
+    return typeof response.data === 'number' ? response.data : response.data.count ?? 0
   } catch {
     return 0
   }
