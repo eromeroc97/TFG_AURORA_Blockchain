@@ -68,6 +68,7 @@ export default function EcosystemsManagementPage() {
   const [sharedSearchTerm, setSharedSearchTerm] = useState('')
   const [sharedCurrentPage, setSharedCurrentPage] = useState(1)
   const [sharedPageSize, setSharedPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+  const [sharedRoleFilter, setSharedRoleFilter] = useState<'ALL' | 'VIEWER' | 'EDITOR'>('ALL')
 
   useEffect(() => {
     const selectedId = location.state?.selectedId as string | undefined
@@ -286,20 +287,14 @@ export default function EcosystemsManagementPage() {
     [visibleEcosystems],
   )
 
-  const ecosystemsSharedWithMe = useMemo(
-    () => visibleEcosystems.filter((eco) => eco.isShared && eco.ownerId !== userId),
-    [visibleEcosystems, userId],
-  )
-
   const filteredSharedEcosystems = useMemo(
     () =>
-      ecosystemsSharedWithMe.filter((eco) => {
-        const matchesSearch =
-          eco.name.toLowerCase().includes(sharedSearchTerm.toLowerCase()) ||
-          (eco.ownerId && eco.ownerId.toLowerCase().includes(sharedSearchTerm.toLowerCase()))
-        return matchesSearch
+      sharedWithMe.filter((eco) => {
+        const matchesSearch = eco.name.toLowerCase().includes(sharedSearchTerm.toLowerCase())
+        const matchesRole = sharedRoleFilter === 'ALL' || eco.accessRole === sharedRoleFilter
+        return matchesSearch && matchesRole
       }),
-    [ecosystemsSharedWithMe, sharedSearchTerm],
+    [sharedWithMe, sharedSearchTerm, sharedRoleFilter],
   )
 
   const sharedTotalPages = Math.ceil(filteredSharedEcosystems.length / sharedPageSize)
@@ -619,16 +614,29 @@ export default function EcosystemsManagementPage() {
                     className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
                   />
                 </div>
-                <Select
-                  value={sharedStatusFilter}
-                  onChange={(value) => setSharedStatusFilter(value as 'ALL' | 'SHARED' | 'PRIVATE')}
-                  options={[
-                    { value: 'ALL', label: 'Todos los estados' },
-                    { value: 'PRIVATE', label: 'Privado' },
-                    { value: 'SHARED', label: 'Compartido' },
-                  ]}
-                  className="w-44"
-                />
+                {activeTab === 'shared-with-me' ? (
+                  <Select
+                    value={sharedRoleFilter}
+                    onChange={(value) => setSharedRoleFilter(value as 'ALL' | 'VIEWER' | 'EDITOR')}
+                    options={[
+                      { value: 'ALL', label: 'Todos los roles' },
+                      { value: 'VIEWER', label: 'Viewer' },
+                      { value: 'EDITOR', label: 'Editor' },
+                    ]}
+                    className="w-40"
+                  />
+                ) : (
+                  <Select
+                    value={sharedStatusFilter}
+                    onChange={(value) => setSharedStatusFilter(value as 'ALL' | 'SHARED' | 'PRIVATE')}
+                    options={[
+                      { value: 'ALL', label: 'Todos los estados' },
+                      { value: 'PRIVATE', label: 'Privado' },
+                      { value: 'SHARED', label: 'Compartido' },
+                    ]}
+                    className="w-44"
+                  />
+                )}
               </div>
 
               {error ? (
@@ -746,7 +754,7 @@ export default function EcosystemsManagementPage() {
                           )}
                           {ecosystem.accessType === 'DELEGATED' ? (
                               <span className="text-xs font-medium px-2 py-1 rounded-full bg-teal-500/10 text-teal-600">
-                                Delegado
+                                {ecosystem.accessRole === 'EDITOR' ? 'Editor' : 'Viewer'}
                               </span>
                             ) : ecosystem.isShared ? (
                               <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent">
@@ -824,6 +832,16 @@ export default function EcosystemsManagementPage() {
                     className="w-full rounded-xl border border-border bg-white pl-10 pr-4 py-2 text-sm text-primary outline-none transition-colors focus:border-accent"
                   />
                 </div>
+                <Select
+                  value={sharedRoleFilter}
+                  onChange={(value) => setSharedRoleFilter(value as 'ALL' | 'VIEWER' | 'EDITOR')}
+                  options={[
+                    { value: 'ALL', label: 'Todos los roles' },
+                    { value: 'VIEWER', label: 'Viewer' },
+                    { value: 'EDITOR', label: 'Editor' },
+                  ]}
+                  className="w-40"
+                />
               </div>
 
               {filteredSharedEcosystems.length === 0 ? (
@@ -842,7 +860,7 @@ export default function EcosystemsManagementPage() {
                           <div className="flex-1">
                             <p className="font-medium text-primary">{ecosystem.name}</p>
                             <p className="text-xs text-muted mt-1">
-                              Propietario: {ecosystem.ownerId ? ownerEmails[ecosystem.ownerId] ?? ecosystem.ownerId : 'Desconocido'}
+                              Rol: <span className="font-medium text-teal-600">{ecosystem.accessRole === 'EDITOR' ? 'Editor' : 'Viewer'}</span>
                             </p>
                           </div>
                           <button

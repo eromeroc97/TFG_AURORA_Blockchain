@@ -606,7 +606,7 @@ export class EcosystemsService {
       referenceId: ecosystemId,
       referenceType: ReferenceType.ECOSYSTEM,
       title: 'Petición de acceso a ecosistema',
-      message: `${owner?.email ?? 'Un usuario'} te ha invitado a gestionar el ecosistema "${ecosystem.name}"`,
+      message: `${owner?.email ?? 'Un usuario'} te ha invitaro a gestionar el ecosistema "${ecosystem.name}" como ${role ?? AccessRole.VIEWER}`,
       metadata: {
         ecosystemId,
         targetUserId: targetUser.id,
@@ -748,6 +748,7 @@ export class EcosystemsService {
       ecosystemLongitude: access.ecosystem.longitude,
       ecosystemIsOnline: access.ecosystem.isOnline,
       ecosystemLastSeen: access.ecosystem.lastSeen,
+      ecosystemOwnerId: access.ecosystem.ownerId,
       role: access.role,
       accessType: 'DELEGATED' as const,
     }));

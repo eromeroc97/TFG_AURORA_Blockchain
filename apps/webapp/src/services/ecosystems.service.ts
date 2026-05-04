@@ -20,13 +20,13 @@ export type AccessMapDevice = {
 export type AccessMapEcosystem = {
   id: string
   name: string
-  ownerId: string
+  ownerId?: string
   lat: number | null
   lng: number | null
   isShared: boolean
   devices: AccessMapDevice[]
   accessType?: 'OWNER' | 'DELEGATED'
-  accessRole?: 'VIEWER' | 'EDITOR'
+  accessRole?: 'VIEWER' | 'EDITOR' | 'OWNER'
   sharedUsers?: EcosystemAccess[]
 }
 
@@ -145,33 +145,44 @@ export async function getEcosystemAccesses(ecosystemId: string): Promise<Ecosyst
 
 export async function getSharedWithMe(): Promise<AccessMapEcosystem[]> {
   try {
-    const response = await apiClient.get<ApiEcosystem[]>('/ecosystems/shared-with-me')
+    const response = await apiClient.get<Array<{
+      ecosystemId: string
+      ecosystemName: string
+      ecosystemStatus: string
+      ecosystemLatitude: number | null
+      ecosystemLongitude: number | null
+      ecosystemIsOnline: boolean | null
+      ecosystemLastSeen: string | null
+      ecosystemOwnerId: string | null
+      role: string
+      accessType: 'DELEGATED'
+    }>>('/ecosystems/shared-with-me')
 
     const ecosystemsWithDevices = await Promise.all(
       response.data.map(async (ecosystem) => {
         try {
-          const devicesResponse = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystem.id}/devices`)
+          const devicesResponse = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystem.ecosystemId}/devices`)
           return {
-            id: ecosystem.id,
-            name: ecosystem.name,
-            ownerId: ecosystem.ownerId,
-            lat: ecosystem.latitude,
-            lng: ecosystem.longitude,
+            id: ecosystem.ecosystemId,
+            name: ecosystem.ecosystemName,
+            ownerId: ecosystem.ecosystemOwnerId ?? undefined,
+            lat: ecosystem.ecosystemLatitude,
+            lng: ecosystem.ecosystemLongitude,
             isShared: true,
             accessType: 'DELEGATED' as const,
-            accessRole: ecosystem.accessRole,
+            accessRole: ecosystem.role as 'VIEWER' | 'EDITOR' | 'OWNER',
             devices: devicesResponse.data.map(mapApiDeviceToAccessMap),
           }
         } catch {
           return {
-            id: ecosystem.id,
-            name: ecosystem.name,
-            ownerId: ecosystem.ownerId,
-            lat: ecosystem.latitude,
-            lng: ecosystem.longitude,
+            id: ecosystem.ecosystemId,
+            name: ecosystem.ecosystemName,
+            ownerId: ecosystem.ecosystemOwnerId ?? undefined,
+            lat: ecosystem.ecosystemLatitude,
+            lng: ecosystem.ecosystemLongitude,
             isShared: true,
             accessType: 'DELEGATED' as const,
-            accessRole: ecosystem.accessRole,
+            accessRole: ecosystem.role as 'VIEWER' | 'EDITOR' | 'OWNER',
             devices: [],
           }
         }
