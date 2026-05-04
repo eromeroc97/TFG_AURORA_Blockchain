@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Bell, ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Bell, ChevronLeft, ChevronRight, Check, X, Search, Calendar } from 'lucide-react'
 import {
   acceptNotification,
   getNotifications,
@@ -7,8 +7,10 @@ import {
   rejectNotification,
   type Notification,
 } from '../services/notifications.service'
+import Select from '../components/Select'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
+const DEFAULT_PAGE_SIZE = 10
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString)
@@ -54,6 +56,110 @@ export default function NotificationsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
+  const [searchText, setSearchText] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('ALL')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_SIZE)
+
+  const mockNotifications: Notification[] = [
+    {
+      id: '1',
+      category: 'ACTION_EXPECTED',
+      type: 'ECOSYSTEM_DELEGATION_REQUEST',
+      targetType: 'INDIVIDUAL',
+      actorType: 'USER',
+      actorId: 'user-1',
+      actorEmail: 'juan.perez@uclm.es',
+      userId: 'user-2',
+      title: 'Solicitud de acceso al ecosistema',
+      message: 'Juan Pérez te ha solicitado acceso al ecosistema "Casa Principal" con rol de Editor.',
+      status: 'PENDING',
+      actionUrl: null,
+      metadata: { ecosystemId: 'eco-1', targetUserId: 'user-2', role: 'EDITOR' },
+      readAt: null,
+      respondedAt: null,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '2',
+      category: 'READ_ONLY',
+      type: 'ECOSYSTEM_DELEGATION_REQUEST',
+      targetType: 'INDIVIDUAL',
+      actorType: 'SYSTEM',
+      actorId: null,
+      actorEmail: null,
+      userId: 'user-2',
+      title: 'Acceso concedido',
+      message: 'Se ha confirmado tu acceso al ecosistema "Oficina" con rol de Viewer.',
+      status: 'READ',
+      actionUrl: null,
+      metadata: null,
+      readAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      respondedAt: null,
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '3',
+      category: 'ACTION_EXPECTED',
+      type: 'ECOSYSTEM_DELEGATION_REQUEST',
+      targetType: 'INDIVIDUAL',
+      actorType: 'USER',
+      actorId: 'user-3',
+      actorEmail: 'maria.garcia@uclm.es',
+      userId: 'user-2',
+      title: 'Solicitud de delegación',
+      message: 'María García te solicita delegarte la gestión del ecosistema "Laboratorio IoT".',
+      status: 'ACCEPTED',
+      actionUrl: null,
+      metadata: { ecosystemId: 'eco-2' },
+      readAt: null,
+      respondedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '4',
+      category: 'READ_ONLY',
+      type: 'ECOSYSTEM_DELEGATION_REQUEST',
+      targetType: 'INDIVIDUAL',
+      actorType: 'SYSTEM',
+      actorId: null,
+      actorEmail: null,
+      userId: 'user-2',
+      title: 'Ecosistema eliminado',
+      message: 'El ecosistema "Prueba Temporal" ha sido eliminado por su propietario.',
+      status: 'REJECTED',
+      actionUrl: null,
+      metadata: null,
+      readAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+      respondedAt: null,
+      createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '5',
+      category: 'ACTION_EXPECTED',
+      type: 'ECOSYSTEM_DELEGATION_REQUEST',
+      targetType: 'INDIVIDUAL',
+      actorType: 'USER',
+      actorId: 'user-4',
+      actorEmail: 'admin@uclm.es',
+      userId: 'user-2',
+      title: 'Invitación a ecosistema',
+      message: 'El administrador te invita a unirte al ecosistema "Edificio Central" como Administrador.',
+      status: 'PENDING',
+      actionUrl: null,
+      metadata: { ecosystemId: 'eco-3', role: 'ADMIN' },
+      readAt: null,
+      respondedAt: null,
+      createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+]
 
   const loadNotifications = async () => {
     setIsLoading(true)
@@ -99,9 +205,44 @@ export default function NotificationsPage() {
     setActionLoading(null)
   }
 
-  const totalPages = Math.ceil(notifications.length / PAGE_SIZE)
-  const startIndex = (currentPage - 1) * PAGE_SIZE
-  const paginatedNotifications = notifications.slice(startIndex, startIndex + PAGE_SIZE)
+  const handleCloseModal = () => {
+    if (selectedNotification?.category === 'READ_ONLY' && selectedNotification.status === 'PENDING') {
+      handleMarkAsRead(selectedNotification.id)
+    }
+    setSelectedNotification(null)
+  }
+
+  const handleModalAccept = async () => {
+    if (selectedNotification) {
+      await handleAccept(selectedNotification.id)
+      setSelectedNotification(null)
+    }
+  }
+
+  const handleModalReject = async () => {
+    if (selectedNotification) {
+      await handleReject(selectedNotification.id)
+      setSelectedNotification(null)
+    }
+  }
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((n) => {
+      const matchesSearch =
+        searchText === '' ||
+        n.title.toLowerCase().includes(searchText.toLowerCase()) ||
+        n.message.toLowerCase().includes(searchText.toLowerCase())
+      const matchesStatus = statusFilter === 'ALL' || n.status === statusFilter
+      const notificationDate = new Date(n.createdAt)
+      const matchesStartDate = !startDate || notificationDate >= new Date(startDate)
+      const matchesEndDate = !endDate || notificationDate <= new Date(endDate + 'T23:59:59')
+      return matchesSearch && matchesStatus && matchesStartDate && matchesEndDate
+    })
+  }, [notifications, searchText, statusFilter, startDate, endDate])
+
+  const totalPages = Math.ceil(filteredNotifications.length / pageSize)
+  const startIndex = (currentPage - 1) * pageSize
+  const paginatedNotifications = filteredNotifications.slice(startIndex, startIndex + pageSize)
 
   const canShowActionButtons = (notification: Notification): boolean => {
     if (notification.category === 'READ_ONLY') {
@@ -133,7 +274,66 @@ export default function NotificationsPage() {
         </p>
       </div>
 
-      {notifications.length === 0 ? (
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por título o mensaje..."
+              value={searchText}
+              onChange={(e) => {
+                setSearchText(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full rounded-xl border border-border bg-white py-2.5 pl-10 pr-4 text-sm text-primary placeholder:text-slate-400 outline-none transition-colors focus:border-accent"
+            />
+          </div>
+
+          <Select
+            value={statusFilter}
+            onChange={(value) => {
+              setStatusFilter(value as string)
+              setCurrentPage(1)
+            }}
+            options={[
+              { value: 'ALL', label: 'Todos los estados' },
+              { value: 'PENDING', label: 'Pendiente' },
+              { value: 'READ', label: 'Leída' },
+              { value: 'ACCEPTED', label: 'Aceptada' },
+              { value: 'REJECTED', label: 'Rechazada' },
+            ]}
+          />
+
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">Desde</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full rounded-xl border border-border bg-white py-2.5 pl-16 pr-4 text-sm text-primary outline-none transition-colors focus:border-accent"
+            />
+          </div>
+
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">Hasta</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full rounded-xl border border-border bg-white py-2.5 pl-16 pr-4 text-sm text-primary outline-none transition-colors focus:border-accent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {filteredNotifications.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white/95 p-12 text-center shadow-xl backdrop-blur-sm">
           <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-slate-100">
             <Bell className="size-8 text-slate-400" />
@@ -152,17 +352,20 @@ export default function NotificationsPage() {
                     <th className="px-6 py-4 font-semibold">Título</th>
                     <th className="px-6 py-4 font-semibold">Mensaje</th>
                     <th className="px-6 py-4 font-semibold">Estado</th>
-                    <th className="px-6 py-4 font-semibold text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {paginatedNotifications.map((notification) => (
-                    <tr key={notification.id} className="hover:bg-slate-50/50">
+                    <tr
+                      key={notification.id}
+                      className="cursor-pointer hover:bg-slate-50/50"
+                      onClick={() => setSelectedNotification(notification)}
+                    >
                       <td className="whitespace-nowrap px-6 py-4 text-slate-500">
                         {formatDate(notification.createdAt)}
                       </td>
                       <td className={`px-6 py-4 ${getStatusStyle(notification.status)}`}>{notification.title}</td>
-                      <td className={`max-w-xs truncate px-6 py-4 ${getStatusStyle(notification.status)}`}>
+                      <td className={`max-w-md truncate px-6 py-4 ${getStatusStyle(notification.status)}`}>
                         {notification.message}
                       </td>
                       <td className="px-6 py-4">
@@ -180,44 +383,6 @@ export default function NotificationsPage() {
                           {getStatusLabel(notification.status)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        {canShowActionButtons(notification) ? (
-                          <div className="flex items-center justify-end gap-2">
-                            {notification.category === 'READ_ONLY' && (
-                              <button
-                                onClick={() => handleMarkAsRead(notification.id)}
-                                disabled={actionLoading === notification.id}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <Check className="size-3.5" />
-                                Marcar como leída
-                              </button>
-                            )}
-                            {notification.category === 'ACTION_EXPECTED' && (
-                              <>
-                                <button
-                                  onClick={() => handleAccept(notification.id)}
-                                  disabled={actionLoading === notification.id}
-                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  <Check className="size-3.5" />
-                                  Aceptar
-                                </button>
-                                <button
-                                  onClick={() => handleReject(notification.id)}
-                                  disabled={actionLoading === notification.id}
-                                  className="inline-flex items-center gap-1.5 rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  <X className="size-3.5" />
-                                  Rechazar
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <span className={getStatusStyle(notification.status)}>{getStatusLabel(notification.status)}</span>
-                        )}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -225,11 +390,24 @@ export default function NotificationsPage() {
             </div>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
+          {totalPages >= 1 && (
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500">Mostrar</span>
+                <Select
+                  value={pageSize}
+                  onChange={(value) => {
+                    setPageSize(Number(value) as typeof DEFAULT_PAGE_SIZE)
+                    setCurrentPage(1)
+                  }}
+                  options={PAGE_SIZE_OPTIONS.map((size) => ({ value: size, label: size.toString() }))}
+                />
+                <span className="text-sm text-slate-500">por página</span>
+              </div>
               <p className="text-sm text-slate-500">
-                Mostrando {startIndex + 1} a {Math.min(startIndex + PAGE_SIZE, notifications.length)} de{' '}
-                {notifications.length} notificaciones
+                Mostrando {startIndex + 1} a {Math.min(startIndex + pageSize, filteredNotifications.length)} de{' '}
+                {filteredNotifications.length} notificaciones
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -261,8 +439,82 @@ export default function NotificationsPage() {
                 </button>
               </div>
             </div>
+            </div>
           )}
         </>
+      )}
+
+      {selectedNotification && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-[70%] rounded-2xl border border-gray-100 bg-white/95 shadow-2xl backdrop-blur-sm">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-600">Notificación</p>
+                  <h3 className="mt-2 text-lg font-semibold text-slate-900">{selectedNotification.title}</h3>
+                </div>
+                <span
+                  className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium ${
+                    selectedNotification.status === 'PENDING'
+                      ? 'bg-amber-100 text-amber-800'
+                      : selectedNotification.status === 'READ'
+                        ? 'bg-slate-100 text-slate-600'
+                        : selectedNotification.status === 'ACCEPTED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-rose-100 text-rose-800'
+                  }`}
+                >
+                  {getStatusLabel(selectedNotification.status)}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span className="font-medium">Fecha:</span>
+                <span>{formatDate(selectedNotification.createdAt)}</span>
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700">Mensaje</p>
+                <div className="rounded-xl border border-gray-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  {selectedNotification.message}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-gray-100 px-6 py-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Cerrar
+              </button>
+              {selectedNotification.category === 'ACTION_EXPECTED' && selectedNotification.status === 'PENDING' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleModalReject}
+                    disabled={actionLoading === selectedNotification.id}
+                    className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <X className="mr-2 size-4" />
+                    Rechazar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleModalAccept}
+                    disabled={actionLoading === selectedNotification.id}
+                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Check className="mr-2 size-4" />
+                    Aceptar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
