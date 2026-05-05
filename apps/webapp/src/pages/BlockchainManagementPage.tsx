@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Cpu, Layers, Network, RefreshCw, Server, Activity, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Cpu, Layers, Network, RefreshCw, Server, Activity, X } from 'lucide-react'
 import DeploySmartContractModal from '../components/blockchain/DeploySmartContractModal'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
+import Select from '../components/Select'
 import { useBlockchainController } from '../controllers/useBlockchainController'
 
 type ModalType = 'organizations' | 'namespaces' | 'ledger' | null
@@ -16,6 +17,11 @@ export default function BlockchainManagementPage() {
     namespaces,
     blocks,
     ledgerHeight,
+    blockPage,
+    blockPageSize,
+    setBlockPage,
+    setBlockPageSize,
+    fetchRecentBlocks,
     managerStatus,
     isLoading,
     error,
@@ -24,30 +30,17 @@ export default function BlockchainManagementPage() {
     deploySmartContract,
   } = useBlockchainController()
 
+  const [blockFilters, setBlockFilters] = useState({
+    blockNumber: '',
+    hash: '',
+    txCount: '',
+    startDate: '',
+    endDate: '',
+  })
+
   const handleDeploy = async (data: { name: string; version: string; channel: string; package: File }) => {
     await deploySmartContract(data)
     setIsModalOpen(false)
-  }
-
-  const toggleNamespace = async (namespaceName: string) => {
-    if (expandedNamespace === namespaceName) {
-      setExpandedNamespace(null)
-    } else {
-      setExpandedNamespace(namespaceName)
-      if (!namespaceChannels[namespaceName] && !loadingChannels[namespaceName]) {
-        setLoadingChannels(prev => ({ ...prev, [namespaceName]: true }))
-        try {
-          const response = await fetch(`/api/blockchain/namespace-channels?namespace=${namespaceName}`)
-          const data = await response.json()
-          const channels = data.items ?? []
-          setNamespaceChannels(prev => ({ ...prev, [namespaceName]: channels }))
-        } catch {
-          setNamespaceChannels(prev => ({ ...prev, [namespaceName]: [] }))
-        } finally {
-          setLoadingChannels(prev => ({ ...prev, [namespaceName]: false }))
-        }
-      }
-    }
   }
 
   const openDetailModal = (type: ModalType) => {
@@ -57,6 +50,45 @@ export default function BlockchainManagementPage() {
   const closeDetailModal = () => {
     setDetailModal(null)
   }
+
+  const handleBlockFilterChange = (field: keyof typeof blockFilters, value: string) => {
+    setBlockFilters(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handlePageSizeChange = async (value: number) => {
+    setBlockPageSize(value)
+    setBlockPage(1)
+    await fetchRecentBlocks(value, 1)
+  }
+
+  const handlePageChange = async (newPage: number) => {
+    if (newPage < 1) return
+    setBlockPage(newPage)
+    await fetchRecentBlocks(blockPageSize, newPage)
+  }
+
+  const filteredBlocks = useMemo(() => {
+    return blocks.filter((block) => {
+      const blockNumberMatch = blockFilters.blockNumber
+        ? block.blockNumber.toString().includes(blockFilters.blockNumber)
+        : true
+      const hashMatch = blockFilters.hash
+        ? block.blockHash.toLowerCase().includes(blockFilters.hash.toLowerCase())
+        : true
+      const txCountMatch = blockFilters.txCount
+        ? block.transactionCount.toString().includes(blockFilters.txCount)
+        : true
+      const createdAt = block.createdAt ? new Date(block.createdAt) : null
+      const startDateMatch = blockFilters.startDate
+        ? Boolean(createdAt && createdAt >= new Date(blockFilters.startDate))
+        : true
+      const endDateMatch = blockFilters.endDate
+        ? Boolean(createdAt && createdAt <= new Date(`${blockFilters.endDate}T23:59:59`))
+        : true
+
+      return blockNumberMatch && hashMatch && txCountMatch && startDateMatch && endDateMatch
+    })
+  }, [blocks, blockFilters])
 
   const cardClasses = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-teal-300"
 
@@ -140,7 +172,7 @@ export default function BlockchainManagementPage() {
               <p className="text-sm text-slate-500">Ledger Height</p>
             </div>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '...' : ledgerHeight > 0 ? ledgerHeight.toLocaleString() : '-'}
+              {isLoading ? '...' : ledgerHeight != null ? ledgerHeight.toLocaleString() : '-'}
             </p>
           </div>
         </div>
@@ -166,11 +198,61 @@ export default function BlockchainManagementPage() {
         </div>
 
         <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Bloques Recientes</h2>
-            <span className="text-xs text-slate-500">
-              Mostrando {blocks.length} bloques
-            </span>
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Bloques Recientes</h2>
+                <span className="text-xs text-slate-500">
+                  Mostrando {blocks.length} bloques
+                </span>
+              </div>
+            </div>
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <label className="block text-sm text-slate-600">
+              Bloque
+              <input
+                value={blockFilters.blockNumber}
+                onChange={(e) => handleBlockFilterChange('blockNumber', e.target.value)}
+                placeholder="Filtrar por número"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block text-sm text-slate-600">
+              Hash
+              <input
+                value={blockFilters.hash}
+                onChange={(e) => handleBlockFilterChange('hash', e.target.value)}
+                placeholder="Filtrar por hash"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block text-sm text-slate-600">
+              TXs
+              <input
+                value={blockFilters.txCount}
+                onChange={(e) => handleBlockFilterChange('txCount', e.target.value)}
+                placeholder="Filtrar por transacciones"
+                className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block text-sm text-slate-600">
+              Fecha
+              <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                <input
+                  type="date"
+                  value={blockFilters.startDate}
+                  onChange={(e) => handleBlockFilterChange('startDate', e.target.value)}
+                  placeholder="Inicio"
+                  className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                />
+                <input
+                  type="date"
+                  value={blockFilters.endDate}
+                  onChange={(e) => handleBlockFilterChange('endDate', e.target.value)}
+                  placeholder="Fin"
+                  className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                />
+              </div>
+            </label>
           </div>
 
           {isLoading ? (
@@ -187,38 +269,78 @@ export default function BlockchainManagementPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Bloque</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Hash</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">TXs</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {blocks.map((block) => (
-                    <tr key={block.blockNumber}>
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        #{block.blockNumber}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                        {block.blockHash.substring(0, 16)}...
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {block.transactionCount}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {block.createdAt
-                          ? new Date(block.createdAt).toLocaleString('es-ES')
-                          : '-'}
-                      </td>
+            <>
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Bloque</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Hash</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">TXs</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {filteredBlocks.map((block) => (
+                      <tr key={block.blockNumber}>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          #{block.blockNumber}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                          {block.blockHash.substring(0, 16)}...
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {block.transactionCount}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {block.createdAt
+                            ? new Date(block.createdAt).toLocaleString('es-ES')
+                            : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-500">Mostrar</span>
+                  <Select
+                    value={String(blockPageSize)}
+                    onChange={(value) => void handlePageSizeChange(Number(value))}
+                    options={[
+                      { value: '10', label: '10' },
+                      { value: '25', label: '25' },
+                      { value: '50', label: '50' },
+                    ]}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-slate-500">resultados</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handlePageChange(blockPage - 1)}
+                    disabled={blockPage === 1 || isLoading}
+                    className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <span className="text-sm text-slate-600">
+                    Página {blockPage} de {Math.max(1, Math.ceil((ledgerHeight ?? 0) / blockPageSize))}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void handlePageChange(blockPage + 1)}
+                    disabled={blocks.length < blockPageSize || isLoading}
+                    className="inline-flex items-center justify-center rounded-lg border border-border bg-white p-2 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -369,7 +491,7 @@ export default function BlockchainManagementPage() {
                   <div className="rounded-xl border border-slate-200 p-4">
                     <p className="text-sm text-slate-500">Altura actual</p>
                     <p className="text-2xl font-semibold text-slate-900">
-                      {ledgerHeight.toLocaleString()}
+                      {ledgerHeight != null ? ledgerHeight.toLocaleString() : '-'}
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 p-4">

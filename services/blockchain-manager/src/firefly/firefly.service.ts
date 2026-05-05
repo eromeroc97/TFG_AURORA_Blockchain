@@ -94,12 +94,6 @@ export class FireflyService {
     const response = await this.client.get(`/api/v1/namespaces/${namespace}/status`);
     return response.data;
   }
-
-  async getNetworkChannels(namespace = 'default') {
-    // The provided FireFly OpenAPI spec does not expose a namespace channel listing endpoint.
-    // Keep this endpoint safe by returning an empty items list instead of failing backend requests.
-    return { items: [] };
-  }
 }
 
 @Module({
