@@ -94,6 +94,15 @@ export class FireflyService {
     const response = await this.client.get(`/api/v1/namespaces/${namespace}/status`);
     return response.data;
   }
+
+  async getNetworkChannels(namespace = 'default') {
+    try {
+      const response = await this.client.get(`/api/v1/namespaces/${namespace}/network/channels`);
+      return response.data;
+    } catch (error) {
+      return { items: [] };
+    }
+  }
 }
 
 @Module({

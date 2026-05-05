@@ -8,12 +8,14 @@ import {
   getRecentBlocks,
   getLedgerInfo,
   getBlockchainManagerStatus,
+  getChannels,
   type DeploySmartContractRequest,
   type SmartContract,
   type NetworkNode,
   type Organization,
   type ChannelNamespace,
   type BlockInfo,
+  type Channel,
 } from '../services/blockchain.service'
 
 export function useBlockchainController(enabled = true) {
@@ -25,11 +27,21 @@ export function useBlockchainController(enabled = true) {
   const [ledgerHeight, setLedgerHeight] = useState(0)
   const [ledgerLastBlockTime, setLedgerLastBlockTime] = useState('')
   const [managerStatus, setManagerStatus] = useState<'Online' | 'Offline'>('Offline')
+  const [namespaceChannels, setNamespaceChannels] = useState<Record<string, Channel[]>>({})
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deployLoading, setDeployLoading] = useState(false)
   const [deploySuccess, setDeploySuccess] = useState(false)
+
+  const fetchNamespaceChannels = async (namespaceName: string) => {
+    if (namespaceChannels[namespaceName]) {
+      return namespaceChannels[namespaceName]
+    }
+    const channels = await getChannels(namespaceName)
+    setNamespaceChannels(prev => ({ ...prev, [namespaceName]: channels }))
+    return channels
+  }
 
   const refreshNetworkData = async () => {
     if (!enabled) {
@@ -98,6 +110,8 @@ export function useBlockchainController(enabled = true) {
     ledgerHeight,
     ledgerLastBlockTime,
     managerStatus,
+    namespaceChannels,
+    fetchNamespaceChannels,
     isLoading,
     error,
     deployLoading,

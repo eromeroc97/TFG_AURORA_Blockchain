@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react'
+import { useEffect, useMemo } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -6,6 +6,8 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   MarkerType,
+  useReactFlow,
+  ReactFlowProvider,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { NetworkNode, Organization } from '../../services/blockchain.service'
@@ -42,15 +44,18 @@ const defaultNodeStyle = {
   textAlign: 'center' as const,
 }
 
-export default function BlockchainTopologyGraph({
-  nodes,
-  organizations,
-}: BlockchainTopologyGraphProps) {
+function GraphContent({ nodes, organizations }: { nodes: NetworkNode[]; organizations: Organization[] }) {
+  const { setViewport } = useReactFlow()
+
+  useEffect(() => {
+    setViewport({ x: 0, y: 0, zoom: 0.8 }, { duration: 800 })
+  }, [setViewport])
+
   const ordererNode = useMemo(
     () => ({
       id: 'orderer',
       type: 'default',
-      position: { x: 250, y: 250 },
+      position: { x: 300, y: 0 },
       data: { label: 'Orderer\n(Raft)' },
       style: {
         ...defaultNodeStyle,
@@ -68,7 +73,7 @@ export default function BlockchainTopologyGraph({
         {
           id: 'org-1',
           type: 'default',
-          position: { x: 250, y: 100 },
+          position: { x: 300, y: 100 },
           data: { label: 'Organization' },
           style: {
             ...defaultNodeStyle,
@@ -80,10 +85,11 @@ export default function BlockchainTopologyGraph({
       ]
     }
 
+    const startX = Math.max(50, 400 - organizations.length * 100)
     return organizations.map((org, index) => ({
       id: `org-${index}`,
       type: 'default',
-      position: { x: 50 + index * 180, y: 100 },
+      position: { x: startX + index * 200, y: 100 },
       data: { label: org.name },
       style: {
         ...defaultNodeStyle,
@@ -94,22 +100,24 @@ export default function BlockchainTopologyGraph({
     }))
   }, [organizations])
 
-  const peerNodes = useMemo(
-    () =>
-      nodes.map((node, index) => ({
-        id: `peer-${index}`,
-        type: 'default',
-        position: { x: 50 + index * 120, y: 0 },
-        data: { label: node.name },
-        style: {
-          ...defaultNodeStyle,
-          background: nodeStyles.peer.background,
-          borderColor: nodeStyles.peer.border,
-          color: nodeStyles.peer.color,
-        },
-      })),
-    [nodes],
-  )
+  const peerNodes = useMemo(() => {
+    if (nodes.length === 0) {
+      return []
+    }
+    const startX = Math.max(50, 400 - nodes.length * 80)
+    return nodes.map((node, index) => ({
+      id: `peer-${index}`,
+      type: 'default',
+      position: { x: startX + index * 160, y: 250 },
+      data: { label: node.name },
+      style: {
+        ...defaultNodeStyle,
+        background: nodeStyles.peer.background,
+        borderColor: nodeStyles.peer.border,
+        color: nodeStyles.peer.color,
+      },
+    }))
+  }, [nodes])
 
   const initialNodes = useMemo(
     () => [ordererNode, ...orgNodes, ...peerNodes],
@@ -154,6 +162,29 @@ export default function BlockchainTopologyGraph({
   const [reactflowNodes, , onNodesChange] = useNodesState(initialNodes)
   const [reactflowEdges, , onEdgesChange] = useEdgesState(edges)
 
+  return (
+    <ReactFlow
+      nodes={reactflowNodes}
+      edges={reactflowEdges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      fitView
+      attributionPosition="bottom-left"
+    >
+      <Background color="#f1f5f9" gap={16} />
+      <Controls />
+      <MiniMap
+        nodeColor={(n) => (n.style?.background as string) || '#fff'}
+        maskColor="rgba(248, 250, 252, 0.8)"
+      />
+    </ReactFlow>
+  )
+}
+
+export default function BlockchainTopologyGraph({
+  nodes,
+  organizations,
+}: BlockchainTopologyGraphProps) {
   const hasData = nodes.length > 0 || organizations.length > 0
 
   if (!hasData) {
@@ -171,21 +202,9 @@ export default function BlockchainTopologyGraph({
 
   return (
     <div className="h-96 rounded-xl border border-slate-200">
-      <ReactFlow
-        nodes={reactflowNodes}
-        edges={reactflowEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        fitView
-        attributionPosition="bottom-left"
-      >
-        <Background color="#f1f5f9" gap={16} />
-        <Controls />
-        <MiniMap
-          nodeColor={(n) => (n.style?.background as string) || '#fff'}
-          maskColor="rgba(248, 250, 252, 0.8)"
-        />
-      </ReactFlow>
+      <ReactFlowProvider>
+        <GraphContent nodes={nodes} organizations={organizations} />
+      </ReactFlowProvider>
     </div>
   )
 }

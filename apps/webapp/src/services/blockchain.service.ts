@@ -58,6 +58,23 @@ export interface BlockInfo {
   transactions: Transaction[]
 }
 
+export interface Channel {
+  name: string
+  description?: string
+}
+
+export async function getChannels(namespace: string): Promise<Channel[]> {
+  try {
+    const response = await apiClient.get<{ items: Channel[] }>(
+      `/blockchain/namespaces/${namespace}/channels`,
+      { params: { namespace } }
+    )
+    return response.data.items ?? []
+  } catch {
+    return []
+  }
+}
+
 export async function getSmartContracts(): Promise<SmartContract[]> {
   try {
     const response = await apiClient.get<SmartContract[]>('/blockchain/contracts')

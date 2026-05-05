@@ -125,4 +125,10 @@ export class BlockchainController {
       lastBlockTime: pin?.created ?? new Date().toISOString(),
     } as LedgerInfoResponse;
   }
+
+  @Get('namespaces/:name/channels')
+  async getNamespaceChannels(@Query('namespace') defaultNamespace = 'default') {
+    const response = await this.fireflyService.getNetworkChannels(defaultNamespace);
+    return response;
+  }
 }
