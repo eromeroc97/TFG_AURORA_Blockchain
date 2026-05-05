@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Cpu, Layers, Network, RefreshCw, Server } from 'lucide-react'
+import { Cpu, Layers, Network, RefreshCw, Server, Activity } from 'lucide-react'
 import DeploySmartContractModal from '../components/blockchain/DeploySmartContractModal'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
 import { useBlockchainController } from '../controllers/useBlockchainController'
@@ -13,6 +13,7 @@ export default function BlockchainManagementPage() {
     namespaces,
     blocks,
     ledgerHeight,
+    managerStatus,
     isLoading,
     error,
     deployLoading,
@@ -49,7 +50,17 @@ export default function BlockchainManagementPage() {
           </button>
         </div>
 
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-amber-600" />
+              <p className="text-sm text-slate-500">Blockchain Manager</p>
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {isLoading ? '...' : managerStatus}
+            </p>
+          </div>
+
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <Server className="h-5 w-5 text-emerald-600" />

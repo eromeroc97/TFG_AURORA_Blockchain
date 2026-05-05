@@ -140,3 +140,12 @@ export async function getLedgerInfo(): Promise<{ height: number; lastBlockTime: 
     return { height: 0, lastBlockTime: '' }
   }
 }
+
+export async function getBlockchainManagerStatus(): Promise<'Online' | 'Offline'> {
+  try {
+    const response = await apiClient.get<{ status: string }>('/blockchain/health')
+    return response.data.status === 'UP' ? 'Online' : 'Offline'
+  } catch {
+    return 'Offline'
+  }
+}

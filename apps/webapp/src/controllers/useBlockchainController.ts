@@ -7,6 +7,7 @@ import {
   getNamespaces,
   getRecentBlocks,
   getLedgerInfo,
+  getBlockchainManagerStatus,
   type DeploySmartContractRequest,
   type SmartContract,
   type NetworkNode,
@@ -23,6 +24,7 @@ export function useBlockchainController(enabled = true) {
   const [blocks, setBlocks] = useState<BlockInfo[]>([])
   const [ledgerHeight, setLedgerHeight] = useState(0)
   const [ledgerLastBlockTime, setLedgerLastBlockTime] = useState('')
+  const [managerStatus, setManagerStatus] = useState<'Online' | 'Offline'>('Offline')
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,13 +42,14 @@ export function useBlockchainController(enabled = true) {
     setError(null)
 
     try {
-      const [contracts, nodes, orgs, ns, recentBlocks, ledger] = await Promise.all([
+      const [contracts, nodes, orgs, ns, recentBlocks, ledger, status] = await Promise.all([
         getSmartContracts(),
         getNetworkNodes(),
         getOrganizations(),
         getNamespaces(),
         getRecentBlocks(10),
         getLedgerInfo(),
+        getBlockchainManagerStatus(),
       ])
 
       setSmartContracts(contracts)
@@ -56,6 +59,7 @@ export function useBlockchainController(enabled = true) {
       setBlocks(recentBlocks)
       setLedgerHeight(ledger.height)
       setLedgerLastBlockTime(ledger.lastBlockTime)
+      setManagerStatus(status)
     } catch {
       setError('No se ha podido cargar la información de la blockchain.')
     } finally {
@@ -93,6 +97,7 @@ export function useBlockchainController(enabled = true) {
     blocks,
     ledgerHeight,
     ledgerLastBlockTime,
+    managerStatus,
     isLoading,
     error,
     deployLoading,

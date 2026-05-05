@@ -97,6 +97,38 @@ services:
       retries: 3
       start_period: 10s
 
+  blockchain-manager:
+    build:
+      context: ./services/blockchain-manager
+      dockerfile: Dockerfile
+    env_file:
+      - ./services/blockchain-manager/.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.blockchain.rule=PathPrefix(`/api/blockchain`)"
+      - "traefik.http.routers.blockchain.entrypoints=web"
+      - "traefik.http.routers.blockchain.priority=102"
+      - "traefik.http.services.blockchain.loadbalancer.server.port=3004"
+      - "traefik.http.middlewares.blockchain-strip.stripprefix.prefixes=/api/blockchain"
+      - "traefik.http.routers.blockchain.middlewares=blockchain-strip"
+      - "traefik.http.routers.blockchain-health.rule=PathPrefix(`/api/blockchain/health`)"
+      - "traefik.http.routers.blockchain-health.entrypoints=web"
+      - "traefik.http.routers.blockchain-health.priority=203"
+      - "traefik.http.routers.blockchain-health.service=blockchain"
+      - "traefik.http.middlewares.blockchain-health-strip.stripprefix.prefixes=/api/blockchain"
+      - "traefik.http.routers.blockchain-health.middlewares=blockchain-health-strip"
+      - "traefik.docker.network=aurora-secure-net"
+    networks:
+      - aurora-secure-net
+    expose:
+      - "3004"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3004/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   webapp:
     image: caddy:2.8.4-alpine
     depends_on:
