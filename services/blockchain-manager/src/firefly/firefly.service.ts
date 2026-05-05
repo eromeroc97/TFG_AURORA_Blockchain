@@ -37,12 +37,18 @@ export interface FireflyPin {
   parent?: string;
 }
 
+function normalizeFireflyApiUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim().replace(/\/$/, '')
+  return trimmed.replace(/\/api\/v1$/i, '')
+}
+
 @Injectable()
 export class FireflyService {
   private readonly client: AxiosInstance;
 
   constructor() {
-    const apiUrl = process.env.FIREFLY_API_URL || 'http://firefly:5000';
+    const rawApiUrl = process.env.FIREFLY_API_URL || 'http://firefly:5000';
+    const apiUrl = normalizeFireflyApiUrl(rawApiUrl)
     const apiKey = process.env.FIREFLY_API_KEY || '';
 
     this.client = axios.create({

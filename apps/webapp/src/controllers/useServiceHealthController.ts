@@ -36,7 +36,25 @@ const serviceDefinitions = [
   },
 ]
 
-const getHealthUrl = (envKey: string) => (import.meta.env as Record<string, string | undefined>)[envKey] ?? ''
+const getHealthUrl = (envKey: string) => {
+  const rawUrl = (import.meta.env as Record<string, string | undefined>)[envKey] ?? ''
+  if (!rawUrl) {
+    return ''
+  }
+
+  try {
+    const parsed = new URL(rawUrl, window.location.href)
+    const isLocalHost = ['localhost', '127.0.0.1'].includes(parsed.hostname)
+
+    if (isLocalHost && parsed.pathname.startsWith('/api')) {
+      return `${parsed.pathname}${parsed.search}`
+    }
+  } catch {
+    // Si no es una URL absoluta, devolvemos tal cual.
+  }
+
+  return rawUrl
+}
 
 const checkServiceHealth = async (url: string): Promise<{ status: 'Online' | 'Offline'; message?: string }> => {
   if (!url) {
