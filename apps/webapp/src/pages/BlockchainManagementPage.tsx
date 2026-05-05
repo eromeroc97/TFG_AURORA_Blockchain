@@ -41,7 +41,7 @@ export default function BlockchainManagementPage() {
       if (!namespaceChannels[namespaceName] && !loadingChannels[namespaceName]) {
         setLoadingChannels(prev => ({ ...prev, [namespaceName]: true }))
         try {
-          const response = await fetch(`/api/blockchain/namespaces/${namespaceName}/channels?namespace=${namespaceName}`)
+          const response = await fetch(`/api/blockchain/namespace-channels?namespace=${namespaceName}`)
           const data = await response.json()
           const channels = data.items ?? []
           setNamespaceChannels(prev => ({ ...prev, [namespaceName]: channels }))

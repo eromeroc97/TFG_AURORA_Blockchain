@@ -30,6 +30,12 @@ interface LedgerInfoResponse {
 export class BlockchainController {
   constructor(private readonly fireflyService: FireflyService) {}
 
+  @Get('namespace-channels')
+  async getNamespaceChannels(@Query('namespace') namespace: string) {
+    const response = await this.fireflyService.getNetworkChannels(namespace);
+    return response;
+  }
+
   @NestHeader('Access-Control-Allow-Origin', '*')
   @NestHeader('Access-Control-Allow-Methods', 'GET,OPTIONS')
   @NestHeader('Access-Control-Allow-Headers', 'Content-Type,Accept,Authorization')
@@ -124,11 +130,5 @@ export class BlockchainController {
       height: 0,
       lastBlockTime: pin?.created ?? new Date().toISOString(),
     } as LedgerInfoResponse;
-  }
-
-  @Get('namespaces/:name/channels')
-  async getNamespaceChannels(@Query('namespace') defaultNamespace = 'default') {
-    const response = await this.fireflyService.getNetworkChannels(defaultNamespace);
-    return response;
   }
 }
