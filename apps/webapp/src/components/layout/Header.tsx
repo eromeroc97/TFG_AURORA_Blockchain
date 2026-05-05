@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Cpu, LogOut, Shield, UserCircle2 } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, Shield, UserCircle2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import auroraLogo from '../../assets/aurora-logo.png'

@@ -84,7 +84,7 @@ export default function DeploySmartContractModal({
     })
   }
 
-  const isValid = name.trim() && version.trim() && packageFile && !fileError
+  const isFormValid = name.trim() && version.trim() && packageFile && !fileError
 
   if (!isOpen) return null
 
@@ -212,8 +212,8 @@ export default function DeploySmartContractModal({
             </button>
             <button
               type="submit"
-              disabled={!isValid || isLoading}
-              className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!isFormValid || isLoading}
+              className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:bg-slate-300 disabled:text-slate-500"
             >
               {isLoading ? (
                 <>
