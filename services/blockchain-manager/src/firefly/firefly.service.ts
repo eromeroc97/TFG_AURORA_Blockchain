@@ -1,6 +1,42 @@
 import { Injectable, Module } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 
+export interface FireflyNamespace {
+  name: string;
+  description?: string;
+  created?: string;
+  initializing?: boolean;
+  initializationError?: string;
+}
+
+export interface FireflyIdentity {
+  id?: string;
+  name: string;
+  type: 'org' | 'node' | 'custom';
+  did?: string;
+  description?: string;
+  namespace?: string;
+  created?: string;
+  updated?: string;
+  parent?: string;
+  messages?: {
+    claim?: string;
+    update?: string;
+    verification?: string;
+  };
+}
+
+export interface FireflyPin {
+  hash: string;
+ batch?: string;
+  created?: string;
+  dispatched?: boolean;
+  index?: number;
+  masked?: boolean;
+  sequence?: number;
+  parent?: string;
+}
+
 @Injectable()
 export class FireflyService {
   private readonly client: AxiosInstance;
@@ -26,6 +62,11 @@ export class FireflyService {
 
   async getOrganizations(namespace = 'default') {
     const response = await this.client.get(`/api/v1/namespaces/${namespace}/network/organizations`);
+    return response.data;
+  }
+
+  async getIdentities(namespace = 'default') {
+    const response = await this.client.get(`/api/v1/namespaces/${namespace}/identities`);
     return response.data;
   }
 

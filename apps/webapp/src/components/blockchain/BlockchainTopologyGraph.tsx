@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   useNodesState,
   useEdgesState,
+  MarkerType,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { NetworkNode, Organization } from '../../services/blockchain.service'
@@ -45,6 +46,22 @@ export default function BlockchainTopologyGraph({
   nodes,
   organizations,
 }: BlockchainTopologyGraphProps) {
+  const ordererNode = useMemo(
+    () => ({
+      id: 'orderer',
+      type: 'default',
+      position: { x: 250, y: 250 },
+      data: { label: 'Orderer\n(Raft)' },
+      style: {
+        ...defaultNodeStyle,
+        background: nodeStyles.orderer.background,
+        borderColor: nodeStyles.orderer.border,
+        color: nodeStyles.orderer.color,
+      },
+    }),
+    [],
+  )
+
   const orgNodes = useMemo(() => {
     if (organizations.length === 0) {
       return [
@@ -77,22 +94,6 @@ export default function BlockchainTopologyGraph({
     }))
   }, [organizations])
 
-  const ordererNode = useMemo(
-    () => ({
-      id: 'orderer',
-      type: 'default',
-      position: { x: 250, y: 250 },
-      data: { label: 'Orderer\n(Raft)' },
-      style: {
-        ...defaultNodeStyle,
-        background: nodeStyles.orderer.background,
-        borderColor: nodeStyles.orderer.border,
-        color: nodeStyles.orderer.color,
-      },
-    }),
-    [],
-  )
-
   const peerNodes = useMemo(
     () =>
       nodes.map((node, index) => ({
@@ -116,7 +117,14 @@ export default function BlockchainTopologyGraph({
   )
 
   const edges = useMemo(() => {
-    const edgeList: { id: string; source: string; target: string; animated?: boolean; style?: React.CSSProperties }[] = []
+    const edgeList: {
+      id: string
+      source: string
+      target: string
+      animated?: boolean
+      style?: React.CSSProperties
+      markerEnd?: { type: MarkerType }
+    }[] = []
 
     organizations.forEach((_, index) => {
       edgeList.push({
@@ -125,6 +133,7 @@ export default function BlockchainTopologyGraph({
         target: `org-${index}`,
         animated: true,
         style: { stroke: '#94a3b8', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed },
       })
     })
 
@@ -135,6 +144,7 @@ export default function BlockchainTopologyGraph({
         source: `org-${orgIndex}`,
         target: `peer-${index}`,
         style: { stroke: '#94a3b8', strokeWidth: 1 },
+        markerEnd: { type: MarkerType.ArrowClosed },
       })
     })
 
@@ -160,10 +170,10 @@ export default function BlockchainTopologyGraph({
   }
 
   return (
-    <div className="h-64 rounded-xl border border-slate-200">
+    <div className="h-96 rounded-xl border border-slate-200">
       <ReactFlow
         nodes={reactflowNodes}
-        edges={reactflowEdges as any}
+        edges={reactflowEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         fitView

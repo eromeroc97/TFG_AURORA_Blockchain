@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { Cpu, Layers, Network, RefreshCw, Server, Activity } from 'lucide-react'
+import { Cpu, Layers, Network, RefreshCw, Server, Activity, X } from 'lucide-react'
 import DeploySmartContractModal from '../components/blockchain/DeploySmartContractModal'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
 import { useBlockchainController } from '../controllers/useBlockchainController'
 
+type ModalType = 'organizations' | 'namespaces' | 'ledger' | null
+
 export default function BlockchainManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [detailModal, setDetailModal] = useState<ModalType>(null)
   const {
     smartContracts,
     networkNodes,
@@ -25,6 +28,16 @@ export default function BlockchainManagementPage() {
     await deploySmartContract(data)
     setIsModalOpen(false)
   }
+
+  const openDetailModal = (type: ModalType) => {
+    setDetailModal(type)
+  }
+
+  const closeDetailModal = () => {
+    setDetailModal(null)
+  }
+
+  const cardClasses = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-teal-300"
 
   return (
     <div className="min-h-screen p-6">
@@ -71,7 +84,10 @@ export default function BlockchainManagementPage() {
             </p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div 
+            className={cardClasses}
+            onClick={() => openDetailModal('organizations')}
+          >
             <div className="flex items-center gap-2">
               <Network className="h-5 w-5 text-sky-600" />
               <p className="text-sm text-slate-500">Organizaciones</p>
@@ -79,29 +95,25 @@ export default function BlockchainManagementPage() {
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {isLoading ? '...' : organizations.length > 0 ? organizations.length : '-'}
             </p>
-            {organizations.length > 0 && (
-              <p className="mt-1 text-xs text-slate-500 truncate">
-                {organizations.map((o) => o.name).join(', ')}
-              </p>
-            )}
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div 
+            className={cardClasses}
+            onClick={() => openDetailModal('namespaces')}
+          >
             <div className="flex items-center gap-2">
               <Layers className="h-5 w-5 text-teal-600" />
-              <p className="text-sm text-slate-500">Canales</p>
+              <p className="text-sm text-slate-500">Namespaces</p>
             </div>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {isLoading ? '...' : namespaces.length > 0 ? namespaces.length : '-'}
             </p>
-            {namespaces.length > 0 && (
-              <p className="mt-1 text-xs text-slate-500 truncate">
-                {namespaces.map((n) => n.name).join(', ')}
-              </p>
-            )}
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div 
+            className={cardClasses}
+            onClick={() => openDetailModal('ledger')}
+          >
             <div className="flex items-center gap-2">
               <Cpu className="h-5 w-5 text-teal-600" />
               <p className="text-sm text-slate-500">Ledger Height</p>
@@ -117,7 +129,7 @@ export default function BlockchainManagementPage() {
             <h2 className="text-lg font-semibold text-slate-900">Topología de Red</h2>
           </div>
           {isLoading ? (
-            <div className="flex h-48 items-center justify-center">
+            <div className="flex h-96 items-center justify-center">
               <RefreshCw className="size-8 animate-spin text-slate-400" />
             </div>
           ) : error ? (
@@ -277,6 +289,74 @@ export default function BlockchainManagementPage() {
           <p className="text-sm font-medium text-accent">
             Despliegue iniciado. Esperando consenso de la red...
           </p>
+        </div>
+      )}
+
+      {detailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={closeDetailModal} />
+          <div className="relative z-10 w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <button
+              onClick={closeDetailModal}
+              className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X className="size-5" />
+            </button>
+
+            {detailModal === 'organizations' && (
+              <>
+                <h3 className="text-xl font-semibold text-slate-900">Organizaciones</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Total: {organizations.length} organizaciones
+                </p>
+                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                  {organizations.map((org) => (
+                    <div key={org.id} className="rounded-xl border border-slate-200 p-3">
+                      <p className="font-medium text-slate-900">{org.name}</p>
+                      <p className="text-xs text-slate-500">{org.mspId}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {detailModal === 'namespaces' && (
+              <>
+                <h3 className="text-xl font-semibold text-slate-900">Namespaces</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Total: {namespaces.length} canales
+                </p>
+                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                  {namespaces.map((ns) => (
+                    <div key={ns.name} className="rounded-xl border border-slate-200 p-3">
+                      <p className="font-medium text-slate-900">{ns.name}</p>
+                      <p className="text-xs text-slate-500">{ns.description || 'Sin descripción'}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {detailModal === 'ledger' && (
+              <>
+                <h3 className="text-xl font-semibold text-slate-900">Ledger</h3>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-sm text-slate-500">Altura actual</p>
+                    <p className="text-2xl font-semibold text-slate-900">
+                      {ledgerHeight.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-sm text-slate-500">Bloques totales</p>
+                    <p className="text-2xl font-semibold text-slate-900">
+                      {blocks.length}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
