@@ -5,7 +5,7 @@ Esta carpeta contiene los smart contracts (chaincodes) desarrollados en Go para 
 
 ## Prerrequisitos
 - FireFly CLI instalado (`ff --version` para verificar)
-- Stack de FireFly en ejecución (namespace por defecto: `default`, canal: `aurorasmarthome`)
+- Stack de FireFly en ejecución (namespace por defecto: `default`, canal: `mychannel` o el canal configurado en tu stack)
 - Go 1.21+ instalado (para empaquetar dependencias)
 
 ## Despliegue de Chaincodes en FireFly
@@ -31,32 +31,32 @@ tar -czf chaincodes/aurora-telemetry-anchor.tgz \
 
 > **Nota**: Si no tienes Go instalado, el archivo `go.sum` no se generará. El chaincode podría funcionar si las dependencias en `go.mod` son correctas, pero es recomendable usar `go mod tidy`.
 
-### Paso 2: Desplegar en FireFly (Namespace Default + Canal aurorasmarthome)
-Usa el CLI de FireFly para instalar, aprobar y confirmar el chaincode en el canal `aurorasmarthome` y namespace `default`:
+### Paso 2: Desplegar en FireFly
+Usa el CLI de FireFly para desplegar el chaincode en el canal configurado por tu stack:
 
 ```bash
 ff deploy chaincode \
   --name aurora-telemetry-anchor \
   --path ./chaincodes/aurora-telemetry-anchor.tgz \
-  --channel aurorasmarthome \
-  --namespace default
+  --channel mychannel
 ```
 
-> **Verificar canal**: Lista canales disponibles:
-> ```bash
-> ff get channels --namespace default
-> ```
+> **Importante**: reemplaza `mychannel` por el canal real de tu stack FireFly. El comando `ff get` NO forma parte del FireFly CLI, por lo que no se debe usar aquí.
 
 ### Paso 3: Obtener ID del Contrato
-Tras despliegue exitoso, FireFly devuelve el `contractId`. También puedes consultarlo:
+Tras un despliegue exitoso, FireFly devuelve el `contractId` en la salida del comando. Guarda ese valor para invocaciones posteriores.
+
+### Paso 4: Verificar el stack de FireFly
+Para comprobar el estado del stack y ver información de los servicios:
+
 ```bash
-ff get contracts --namespace default | grep aurora-telemetry-anchor
+ff info <stack_name>
 ```
 
-### Paso 4: Verificar Despliegue
-Consulta los detalles del contrato desplegado:
+Si necesitas confirmar que el stack está ejecutándose correctamente, también puedes listar los stacks locales:
+
 ```bash
-ff get contract --namespace default --id <CONTRACT_ID>
+ff ls
 ```
 
 ## Invocación de Funciones (Ejemplo Bash)

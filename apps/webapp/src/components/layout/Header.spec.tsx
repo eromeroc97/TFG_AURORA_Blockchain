@@ -32,7 +32,7 @@ describe('Header', () => {
   })
 
   it('renders navigation and profile fallback data', () => {
-    renderHeader('/users')
+    renderHeader('/users', { userRole: 'ADMIN' })
 
     expect(screen.getByAltText('AURORA')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard')
