@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Cpu, Layers, Network, RefreshCw, Server, Activity, X } from 'lucide-react'
+import DeploySmartContractModal from '../components/blockchain/DeploySmartContractModal'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
 import Select from '../components/Select'
 import { useBlockchainController } from '../controllers/useBlockchainController'
@@ -7,6 +8,7 @@ import { useBlockchainController } from '../controllers/useBlockchainController'
 type ModalType = 'organizations' | 'namespaces' | 'ledger' | null
 
 export default function BlockchainManagementPage() {
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [detailModal, setDetailModal] = useState<ModalType>(null)
   const {
     smartContracts,
@@ -23,6 +25,9 @@ export default function BlockchainManagementPage() {
     managerStatus,
     isLoading,
     error,
+    deployLoading,
+    deploySuccess,
+    deploySmartContract,
   } = useBlockchainController()
 
   const [blockFilters, setBlockFilters] = useState({
@@ -32,6 +37,11 @@ export default function BlockchainManagementPage() {
     startDate: '',
     endDate: '',
   })
+
+  const handleDeploy = async (data: { name: string; version: string; channel: string; package: File }) => {
+    await deploySmartContract(data)
+    setIsModalOpen(false)
+  }
 
   const openDetailModal = (type: ModalType) => {
     setDetailModal(type)
@@ -96,6 +106,14 @@ export default function BlockchainManagementPage() {
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+          >
+            <Server className="size-4" />
+            Desplegar Smart Contract
+          </button>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -329,6 +347,14 @@ export default function BlockchainManagementPage() {
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Smart Contracts</h2>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent/80"
+            >
+              <Server className="size-4" />
+              Desplegar nuevo
+            </button>
           </div>
 
           {isLoading ? (
@@ -394,6 +420,20 @@ export default function BlockchainManagementPage() {
         </div>
       </div>
 
+      <DeploySmartContractModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onDeploy={handleDeploy}
+        isLoading={deployLoading}
+      />
+
+      {deploySuccess && (
+        <div className="fixed bottom-6 right-6 z-[80] rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 shadow-lg">
+          <p className="text-sm font-medium text-accent">
+            Despliegue iniciado. Esperando consenso de la red...
+          </p>
+        </div>
+      )}
 
       {detailModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
