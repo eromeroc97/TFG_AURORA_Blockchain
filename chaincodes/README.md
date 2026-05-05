@@ -1,81 +1,104 @@
 # Chaincodes - Aurora Blockchain TFG
 
 ## Descripción
-Esta carpeta contiene los smart contracts (chaincodes) desarrollados en Go para Hyperledger Fabric, desplegados a través de FireFly.
+Esta carpeta contiene los smart contracts (chaincodes) desarrollados en Go para la red Hyperledger Fabric y orquestados a través de Hyperledger FireFly.
 
 ## Prerrequisitos
-- FireFly CLI instalado (`ff --version` para verificar)
-- Stack de FireFly en ejecución (namespace por defecto: `default`, canal: `mychannel` o el canal configurado en tu stack)
-- Go 1.21+ instalado (para empaquetar dependencias)
+- **FireFly CLI** instalado (`ff --version` para verificar).
+- **Docker** instalado y en ejecución (vital para empaquetar los contratos con las herramientas oficiales de Fabric).
+- Stack de FireFly en ejecución (puedes verificar su estado con `ff ls`).
 
-## Despliegue de Chaincodes en FireFly
+---
 
-### Paso 1: Empaquetar el Chaincode
-Empaqueta el código fuente y dependencias en un `.tgz` (desde bash):
+## 🚀 Guía de Despliegue de Chaincodes
+
+El despliegue consta de dos fases críticas: empaquetar el código con el estándar exacto de Fabric y enviarlo a la red a través de FireFly.
+
+### Paso 1: Empaquetar el Chaincode (Vía Docker)
+Hyperledger Fabric exige que los paquetes tengan una estructura interna específica (`metadata.json` + `code.tar.gz`). En lugar de instalar binarios de Fabric en tu máquina, usamos su contenedor oficial.
+
+1. Abre tu terminal y navega hasta esta misma carpeta (`/chaincodes`).
+2. Ejecuta el siguiente comando, sustituyendo las variables `<...>` por tus datos:
 
 ```bash
-# Navegar al directorio raíz del proyecto
-cd /ruta/al/proyecto/TFG_AURORA_Blockchain
-
-# Descargar dependencias y generar go.sum (requiere Go instalado)
-cd chaincodes/aurora-telemetry-anchor
-go mod tidy
-cd ../..
-
-# Empaquetar el chaincode
-tar -czf chaincodes/aurora-telemetry-anchor.tgz \
-  chaincodes/aurora-telemetry-anchor/main.go \
-  chaincodes/aurora-telemetry-anchor/go.mod \
-  chaincodes/aurora-telemetry-anchor/go.sum
+docker run --rm -v $PWD:/workspace -w /workspace hyperledger/fabric-tools:2.4 \
+  peer lifecycle chaincode package <NOMBRE_PAQUETE>.tgz \
+  --path ./<CARPETA_DEL_CHAINCODE> \
+  --lang golang \
+  --label <NOMBRE_CHAINCODE>_<VERSION>
 ```
 
-> **Nota**: Si no tienes Go instalado, el archivo `go.sum` no se generará. El chaincode podría funcionar si las dependencias en `go.mod` son correctas, pero es recomendable usar `go mod tidy`.
+**⚠️ REGLA DE ORO PARA EL LABEL:** 
+El parámetro `--label` debe ser **ESTRICTAMENTE** el nombre del chaincode seguido de un guion bajo y la versión (ej. `aurora-telemetry-anchor_1.0`). Si esta etiqueta no coincide exactamente con lo que le digas a FireFly en el Paso 2, la instalación fallará.
 
-### Paso 2: Desplegar en FireFly
-Usa el CLI de FireFly para desplegar el chaincode en el canal configurado por tu stack:
-
+**Ejemplo real para el chaincode de Telemetría:**
 ```bash
-ff deploy chaincode \
-  --name aurora-telemetry-anchor \
-  --path ./chaincodes/aurora-telemetry-anchor.tgz \
-  --channel mychannel
+docker run --rm -v $PWD:/workspace -w /workspace hyperledger/fabric-tools:2.4 peer lifecycle chaincode package aurora-pkg.tgz --path ./aurora-telemetry-anchor --lang golang --label aurora-telemetry-anchor_1.0
 ```
 
-> **Importante**: reemplaza `mychannel` por el canal real de tu stack FireFly. El comando `ff get` NO forma parte del FireFly CLI, por lo que no se debe usar aquí.
+### Paso 2: Desplegar en la red con FireFly
+Una vez generado el archivo `.tgz`, utilizamos la CLI de FireFly para instalarlo en los *peers*, aprobarlo y hacer el *commit* en el canal.
 
-### Paso 3: Obtener ID del Contrato
-Tras un despliegue exitoso, FireFly devuelve el `contractId` en la salida del comando. Guarda ese valor para invocaciones posteriores.
-
-### Paso 4: Verificar el stack de FireFly
-Para comprobar el estado del stack y ver información de los servicios:
-
+La sintaxis del comando es:
 ```bash
-ff info <stack_name>
+ff deploy fabric <NOMBRE_STACK> <ARCHIVO.tgz> <CANAL> <NOMBRE_CHAINCODE> <VERSION>
 ```
 
-Si necesitas confirmar que el stack está ejecutándose correctamente, también puedes listar los stacks locales:
-
+**Ejemplo real de despliegue:**
 ```bash
-ff ls
+ff deploy fabric red-tfg aurora-pkg.tgz firefly aurora-telemetry-anchor 1.0
 ```
+*(Nota: El canal por defecto que crea FireFly se llama `firefly`)*.
 
-## Invocación de Funciones (Ejemplo Bash)
-Invoca `AnchorTelemetry` usando el CLI de FireFly:
+---
+
+## 📡 Verificación e Invocación (API REST)
+
+A diferencia de Fabric puro, FireFly abstrae la interacción mediante APIs REST estándar.
+
+### 1. Verificar el registro
+Para comprobar que el contrato se ha desplegado y FireFly ha generado su interfaz (FFI), puedes hacer una petición GET a tu nodo local:
+```http
+GET http://localhost:5000/api/v1/namespaces/default/apis
+```
+Esto te devolverá la lista de contratos y la URL directa a su explorador Swagger/OpenAPI autogenerado.
+
+### 2. Invocar funciones (Ejemplo)
+Para invocar una transacción (ej. `AnchorTelemetry`), no usamos la terminal, sino que hacemos una petición HTTP POST al endpoint de invocación de FireFly:
+
 ```bash
-ff invoke contract \
-  --namespace default \
-  --id <CONTRACT_ID> \
-  --method AnchorTelemetry \
-  --params '{
+curl -X POST http://localhost:5000/api/v1/namespaces/default/contracts/invoke \
+-H "Content-Type: application/json" \
+-d '{
+  "location": {
+    "channel": "firefly",
+    "chaincode": "aurora-telemetry-anchor"
+  },
+  "method": {
+    "name": "AnchorTelemetry",
+    "params": [
+      { "name": "ingestId", "schema": { "type": "string" } },
+      { "name": "ecosystemId", "schema": { "type": "string" } },
+      { "name": "telemetryHash", "schema": { "type": "string" } },
+      { "name": "signature", "schema": { "type": "string" } },
+      { "name": "publicKey", "schema": { "type": "string" } }
+    ],
+    "returns": []
+  },
+  "input": {
     "ingestId": "test-ingest-001",
     "ecosystemId": "eco-test-1",
-    "telemetryHash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
-    "signature": "mock-signature-abc123",
-    "publicKey": "mock-public-key-xyz789"
-  }'
+    "telemetryHash": "a1b2c3d4e5f6...",
+    "signature": "mock-signature",
+    "publicKey": "mock-public-key"
+  }
+}'
 ```
 
-## Lista de Chaincodes
-| Chaincode | Descripción |
-|-----------|-------------|
-| `aurora-telemetry-anchor/` | Anclaje de telemetría IoT: persiste hash firmado, previene duplicados por `ingestId`, emite evento `TelemetryAnchored` |
+---
+
+## 🗂️ Lista de Chaincodes Disponibles
+
+| Carpeta / Chaincode | Versión Actual | Descripción |
+|---------------------|----------------|-------------|
+| `aurora-telemetry-anchor/` | `1.0` | Anclaje de telemetría IoT: persiste el hash firmado, previene duplicados mediante `ingestId` y consolida el no-repudio. |

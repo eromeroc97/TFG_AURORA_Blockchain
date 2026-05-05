@@ -37,6 +37,16 @@ export interface FireflyPin {
   parent?: string;
 }
 
+export interface FireflyApi {
+  id?: string;
+  name?: string;
+  namespace?: string;
+  type?: string;
+  created?: string;
+  state?: string;
+  version?: string;
+}
+
 @Injectable()
 export class FireflyService {
   private readonly client: AxiosInstance;
@@ -85,9 +95,13 @@ export class FireflyService {
     return response.data;
   }
 
-  async getContracts() {
+  async getApis() {
     const response = await this.client.get('/api/v1/apis');
-    return response.data;
+    return response.data as FireflyApi[];
+  }
+
+  async getContracts() {
+    return await this.getApis();
   }
 
   async getStatus(namespace = 'default') {

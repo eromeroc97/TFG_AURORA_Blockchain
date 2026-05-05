@@ -1,6 +1,6 @@
 import { Controller, Get, Header, Options, UseGuards, Query, Header as NestHeader } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { FireflyService, FireflyNamespace, FireflyIdentity, FireflyPin } from '../firefly/firefly.service';
+import { FireflyService, FireflyNamespace, FireflyIdentity, FireflyPin, FireflyApi } from '../firefly/firefly.service';
 
 interface NetworkNodeResponse {
   id: string;
@@ -112,7 +112,16 @@ export class BlockchainController {
   @Get('contracts')
   async getContracts() {
     const response = await this.fireflyService.getContracts();
-    return response;
+    const items = response as FireflyApi[];
+
+    return items.map((api) => ({
+      id: api.id ?? '',
+      name: api.name ?? '',
+      version: api.version ?? 'N/A',
+      channel: api.namespace ?? '',
+      status: api.state === 'failed' ? 'failed' : 'active',
+      createdAt: api.created ?? new Date().toISOString(),
+    }));
   }
 
   @Get('ledger/info')
