@@ -139,6 +139,14 @@ export class BlockchainController {
     return response;
   }
 
+  @Get('health')
+  async getHealth() {
+    return {
+      status: 'UP',
+      service: 'blockchain-manager',
+    };
+  }
+
   @Get('ledger/info')
   async getLedgerInfo(@Query('namespace') namespace = 'default') {
     const response = await this.fireflyService.getPins(namespace, { limit: 1, skip: 0 });

@@ -116,10 +116,10 @@ export default function BlockchainManagementPage() {
           >
             <div className="flex items-center gap-2">
               <Cpu className="h-5 w-5 text-teal-600" />
-              <p className="text-sm text-slate-500">Ledger Height</p>
+              <p className="text-sm text-slate-500">Bloques totales</p>
             </div>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '...' : ledgerHeight > 0 ? ledgerHeight.toLocaleString() : '-'}
+              {isLoading ? '...' : blocks.length > 0 ? blocks.length.toLocaleString() : '0'}
             </p>
           </div>
         </div>
@@ -348,11 +348,11 @@ export default function BlockchainManagementPage() {
                   <div className="rounded-xl border border-slate-200 p-4">
                     <p className="text-sm text-slate-500">Altura actual</p>
                     <p className="text-2xl font-semibold text-slate-900">
-                      {ledgerHeight.toLocaleString()}
+                      {ledgerHeight > 0 ? ledgerHeight.toLocaleString() : '-'}
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 p-4">
-                    <p className="text-sm text-slate-500">Bloques totales</p>
+                    <p className="text-sm text-slate-500">Bloques recientes</p>
                     <p className="text-2xl font-semibold text-slate-900">
                       {blocks.length}
                     </p>
