@@ -8,12 +8,14 @@ import {
   getRecentBlocks,
   getLedgerInfo,
   getBlockchainManagerStatus,
+  getChannels,
   type DeploySmartContractRequest,
   type SmartContract,
   type NetworkNode,
   type Organization,
   type ChannelNamespace,
   type BlockInfo,
+  type Channel,
 } from '../services/blockchain.service'
 
 export function useBlockchainController(enabled = true) {
@@ -22,20 +24,23 @@ export function useBlockchainController(enabled = true) {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [namespaces, setNamespaces] = useState<ChannelNamespace[]>([])
   const [blocks, setBlocks] = useState<BlockInfo[]>([])
-  const [ledgerHeight, setLedgerHeight] = useState<number | null>(null)
+  const [ledgerHeight, setLedgerHeight] = useState(0)
   const [ledgerLastBlockTime, setLedgerLastBlockTime] = useState('')
   const [managerStatus, setManagerStatus] = useState<'Online' | 'Offline'>('Offline')
-  const [blockPage, setBlockPage] = useState(1)
-  const [blockPageSize, setBlockPageSize] = useState(10)
+  const [namespaceChannels, setNamespaceChannels] = useState<Record<string, Channel[]>>({})
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deployLoading, setDeployLoading] = useState(false)
   const [deploySuccess, setDeploySuccess] = useState(false)
 
-  const fetchRecentBlocks = async (limit = blockPageSize, page = blockPage) => {
-    const recentBlocks = await getRecentBlocks(limit, (page - 1) * limit)
-    setBlocks(recentBlocks)
+  const fetchNamespaceChannels = async (namespaceName: string) => {
+    if (namespaceChannels[namespaceName]) {
+      return namespaceChannels[namespaceName]
+    }
+    const channels = await getChannels(namespaceName)
+    setNamespaceChannels(prev => ({ ...prev, [namespaceName]: channels }))
+    return channels
   }
 
   const refreshNetworkData = async () => {
@@ -49,11 +54,12 @@ export function useBlockchainController(enabled = true) {
     setError(null)
 
     try {
-      const [contracts, nodes, orgs, ns, ledger, status] = await Promise.all([
+      const [contracts, nodes, orgs, ns, recentBlocks, ledger, status] = await Promise.all([
         getSmartContracts(),
         getNetworkNodes(),
         getOrganizations(),
         getNamespaces(),
+        getRecentBlocks(10),
         getLedgerInfo(),
         getBlockchainManagerStatus(),
       ])
@@ -62,10 +68,10 @@ export function useBlockchainController(enabled = true) {
       setNetworkNodes(nodes)
       setOrganizations(orgs)
       setNamespaces(ns)
+      setBlocks(recentBlocks)
       setLedgerHeight(ledger.height)
       setLedgerLastBlockTime(ledger.lastBlockTime)
       setManagerStatus(status)
-      await fetchRecentBlocks(blockPageSize, blockPage)
     } catch {
       setError('No se ha podido cargar la información de la blockchain.')
     } finally {
@@ -104,11 +110,8 @@ export function useBlockchainController(enabled = true) {
     ledgerHeight,
     ledgerLastBlockTime,
     managerStatus,
-    blockPage,
-    blockPageSize,
-    setBlockPage,
-    setBlockPageSize,
-    fetchRecentBlocks,
+    namespaceChannels,
+    fetchNamespaceChannels,
     isLoading,
     error,
     deployLoading,

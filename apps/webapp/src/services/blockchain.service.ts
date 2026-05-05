@@ -58,6 +58,23 @@ export interface BlockInfo {
   transactions: Transaction[]
 }
 
+export interface Channel {
+  name: string
+  description?: string
+}
+
+export async function getChannels(namespace: string): Promise<Channel[]> {
+  try {
+    const response = await apiClient.get<{ items: Channel[] }>(
+      `/blockchain/namespaces/${namespace}/channels`,
+      { params: { namespace } }
+    )
+    return response.data.items ?? []
+  } catch {
+    return []
+  }
+}
+
 export async function getSmartContracts(): Promise<SmartContract[]> {
   try {
     const response = await apiClient.get<SmartContract[]>('/blockchain/contracts')
@@ -110,10 +127,10 @@ export async function getNamespaces(): Promise<ChannelNamespace[]> {
   }
 }
 
-export async function getRecentBlocks(limit = 10, skip = 0): Promise<BlockInfo[]> {
+export async function getRecentBlocks(limit = 10): Promise<BlockInfo[]> {
   try {
     const response = await apiClient.get<BlockInfo[]>('/blockchain/blocks', {
-      params: { limit, skip },
+      params: { limit },
     })
     return response.data
   } catch {
