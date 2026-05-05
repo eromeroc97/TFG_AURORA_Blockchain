@@ -75,10 +75,45 @@ export async function getChannels(namespace: string): Promise<Channel[]> {
   }
 }
 
+function normalizeSmartContract(item: any): SmartContract {
+  const normalizedStatus = ['deploying', 'active', 'failed'].includes(item?.status)
+    ? item.status
+    : 'active'
+
+  return {
+    id: String(item?.id ?? item?.name ?? ''),
+    name: String(item?.name ?? item?.interface?.name ?? 'Desconocido'),
+    version: String(item?.version ?? item?.interface?.version ?? '-'),
+    channel: String(item?.channel ?? item?.namespace ?? 'default'),
+    status: normalizedStatus as SmartContract['status'],
+    createdAt: String(item?.createdAt ?? item?.created ?? new Date().toISOString()),
+  }
+}
+
+function extractSmartContractItems(responseData: any): SmartContract[] {
+  if (Array.isArray(responseData)) {
+    return responseData.map(normalizeSmartContract)
+  }
+
+  if (responseData && typeof responseData === 'object') {
+    const payload = Array.isArray(responseData.items)
+      ? responseData.items
+      : Array.isArray(responseData.data)
+      ? responseData.data
+      : []
+
+    if (Array.isArray(payload)) {
+      return payload.map(normalizeSmartContract)
+    }
+  }
+
+  return []
+}
+
 export async function getSmartContracts(): Promise<SmartContract[]> {
   try {
-    const response = await apiClient.get<SmartContract[]>('/blockchain/contracts')
-    return response.data
+    const response = await apiClient.get('/blockchain/contracts')
+    return extractSmartContractItems(response.data)
   } catch {
     return []
   }

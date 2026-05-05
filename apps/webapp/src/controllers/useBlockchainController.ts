@@ -53,30 +53,75 @@ export function useBlockchainController(enabled = true) {
     setIsLoading(true)
     setError(null)
 
-    try {
-      const [contracts, nodes, orgs, ns, recentBlocks, ledger, status] = await Promise.all([
-        getSmartContracts(),
-        getNetworkNodes(),
-        getOrganizations(),
-        getNamespaces(),
-        getRecentBlocks(10),
-        getLedgerInfo(),
-        getBlockchainManagerStatus(),
-      ])
+    const results = await Promise.allSettled([
+      getSmartContracts(),
+      getNetworkNodes(),
+      getOrganizations(),
+      getNamespaces(),
+      getRecentBlocks(10),
+      getLedgerInfo(),
+      getBlockchainManagerStatus(),
+    ])
 
-      setSmartContracts(contracts)
-      setNetworkNodes(nodes)
-      setOrganizations(orgs)
-      setNamespaces(ns)
-      setBlocks(recentBlocks)
-      setLedgerHeight(ledger.height)
-      setLedgerLastBlockTime(ledger.lastBlockTime)
-      setManagerStatus(status)
-    } catch {
-      setError('No se ha podido cargar la información de la blockchain.')
-    } finally {
-      setIsLoading(false)
+    const [contractsResult, nodesResult, orgsResult, namespacesResult, blocksResult, ledgerResult, statusResult] = results
+    let hasError = false
+
+    if (contractsResult.status === 'fulfilled') {
+      setSmartContracts(Array.isArray(contractsResult.value) ? contractsResult.value : [])
+    } else {
+      setSmartContracts([])
+      hasError = true
     }
+
+    if (nodesResult.status === 'fulfilled') {
+      setNetworkNodes(Array.isArray(nodesResult.value) ? nodesResult.value : [])
+    } else {
+      setNetworkNodes([])
+      hasError = true
+    }
+
+    if (orgsResult.status === 'fulfilled') {
+      setOrganizations(Array.isArray(orgsResult.value) ? orgsResult.value : [])
+    } else {
+      setOrganizations([])
+      hasError = true
+    }
+
+    if (namespacesResult.status === 'fulfilled') {
+      setNamespaces(Array.isArray(namespacesResult.value) ? namespacesResult.value : [])
+    } else {
+      setNamespaces([])
+      hasError = true
+    }
+
+    if (blocksResult.status === 'fulfilled') {
+      setBlocks(Array.isArray(blocksResult.value) ? blocksResult.value : [])
+    } else {
+      setBlocks([])
+      hasError = true
+    }
+
+    if (ledgerResult.status === 'fulfilled') {
+      setLedgerHeight(typeof ledgerResult.value?.height === 'number' ? ledgerResult.value.height : 0)
+      setLedgerLastBlockTime(String(ledgerResult.value?.lastBlockTime ?? ''))
+    } else {
+      setLedgerHeight(0)
+      setLedgerLastBlockTime('')
+      hasError = true
+    }
+
+    if (statusResult.status === 'fulfilled') {
+      setManagerStatus(statusResult.value)
+    } else {
+      setManagerStatus('Offline')
+      hasError = true
+    }
+
+    if (hasError) {
+      setError('No se ha podido cargar completamente la información de la blockchain. Algunos datos pueden no estar disponibles.')
+    }
+
+    setIsLoading(false)
   }
 
   const deploySmartContract = async (data: DeploySmartContractRequest) => {

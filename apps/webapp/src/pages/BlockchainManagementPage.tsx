@@ -29,27 +29,6 @@ export default function BlockchainManagementPage() {
     setIsModalOpen(false)
   }
 
-  const toggleNamespace = async (namespaceName: string) => {
-    if (expandedNamespace === namespaceName) {
-      setExpandedNamespace(null)
-    } else {
-      setExpandedNamespace(namespaceName)
-      if (!namespaceChannels[namespaceName] && !loadingChannels[namespaceName]) {
-        setLoadingChannels(prev => ({ ...prev, [namespaceName]: true }))
-        try {
-          const response = await fetch(`/api/blockchain/namespace-channels?namespace=${namespaceName}`)
-          const data = await response.json()
-          const channels = data.items ?? []
-          setNamespaceChannels(prev => ({ ...prev, [namespaceName]: channels }))
-        } catch {
-          setNamespaceChannels(prev => ({ ...prev, [namespaceName]: [] }))
-        } finally {
-          setLoadingChannels(prev => ({ ...prev, [namespaceName]: false }))
-        }
-      }
-    }
-  }
-
   const openDetailModal = (type: ModalType) => {
     setDetailModal(type)
   }

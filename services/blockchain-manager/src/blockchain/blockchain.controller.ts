@@ -25,6 +25,24 @@ interface LedgerInfoResponse {
   lastBlockTime: string;
 }
 
+function normalizeListResponse<T>(response: unknown): T[] {
+  if (Array.isArray(response)) {
+    return response
+  }
+
+  if (response && typeof response === 'object') {
+    const payload = response as { items?: unknown; data?: unknown }
+    if (Array.isArray(payload.items)) {
+      return payload.items as T[]
+    }
+    if (Array.isArray(payload.data)) {
+      return payload.data as T[]
+    }
+  }
+
+  return []
+}
+
 @Controller('blockchain')
 @UseGuards(AuthGuard('jwt'))
 export class BlockchainController {
@@ -47,7 +65,7 @@ export class BlockchainController {
   @Get('network/nodes')
   async getNetworkNodes(@Query('namespace') namespace = 'default') {
     const response = await this.fireflyService.getNetworkNodes(namespace);
-    const items = (response as FireflyIdentity[]).filter(i => i.type === 'node');
+    const items = normalizeListResponse<FireflyIdentity>(response).filter(i => i.type === 'node');
     
     return {
       items: items.map((node): NetworkNodeResponse => ({
@@ -62,7 +80,7 @@ export class BlockchainController {
   @Get('network/organizations')
   async getOrganizations(@Query('namespace') namespace = 'default') {
     const response = await this.fireflyService.getOrganizations(namespace);
-    const items = (response as FireflyIdentity[]).filter(i => i.type === 'org');
+    const items = normalizeListResponse<FireflyIdentity>(response).filter(i => i.type === 'org');
     
     return {
       items: items.map((org): OrganizationResponse => ({
@@ -76,7 +94,7 @@ export class BlockchainController {
   @Get('namespaces')
   async getNamespaces() {
     const response = await this.fireflyService.getNamespaces();
-    const items = response as FireflyNamespace[];
+    const items = normalizeListResponse<FireflyNamespace>(response);
     
     return {
       items: items.map((ns): NamespaceResponse => ({
@@ -123,11 +141,12 @@ export class BlockchainController {
 
   @Get('ledger/info')
   async getLedgerInfo(@Query('namespace') namespace = 'default') {
-    const pins = await this.fireflyService.getPins(namespace, { limit: 1, skip: 0 });
-    const pin = (pins as FireflyPin[])[0];
+    const response = await this.fireflyService.getPins(namespace, { limit: 1, skip: 0 });
+    const pins = normalizeListResponse<FireflyPin>(response);
+    const pin = pins[0];
     
     return {
-      height: 0,
+      height: pin?.sequence ?? 0,
       lastBlockTime: pin?.created ?? new Date().toISOString(),
     } as LedgerInfoResponse;
   }
