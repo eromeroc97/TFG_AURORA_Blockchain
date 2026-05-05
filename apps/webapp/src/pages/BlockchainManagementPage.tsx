@@ -1,18 +1,14 @@
 import { useState } from 'react'
-import { Cpu, Layers, Network, RefreshCw, Server, Activity, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Cpu, Layers, Network, RefreshCw, Server, Activity, X } from 'lucide-react'
 import DeploySmartContractModal from '../components/blockchain/DeploySmartContractModal'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
 import { useBlockchainController } from '../controllers/useBlockchainController'
-import type { Channel } from '../services/blockchain.service'
 
 type ModalType = 'organizations' | 'namespaces' | 'ledger' | null
 
 export default function BlockchainManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [detailModal, setDetailModal] = useState<ModalType>(null)
-  const [expandedNamespace, setExpandedNamespace] = useState<string | null>(null)
-  const [loadingChannels, setLoadingChannels] = useState<Record<string, boolean>>({})
-  const [namespaceChannels, setNamespaceChannels] = useState<Record<string, Channel[]>>({})
   const {
     smartContracts,
     networkNodes,
@@ -338,7 +334,9 @@ export default function BlockchainManagementPage() {
                   {organizations.map((org) => (
                     <div key={org.id} className="rounded-xl border border-slate-200 p-3">
                       <p className="font-medium text-slate-900">{org.name}</p>
-                      <p className="text-xs text-slate-500">{org.mspId}</p>
+                      <p className="text-xs text-slate-500">
+                        {org.description ?? org.id}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -353,38 +351,11 @@ export default function BlockchainManagementPage() {
                 </p>
                 <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
                   {namespaces.map((ns) => (
-                    <div key={ns.name}>
-                      <button
-                        onClick={() => toggleNamespace(ns.name)}
-                        className="w-full flex items-center justify-between rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          {loadingChannels[ns.name] ? (
-                            <RefreshCw className="size-4 animate-spin text-slate-400" />
-                          ) : expandedNamespace === ns.name ? (
-                            <ChevronDown className="size-4 text-slate-600" />
-                          ) : (
-                            <ChevronRight className="size-4 text-slate-400" />
-                          )}
-                          <span className="font-medium text-slate-900">{ns.name}</span>
-                        </div>
-                        <span className="text-xs text-slate-500">
-                          {namespaceChannels[ns.name]?.length ?? 0} canales
-                        </span>
-                      </button>
-                      {expandedNamespace === ns.name && namespaceChannels[ns.name] && (
-                        <div className="ml-6 mt-1 space-y-1 border-l-2 border-slate-200 pl-3">
-                          {namespaceChannels[ns.name].length === 0 ? (
-                            <p className="text-xs text-slate-400">Sin canales</p>
-                          ) : (
-                            namespaceChannels[ns.name].map((channel, idx) => (
-                              <div key={idx} className="text-sm text-slate-600">
-                                {channel.name || `Canal ${idx + 1}`}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
+                    <div key={ns.name} className="rounded-xl border border-slate-200 p-3">
+                      <p className="font-medium text-slate-900">{ns.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {ns.description ?? 'Sin descripción'}
+                      </p>
                     </div>
                   ))}
                 </div>

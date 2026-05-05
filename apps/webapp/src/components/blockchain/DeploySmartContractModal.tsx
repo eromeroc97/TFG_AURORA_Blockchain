@@ -10,7 +10,7 @@ interface DeploySmartContractModalProps {
   isLoading: boolean
 }
 
-const CHANNELS = [
+const NAMESPACES = [
   { value: 'default', label: 'default' },
   { value: 'firefly', label: 'firefly' },
 ] as const
@@ -23,7 +23,7 @@ export default function DeploySmartContractModal({
 }: DeploySmartContractModalProps) {
   const [name, setName] = useState('')
   const [version, setVersion] = useState('')
-  const [channel, setChannel] = useState('default')
+  const [namespace, setNamespace] = useState('default')
   const [packageFile, setPackageFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -31,7 +31,7 @@ export default function DeploySmartContractModal({
   const resetForm = () => {
     setName('')
     setVersion('')
-    setChannel('default')
+    setNamespace('default')
     setPackageFile(null)
     setFileError(null)
   }
@@ -79,7 +79,7 @@ export default function DeploySmartContractModal({
     await onDeploy({
       name: name.trim(),
       version: version.trim(),
-      channel,
+      channel: namespace,
       package: packageFile,
     })
   }
@@ -136,11 +136,11 @@ export default function DeploySmartContractModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Canal</label>
+            <label className="block text-sm font-medium text-slate-700">Namespace</label>
             <Select
-              value={channel}
-              onChange={(value) => setChannel(value)}
-              options={CHANNELS.map((c) => ({ value: c.value, label: c.label }))}
+              value={namespace}
+              onChange={(value) => setNamespace(value)}
+              options={NAMESPACES.map((c) => ({ value: c.value, label: c.label }))}
             />
           </div>
 
