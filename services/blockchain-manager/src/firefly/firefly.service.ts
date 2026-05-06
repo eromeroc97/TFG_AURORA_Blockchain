@@ -131,10 +131,9 @@ export class FireflyService {
     return response.data;
   }
 
-  async getContractInterface(name: string, namespace = 'default'): Promise<any> {
+  async getContractInterface(apiName: string, namespace = 'default'): Promise<any> {
     const response = await this.client.get(
-      `/api/v1/namespaces/${namespace}/contracts/interfaces`,
-      { params: { name } }
+      `/api/v1/namespaces/${namespace}/apis/${apiName}/api/swagger.json`
     );
     return response.data;
   }

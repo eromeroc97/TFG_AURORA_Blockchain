@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Cpu, Layers, Network, RefreshCw, Activity, X, Server, Search, ChevronLeft, ChevronRight, Filter, XCircle } from 'lucide-react'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
 import RegisterChaincodeModal from '../components/blockchain/RegisterChaincodeModal'
+import DeploymentHelpModal from '../components/blockchain/DeploymentHelpModal'
 import Select from '../components/Select'
 import { useBlockchainController } from '../controllers/useBlockchainController'
 import { getContractInterface, type SmartContract } from '../services/blockchain.service'
@@ -26,6 +27,7 @@ export default function BlockchainManagementPage() {
   const [contractDetailLoading, setContractDetailLoading] = useState(false)
   const {
     smartContracts,
+    contractVersions,
     networkNodes,
     organizations,
     namespaces,
@@ -101,11 +103,39 @@ export default function BlockchainManagementPage() {
     try {
       const response = await getContractInterface(contract.name)
       setContractInterfaceJson(JSON.stringify(response, null, 2))
+      
+      if (response?.info?.version) {
+        setSelectedContract(prev => prev ? { ...prev, version: response.info.version } : null)
+      }
     } catch (err) {
       setContractInterfaceJson(JSON.stringify({ error: 'Error al obtener la interfaz del contrato' }, null, 2))
     } finally {
       setContractDetailLoading(false)
     }
+  }
+
+  const syntaxHighlightJson = (json: string): string => {
+    return json
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+        let cls = 'text-amber-600'
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'text-sky-600'
+            match = match.replace(/:$/, '')
+            return `<span class="${cls}">${match}</span>:`
+          } else {
+            cls = 'text-emerald-600'
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'text-purple-600'
+        } else if (/null/.test(match)) {
+          cls = 'text-rose-600'
+        }
+        return `<span class="${cls}">${match}</span>`
+      })
   }
 
   return (
@@ -431,14 +461,17 @@ export default function BlockchainManagementPage() {
             <h2 className="text-lg font-semibold text-slate-900">
               {smartContracts.length === 1 ? 'Smart Contract' : 'Smart Contracts'}
             </h2>
-            <button
-              type="button"
-              onClick={() => setIsRegisterModalOpen(true)}
-              className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent/80"
-            >
-              <Server className="size-4" />
-              Registrar Chaincode
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsRegisterModalOpen(true)}
+                className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent/80"
+              >
+                <Server className="size-4" />
+                Registrar Smart Contract
+              </button>
+              <DeploymentHelpModal />
+            </div>
           </div>
 
           {isLoading ? (
@@ -477,7 +510,7 @@ export default function BlockchainManagementPage() {
                       className="cursor-pointer hover:bg-slate-50"
                     >
                       <td className="px-4 py-3 font-medium text-slate-900">{contract.name}</td>
-                      <td className="px-4 py-3 text-slate-600">{contract.version}</td>
+                      <td className="px-4 py-3 text-slate-600">{contractVersions[contract.id] || contract.version}</td>
                       <td className="px-4 py-3 text-slate-600">{contract.channel}</td>
                       <td className="px-4 py-3">
                         <span
@@ -589,7 +622,7 @@ export default function BlockchainManagementPage() {
       {selectedContract && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedContract(null)} />
-          <div className="relative z-10 w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="relative z-10 w-[80vw] max-h-[90vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl flex flex-col">
             <button
               onClick={() => setSelectedContract(null)}
               className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
@@ -639,16 +672,19 @@ export default function BlockchainManagementPage() {
               </div>
             </div>
 
-            <div className="mt-4">
-              <p className="text-xs font-medium text-slate-500 mb-2">Interfaz (FFI)</p>
+            <div className="mt-4 flex-1 min-h-0 flex flex-col">
+              <p className="text-xs font-medium text-slate-500 mb-2">Interfaz (Swagger JSON)</p>
               {contractDetailLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <RefreshCw className="size-6 animate-spin text-slate-400" />
                 </div>
               ) : contractInterfaceJson ? (
-                <pre className="max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700 font-mono whitespace-pre-wrap">
-                  {contractInterfaceJson}
-                </pre>
+                <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <pre 
+                    className="text-xs font-mono text-slate-700 whitespace-pre"
+                    dangerouslySetInnerHTML={{ __html: syntaxHighlightJson(contractInterfaceJson) }}
+                  />
+                </div>
               ) : (
                 <p className="text-sm text-slate-500">No se pudo cargar la interfaz</p>
               )}

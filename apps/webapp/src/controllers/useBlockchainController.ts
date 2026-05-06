@@ -9,6 +9,7 @@ import {
   getLedgerInfo,
   getBlockchainManagerStatus,
   getChannels,
+  getContractVersions,
   type DeploySmartContractRequest,
   type SmartContract,
   type NetworkNode,
@@ -20,6 +21,7 @@ import {
 
 export function useBlockchainController(enabled = true) {
   const [smartContracts, setSmartContracts] = useState<SmartContract[]>([])
+  const [contractVersions, setContractVersions] = useState<Record<string, string>>({})
   const [networkNodes, setNetworkNodes] = useState<NetworkNode[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [namespaces, setNamespaces] = useState<ChannelNamespace[]>([])
@@ -67,7 +69,13 @@ export function useBlockchainController(enabled = true) {
     let hasError = false
 
     if (contractsResult.status === 'fulfilled') {
-      setSmartContracts(Array.isArray(contractsResult.value) ? contractsResult.value : [])
+      const contracts = Array.isArray(contractsResult.value) ? contractsResult.value : []
+      setSmartContracts(contracts)
+      
+      if (contracts.length > 0) {
+        const versions = await getContractVersions(contracts)
+        setContractVersions(versions)
+      }
     } else {
       setSmartContracts([])
       hasError = true
@@ -148,6 +156,7 @@ export function useBlockchainController(enabled = true) {
 
   return {
     smartContracts,
+    contractVersions,
     networkNodes,
     organizations,
     namespaces,

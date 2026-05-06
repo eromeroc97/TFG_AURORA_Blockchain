@@ -242,3 +242,22 @@ export async function getContractInterface(name: string): Promise<ContractInterf
   )
   return response.data
 }
+
+export async function getContractVersions(contracts: SmartContract[]): Promise<Record<string, string>> {
+  const versions: Record<string, string> = {}
+  
+  await Promise.allSettled(
+    contracts.map(async (contract) => {
+      try {
+        const response = await getContractInterface(contract.name)
+        if (response?.info?.version) {
+          versions[contract.id] = response.info.version
+        }
+      } catch {
+        // Ignore errors for individual contracts
+      }
+    })
+  )
+  
+  return versions
+}
