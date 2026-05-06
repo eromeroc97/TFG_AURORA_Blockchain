@@ -134,6 +134,25 @@ export class BlockchainController {
     }));
   }
 
+  @Get('events')
+  async getEvents(
+    @Query('namespace') namespace = 'default',
+    @Query('limit') limit = '10',
+    @Query('skip') skip = '0',
+  ) {
+    console.log(`[DEBUG] getEvents called with namespace=${namespace}, limit=${limit}, skip=${skip}`);
+    const response = await this.fireflyService.getBlockchainEvents(namespace, {
+      limit: parseInt(limit, 10),
+      skip: parseInt(skip, 10),
+    });
+    console.log(`[DEBUG] getBlockchainEvents response type:`, typeof response);
+    console.log(`[DEBUG] getBlockchainEvents response:`, JSON.stringify(response).substring(0, 500));
+    const items = normalizeListResponse<Record<string, unknown>>(response);
+    console.log(`[DEBUG] normalized items count:`, items.length);
+
+    return { items };
+  }
+
   @Get('contracts')
   async getContracts() {
     const response = await this.fireflyService.getContracts();

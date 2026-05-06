@@ -6,6 +6,7 @@ import {
   getOrganizations,
   getNamespaces,
   getRecentBlocks,
+  getBlockchainEvents,
   getLedgerInfo,
   getBlockchainManagerStatus,
   getChannels,
@@ -16,6 +17,7 @@ import {
   type Organization,
   type ChannelNamespace,
   type BlockInfo,
+  type BlockchainEvent,
   type Channel,
 } from '../services/blockchain.service'
 
@@ -26,6 +28,7 @@ export function useBlockchainController(enabled = true) {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [namespaces, setNamespaces] = useState<ChannelNamespace[]>([])
   const [blocks, setBlocks] = useState<BlockInfo[]>([])
+  const [events, setEvents] = useState<BlockchainEvent[]>([])
   const [ledgerHeight, setLedgerHeight] = useState(0)
   const [ledgerLastBlockTime, setLedgerLastBlockTime] = useState('')
   const [managerStatus, setManagerStatus] = useState<'Online' | 'Offline'>('Offline')
@@ -61,11 +64,12 @@ export function useBlockchainController(enabled = true) {
       getOrganizations(),
       getNamespaces(),
       getRecentBlocks(10),
+      getBlockchainEvents('default', 10),
       getLedgerInfo(),
       getBlockchainManagerStatus(),
     ])
 
-    const [contractsResult, nodesResult, orgsResult, namespacesResult, blocksResult, ledgerResult, statusResult] = results
+    const [contractsResult, nodesResult, orgsResult, namespacesResult, blocksResult, eventsResult, ledgerResult, statusResult] = results
     let hasError = false
 
     if (contractsResult.status === 'fulfilled') {
@@ -107,6 +111,13 @@ export function useBlockchainController(enabled = true) {
     } else {
       setBlocks([])
       hasError = true
+    }
+
+    if (eventsResult.status === 'fulfilled') {
+      const eventsArray = eventsResult.value as BlockchainEvent[]
+      setEvents(Array.isArray(eventsArray) ? eventsArray : [])
+    } else {
+      setEvents([])
     }
 
     if (ledgerResult.status === 'fulfilled') {
@@ -161,6 +172,7 @@ export function useBlockchainController(enabled = true) {
     organizations,
     namespaces,
     blocks,
+    events,
     ledgerHeight,
     ledgerLastBlockTime,
     managerStatus,

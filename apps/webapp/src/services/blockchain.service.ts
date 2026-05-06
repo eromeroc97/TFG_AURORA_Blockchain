@@ -58,6 +58,18 @@ export interface BlockInfo {
   transactions: Transaction[]
 }
 
+export interface BlockchainEvent {
+  id: string
+  name: string
+  protocolId: string
+  source: string
+  timestamp: string
+  tx?: { blockchainId?: string; type?: string; id?: string }
+  output?: Record<string, unknown>
+  listener?: string
+  namespace: string
+}
+
 export interface Channel {
   name: string
   description?: string
@@ -173,6 +185,17 @@ export async function getRecentBlocks(limit = 10): Promise<BlockInfo[]> {
   }
 }
 
+export async function getBlockchainEvents(namespace = 'default', limit = 10): Promise<BlockchainEvent[]> {
+  try {
+    const response = await apiClient.get<{ items: BlockchainEvent[] }>('/blockchain/events', {
+      params: { namespace, limit },
+    });
+    return response.data.items ?? []
+  } catch {
+    return []
+  }
+}
+
 export async function getRecentTransactions(limit = 20): Promise<Transaction[]> {
   try {
     const response = await apiClient.get<{ items: Transaction[] }>('/blockchain/transactions', {
@@ -229,6 +252,10 @@ export interface ContractInterfaceResponse {
   id?: string
   name?: string
   version?: string
+  info?: {
+    version?: string
+    [key: string]: unknown
+  }
   description?: string
   methods?: unknown[]
   events?: unknown[]
@@ -251,7 +278,7 @@ export async function getContractVersions(contracts: SmartContract[]): Promise<R
       try {
         const response = await getContractInterface(contract.name)
         if (response?.info?.version) {
-          versions[contract.id] = response.info.version
+          versions[contract.id] = String(response.info.version)
         }
       } catch {
         // Ignore errors for individual contracts

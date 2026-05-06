@@ -1,8 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, memo } from 'react'
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   MarkerType,
@@ -44,7 +43,13 @@ const defaultNodeStyle = {
   textAlign: 'center' as const,
 }
 
-function GraphContent({ nodes, organizations }: { nodes: NetworkNode[]; organizations: Organization[] }) {
+const GraphContent = memo(function GraphContent({
+  nodes,
+  organizations,
+}: {
+  nodes: NetworkNode[]
+  organizations: Organization[]
+}) {
   const { setViewport } = useReactFlow()
 
   useEffect(() => {
@@ -169,19 +174,15 @@ function GraphContent({ nodes, organizations }: { nodes: NetworkNode[]; organiza
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       fitView
-      attributionPosition="bottom-left"
       zoomOnScroll={false}
       nodesConnectable={false}
+      proOptions={{ hideAttribution: true }}
     >
       <Background color="#f1f5f9" gap={16} />
       <Controls />
-      <MiniMap
-        nodeColor={(n) => (n.style?.background as string) || '#fff'}
-        maskColor="rgba(248, 250, 252, 0.8)"
-      />
     </ReactFlow>
   )
-}
+})
 
 export default function BlockchainTopologyGraph({
   nodes,
