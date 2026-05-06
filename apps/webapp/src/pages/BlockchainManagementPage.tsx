@@ -22,6 +22,12 @@ export default function BlockchainManagementPage() {
   const [blocksDateFrom, setBlocksDateFrom] = useState('')
   const [blocksDateTo, setBlocksDateTo] = useState('')
   const [showBlocksFilters, setShowBlocksFilters] = useState(false)
+  const [contractsSearchTerm, setContractsSearchTerm] = useState('')
+  const [contractStatusFilter, setContractStatusFilter] = useState('')
+  const [contractChannelFilter, setContractChannelFilter] = useState('')
+  const [showContractFilters, setShowContractFilters] = useState(false)
+  const [contractsPageSize, setContractsPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+  const [contractsCurrentPage, setContractsCurrentPage] = useState(1)
   const [selectedContract, setSelectedContract] = useState<SmartContract | null>(null)
   const [contractInterfaceJson, setContractInterfaceJson] = useState<string | null>(null)
   const [contractDetailLoading, setContractDetailLoading] = useState(false)
@@ -52,14 +58,14 @@ export default function BlockchainManagementPage() {
   const filteredBlocks = useMemo(() => {
     return blocks.filter((block) => {
       const searchLower = blocksSearchTerm.toLowerCase()
-      const matchesSearch = !blocksSearchTerm || 
+      const matchesSearch = !blocksSearchTerm ||
         block.blockHash.toLowerCase().includes(searchLower) ||
         block.blockNumber.toString().includes(searchLower)
 
       const minTxs = blocksMinTxs !== '' ? Number(blocksMinTxs) : null
       const maxTxs = blocksMaxTxs !== '' ? Number(blocksMaxTxs) : null
-      const matchesTxs = (!minTxs || block.transactionCount >= minTxs) && 
-                         (!maxTxs || block.transactionCount <= maxTxs)
+      const matchesTxs = (!minTxs || block.transactionCount >= minTxs) &&
+        (!maxTxs || block.transactionCount <= maxTxs)
 
       const blockDate = block.createdAt ? new Date(block.createdAt) : null
       const matchesDateFrom = !blocksDateFrom || (blockDate && blockDate >= new Date(blocksDateFrom))
@@ -68,6 +74,26 @@ export default function BlockchainManagementPage() {
       return matchesSearch && matchesTxs && matchesDateFrom && matchesDateTo
     })
   }, [blocks, blocksSearchTerm, blocksMinTxs, blocksMaxTxs, blocksDateFrom, blocksDateTo])
+
+  const filteredContracts = useMemo(() => {
+    return smartContracts.filter((contract) => {
+      const searchLower = contractsSearchTerm.toLowerCase()
+      const matchesSearch = !contractsSearchTerm ||
+        contract.name.toLowerCase().includes(searchLower) ||
+        contract.channel.toLowerCase().includes(searchLower)
+
+      const matchesStatus = !contractStatusFilter || contract.status === contractStatusFilter
+      const matchesChannel = !contractChannelFilter || contract.channel === contractChannelFilter
+
+      return matchesSearch && matchesStatus && matchesChannel
+    })
+  }, [smartContracts, contractsSearchTerm, contractStatusFilter, contractChannelFilter])
+
+  const totalContractsPages = Math.ceil(filteredContracts.length / contractsPageSize)
+  const paginatedContracts = useMemo(() => {
+    const start = (contractsCurrentPage - 1) * contractsPageSize
+    return filteredContracts.slice(start, start + contractsPageSize)
+  }, [filteredContracts, contractsCurrentPage, contractsPageSize])
 
   const totalBlocksPages = Math.ceil(filteredBlocks.length / blocksPageSize)
   const paginatedBlocks = useMemo(() => {
@@ -95,15 +121,33 @@ export default function BlockchainManagementPage() {
     setBlocksCurrentPage(1)
   }
 
+  const clearContractFilters = () => {
+    setContractsSearchTerm('')
+    setContractStatusFilter('')
+    setContractChannelFilter('')
+    setContractsCurrentPage(1)
+  }
+
+  const handleContractsPageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalContractsPages) {
+      setContractsCurrentPage(newPage)
+    }
+  }
+
+  const handleContractsPageSizeChange = (newSize: (typeof PAGE_SIZES)[number]) => {
+    setContractsPageSize(newSize)
+    setContractsCurrentPage(1)
+  }
+
   const handleContractClick = async (contract: SmartContract) => {
     setSelectedContract(contract)
     setContractDetailLoading(true)
     setContractInterfaceJson(null)
-    
+
     try {
       const response = await getContractInterface(contract.name)
       setContractInterfaceJson(JSON.stringify(response, null, 2))
-      
+
       if (response?.info?.version) {
         setSelectedContract(prev => prev ? { ...prev, version: response.info.version } : null)
       }
@@ -174,7 +218,7 @@ export default function BlockchainManagementPage() {
             </p>
           </div>
 
-          <div 
+          <div
             className={cardClasses}
             onClick={() => openDetailModal('organizations')}
           >
@@ -187,7 +231,7 @@ export default function BlockchainManagementPage() {
             </p>
           </div>
 
-          <div 
+          <div
             className={cardClasses}
             onClick={() => openDetailModal('namespaces')}
           >
@@ -200,7 +244,7 @@ export default function BlockchainManagementPage() {
             </p>
           </div>
 
-          <div 
+          <div
             className={cardClasses}
             onClick={() => openDetailModal('ledger')}
           >
@@ -457,11 +501,11 @@ export default function BlockchainManagementPage() {
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <h2 className="text-lg font-semibold text-slate-900">
-              {smartContracts.length === 1 ? 'Smart Contract' : 'Smart Contracts'}
+              {filteredContracts.length === 1 ? 'Smart Contract' : 'Smart Contracts'}
             </h2>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsRegisterModalOpen(true)}
@@ -474,69 +518,206 @@ export default function BlockchainManagementPage() {
             </div>
           </div>
 
+          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-2xl border border-border bg-slate-50 px-3 py-2">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={contractsSearchTerm}
+                  onChange={(e) => {
+                    setContractsSearchTerm(e.target.value)
+                    setContractsCurrentPage(1)
+                  }}
+                  placeholder="Buscar por nombre o namespace..."
+                  className="ml-2 w-40 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <Select
+                value={contractsPageSize}
+                onChange={(value) => handleContractsPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
+                options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowContractFilters(!showContractFilters)}
+                className="inline-flex items-center gap-1 rounded-2xl border border-border px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                <Filter className="size-4" />
+                Filtros
+              </button>
+            </div>
+          </div>
+
+          {showContractFilters && (
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    Estado
+                  </label>
+                  <select
+                    value={contractStatusFilter}
+                    onChange={(e) => {
+                      setContractStatusFilter(e.target.value)
+                      setContractsCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  >
+                    <option value="">Todos</option>
+                    <option value="active">Activo</option>
+                    <option value="deploying">Desplegando</option>
+                    <option value="failed">Fallido</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    Namespace
+                  </label>
+                  <select
+                    value={contractChannelFilter}
+                    onChange={(e) => {
+                      setContractChannelFilter(e.target.value)
+                      setContractsCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  >
+                    <option value="">Todos</option>
+                    {namespaces.map((ns) => (
+                      <option key={ns.name} value={ns.name}>{ns.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={clearContractFilters}
+                  className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+                >
+                  <XCircle className="size-4" />
+                  Limpiar
+                </button>
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="h-16 rounded-2xl bg-slate-100" />
               ))}
             </div>
-          ) : smartContracts.length === 0 ? (
+          ) : filteredContracts.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
               <Server className="mx-auto size-8 text-slate-400" />
               <p className="mt-2 text-sm font-medium text-slate-700">
-                No hay smart contracts desplegados
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                No hay smart contracts disponibles en la red.
+                No hay smart contracts para los filtros seleccionados
               </p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Nombre</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Versión</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Estado</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {smartContracts.map((contract) => (
-                    <tr 
-                      key={contract.id} 
-                      onClick={() => handleContractClick(contract)}
-                      className="cursor-pointer hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-900">{contract.name}</td>
-                      <td className="px-4 py-3 text-slate-600">{contractVersions[contract.id] || contract.version}</td>
-                      <td className="px-4 py-3 text-slate-600">{contract.channel}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            contract.status === 'active'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : contract.status === 'deploying'
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-rose-100 text-rose-700'
-                          }`}
-                        >
-                          {contract.status === 'active'
-                            ? 'Activo'
-                            : contract.status === 'deploying'
-                              ? 'Desplegando'
-                              : 'Fallido'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {new Date(contract.createdAt).toLocaleDateString('es-ES')}
-                      </td>
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                <span>
+                  Mostrando {paginatedContracts.length} de {filteredContracts.length} smart contract
+                  {filteredContracts.length === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleContractsPageChange(contractsCurrentPage - 1)}
+                    disabled={contractsCurrentPage === 1}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span>
+                    Página {contractsCurrentPage} de {totalContractsPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleContractsPageChange(contractsCurrentPage + 1)}
+                    disabled={contractsCurrentPage === totalContractsPages}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Nombre</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Versión</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Estado</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {paginatedContracts.map((contract) => (
+                      <tr
+                        key={contract.id}
+                        onClick={() => handleContractClick(contract)}
+                        className="cursor-pointer hover:bg-slate-50"
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-900">{contract.name}</td>
+                        <td className="px-4 py-3 text-slate-600">{contractVersions[contract.id] || contract.version}</td>
+                        <td className="px-4 py-3 text-slate-600">{contract.channel}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${contract.status === 'active'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : contract.status === 'deploying'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}
+                          >
+                            {contract.status === 'active'
+                              ? 'Activo'
+                              : contract.status === 'deploying'
+                                ? 'Desplegando'
+                                : 'Fallido'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {new Date(contract.createdAt).toLocaleDateString('es-ES')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                <span>
+                  Mostrando {paginatedContracts.length} de {filteredContracts.length} smart contract
+                  {filteredContracts.length === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleContractsPageChange(contractsCurrentPage - 1)}
+                    disabled={contractsCurrentPage === 1}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span>
+                    Página {contractsCurrentPage} de {totalContractsPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleContractsPageChange(contractsCurrentPage + 1)}
+                    disabled={contractsCurrentPage === totalContractsPages}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -648,13 +829,12 @@ export default function BlockchainManagementPage() {
                 <div>
                   <p className="text-xs font-medium text-slate-500">Estado</p>
                   <span
-                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                      selectedContract.status === 'active'
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${selectedContract.status === 'active'
                         ? 'bg-emerald-100 text-emerald-700'
                         : selectedContract.status === 'deploying'
                           ? 'bg-amber-100 text-amber-700'
                           : 'bg-rose-100 text-rose-700'
-                    }`}
+                      }`}
                   >
                     {selectedContract.status === 'active'
                       ? 'Activo'
@@ -680,7 +860,7 @@ export default function BlockchainManagementPage() {
                 </div>
               ) : contractInterfaceJson ? (
                 <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <pre 
+                  <pre
                     className="text-xs font-mono text-slate-700 whitespace-pre"
                     dangerouslySetInnerHTML={{ __html: syntaxHighlightJson(contractInterfaceJson) }}
                   />
