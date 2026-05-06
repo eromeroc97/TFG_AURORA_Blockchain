@@ -95,6 +95,16 @@ export default function BlockchainManagementPage() {
     return filteredContracts.slice(start, start + contractsPageSize)
   }, [filteredContracts, contractsCurrentPage, contractsPageSize])
 
+  const lastHourBlocks = useMemo(() => {
+    const oneHourAgo = new Date()
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1)
+    return blocks.filter(block => {
+      if (!block.createdAt) return false
+      const blockDate = new Date(block.createdAt)
+      return blockDate >= oneHourAgo
+    }).length
+  }, [blocks])
+
   const totalBlocksPages = Math.ceil(filteredBlocks.length / blocksPageSize)
   const paginatedBlocks = useMemo(() => {
     const start = (blocksCurrentPage - 1) * blocksPageSize
@@ -250,7 +260,7 @@ export default function BlockchainManagementPage() {
           >
             <div className="flex items-center gap-2">
               <Cpu className="h-5 w-5 text-teal-600" />
-              <p className="text-sm text-slate-500">Bloques totales</p>
+              <p className="text-sm text-slate-500">Altura actual</p>
             </div>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {isLoading ? '...' : blocks.length > 0 ? blocks.length.toLocaleString() : '0'}
@@ -782,9 +792,9 @@ export default function BlockchainManagementPage() {
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 p-4">
-                    <p className="text-sm text-slate-500">Bloques recientes</p>
+                    <p className="text-sm text-slate-500">Bloques última hora</p>
                     <p className="text-2xl font-semibold text-slate-900">
-                      {blocks.length}
+                      {lastHourBlocks}
                     </p>
                   </div>
                 </div>
