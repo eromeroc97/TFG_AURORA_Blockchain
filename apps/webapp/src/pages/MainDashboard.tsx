@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Line,
   LineChart,
@@ -29,10 +29,11 @@ export default function MainDashboard() {
   const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
   const canViewUserCount = role !== 'USER'
 
-  const { ecosystems, isLoading: isMapLoading, error: mapError } = useDashboardController()
-  const { data, error: telemetryError, range, changeRange } = useTelemetryController()
-  const { users } = useUsersController(canViewUserCount)
-  const { services } = useServiceHealthController()
+  const { ecosystems, isLoading: isMapLoading, error: mapError, refreshEcosystems } = useDashboardController()
+  const { data, error: telemetryError, range, changeRange, refreshMetrics } = useTelemetryController()
+  const { users, refreshUsers } = useUsersController(canViewUserCount)
+  const { services, refreshServiceHealth } = useServiceHealthController()
+  const [autoRefresh, setAutoRefresh] = useState(true)
 
   const ranges: TelemetryRange[] = ['30m', '1h', '12h', '24h', '1w', '1M', '1y']
 
@@ -61,6 +62,19 @@ export default function MainDashboard() {
     [ecosystems],
   )
 
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      void refreshEcosystems()
+      void refreshMetrics()
+      void refreshUsers()
+      void refreshServiceHealth()
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, refreshEcosystems, refreshMetrics, refreshUsers, refreshServiceHealth])
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
@@ -71,6 +85,24 @@ export default function MainDashboard() {
               Panel de control del sistema.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className="flex items-center gap-2"
+          >
+            <span className="text-xs text-slate-500">Actualizar automáticamente</span>
+            <span
+              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                autoRefresh ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                  autoRefresh ? 'translate-x-4' : 'translate-x-1'
+                }`}
+              />
+            </span>
+          </button>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
