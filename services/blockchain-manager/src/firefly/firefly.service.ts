@@ -93,15 +93,17 @@ export class FireflyService {
 
   async getBlockchainEvents(namespace = 'default', options?: { limit?: number; skip?: number }) {
     const params = new URLSearchParams();
+    params.append('sort', '-timestamp');
     if (options?.limit) params.append('limit', options.limit.toString());
     if (options?.skip) params.append('skip', options.skip.toString());
-    params.append('sort', '-timestamp');
 
-    const url = `/api/v1/namespaces/${namespace}/blockchainevents?${params}`;
-    console.log(`[DEBUG] FireFly getBlockchainEvents URL: ${this.client.defaults.baseURL}${url}`);
-    
+    const queryString = params.toString();
+    const url = queryString 
+      ? `/api/v1/namespaces/${namespace}/blockchainevents?${queryString}`
+      : `/api/v1/namespaces/${namespace}/blockchainevents`;
+    console.log(`[DEBUG] FireFly URL: ${this.client.defaults.baseURL}${url}`);
     const response = await this.client.get(url);
-    console.log(`[DEBUG] FireFly getBlockchainEvents status:`, response.status);
+    console.log(`[DEBUG] FireFly response items:`, response.data?.items?.length ?? response.data?.length ?? 'unknown');
     return response.data;
   }
 

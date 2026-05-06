@@ -16,6 +16,9 @@ export default function BlockchainManagementPage() {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<BlockchainEvent | null>(null)
+  const [eventsSearchTerm, setEventsSearchTerm] = useState('')
+  const [eventsPageSize, setEventsPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+  const [eventsCurrentPage, setEventsCurrentPage] = useState(1)
   const [contractsSearchTerm, setContractsSearchTerm] = useState('')
   const [contractStatusFilter, setContractStatusFilter] = useState('')
   const [contractChannelFilter, setContractChannelFilter] = useState('')
@@ -78,6 +81,23 @@ export default function BlockchainManagementPage() {
     return filteredContracts.slice(start, start + contractsPageSize)
   }, [filteredContracts, contractsCurrentPage, contractsPageSize])
 
+  const filteredEvents = useMemo(() => {
+    if (!eventsSearchTerm) return events
+    const searchLower = eventsSearchTerm.toLowerCase()
+    return events.filter(event =>
+      event.name.toLowerCase().includes(searchLower) ||
+      event.protocolId?.toLowerCase().includes(searchLower) ||
+      event.id.toLowerCase().includes(searchLower) ||
+      event.source.toLowerCase().includes(searchLower)
+    )
+  }, [events, eventsSearchTerm])
+
+  const totalEventsPages = Math.ceil(filteredEvents.length / eventsPageSize)
+  const paginatedEvents = useMemo(() => {
+    const start = (eventsCurrentPage - 1) * eventsPageSize
+    return filteredEvents.slice(start, start + eventsPageSize)
+  }, [filteredEvents, eventsCurrentPage, eventsPageSize])
+
   const lastHourEvents = useMemo(() => {
     const oneHourAgo = new Date()
     oneHourAgo.setHours(oneHourAgo.getHours() - 1)
@@ -93,6 +113,17 @@ export default function BlockchainManagementPage() {
     setContractStatusFilter('')
     setContractChannelFilter('')
     setContractsCurrentPage(1)
+  }
+
+  const handleEventsPageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalEventsPages) {
+      setEventsCurrentPage(newPage)
+    }
+  }
+
+  const handleEventsPageSizeChange = (newSize: (typeof PAGE_SIZES)[number]) => {
+    setEventsPageSize(newSize)
+    setEventsCurrentPage(1)
   }
 
   const handleContractsPageChange = (newPage: number) => {
@@ -236,7 +267,7 @@ export default function BlockchainManagementPage() {
           >
             <div className="flex items-center gap-2">
               <Cpu className="h-5 w-5 text-teal-600" />
-              <p className="text-sm text-slate-500">Eventos totales</p>
+              <p className="text-sm text-slate-500">Eventos</p>
             </div>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {isLoading ? '...' : events.length > 0 ? events.length.toLocaleString() : '0'}
@@ -267,6 +298,26 @@ export default function BlockchainManagementPage() {
         <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Eventos Recientes</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-2xl border border-border bg-slate-50 px-3 py-2">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={eventsSearchTerm}
+                  onChange={(e) => {
+                    setEventsSearchTerm(e.target.value)
+                    setEventsCurrentPage(1)
+                  }}
+                  placeholder="Buscar eventos..."
+                  className="ml-2 w-40 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <Select
+                value={eventsPageSize}
+                onChange={(value) => handleEventsPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
+                options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
+              />
+            </div>
           </div>
 
           {isLoading ? (
@@ -275,63 +326,117 @@ export default function BlockchainManagementPage() {
                 <div key={i} className="h-16 rounded-2xl bg-slate-100" />
               ))}
             </div>
-          ) : events.length === 0 ? (
+          ) : filteredEvents.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
               <Cpu className="mx-auto size-8 text-slate-400" />
               <p className="mt-2 text-sm font-medium text-slate-700">
-                No hay eventos en el ledger
+                {eventsSearchTerm ? 'No hay eventos para los filtros seleccionados' : 'No hay eventos en el ledger'}
               </p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Evento</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Protocol ID</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Fuente</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">TX</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {events.length === 0 ? (
-                    <tr><td colSpan={5} className="p-4 text-center text-slate-500">No events</td></tr>
-                  ) : events.slice(0, 10).map((event) => (
-                    <tr
-                      key={event.id}
-                      onClick={() => {
-                        setSelectedEvent(event)
-                        setDetailModal('event')
-                      }}
-                      className="cursor-pointer hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        {event.name}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                        {event.protocolId
-                          ? event.protocolId.substring(0, 20) + '...'
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {event.source}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                        {event.tx?.blockchainId
-                          ? event.tx.blockchainId.substring(0, 12) + '...'
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                <span>
+                  Mostrando {paginatedEvents.length} de {filteredEvents.length} evento
+                  {filteredEvents.length === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEventsPageChange(eventsCurrentPage - 1)}
+                    disabled={eventsCurrentPage === 1}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span>
+                    Página {eventsCurrentPage} de {totalEventsPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleEventsPageChange(eventsCurrentPage + 1)}
+                    disabled={eventsCurrentPage === totalEventsPages}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+<thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Evento</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Protocol ID</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fuente</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">TX</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {paginatedEvents.map((event) => (
+                      <tr
+                        key={event.id}
+                        onClick={() => {
+                          setSelectedEvent(event)
+                          setDetailModal('event')
+                        }}
+                        className="cursor-pointer hover:bg-slate-50"
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {event.name}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                          {event.protocolId
+                            ? event.protocolId.substring(0, 20) + '...'
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {event.source}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                          {event.tx?.blockchainId
+                            ? event.tx.blockchainId.substring(0, 12) + '...'
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
                         {event.timestamp
                           ? new Date(event.timestamp).toLocaleString('es-ES')
-                          : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+: '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                <span>
+                  Mostrando {paginatedEvents.length} de {filteredEvents.length} evento
+                  {filteredEvents.length === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEventsPageChange(eventsCurrentPage - 1)}
+                    disabled={eventsCurrentPage === 1}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span>
+                    Página {eventsCurrentPage} de {totalEventsPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleEventsPageChange(eventsCurrentPage + 1)}
+                    disabled={eventsCurrentPage === totalEventsPages}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 

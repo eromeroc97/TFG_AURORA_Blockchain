@@ -64,7 +64,7 @@ export function useBlockchainController(enabled = true) {
       getOrganizations(),
       getNamespaces(),
       getRecentBlocks(10),
-      getBlockchainEvents('default', 10),
+      getBlockchainEvents('default'),
       getLedgerInfo(),
       getBlockchainManagerStatus(),
     ])

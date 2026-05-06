@@ -185,10 +185,10 @@ export async function getRecentBlocks(limit = 10): Promise<BlockInfo[]> {
   }
 }
 
-export async function getBlockchainEvents(namespace = 'default', limit = 10): Promise<BlockchainEvent[]> {
+export async function getBlockchainEvents(namespace = 'default', limit?: number): Promise<BlockchainEvent[]> {
   try {
     const response = await apiClient.get<{ items: BlockchainEvent[] }>('/blockchain/events', {
-      params: { namespace, limit },
+      params: { namespace, ...(limit ? { limit } : {}) },
     });
     return response.data.items ?? []
   } catch {

@@ -137,18 +137,17 @@ export class BlockchainController {
   @Get('events')
   async getEvents(
     @Query('namespace') namespace = 'default',
-    @Query('limit') limit = '10',
+    @Query('limit') limit: string | undefined,
     @Query('skip') skip = '0',
   ) {
-    console.log(`[DEBUG] getEvents called with namespace=${namespace}, limit=${limit}, skip=${skip}`);
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined
+    console.log(`[DEBUG] getEvents: namespace=${namespace}, limit=${parsedLimit}, skip=${skip}`);
     const response = await this.fireflyService.getBlockchainEvents(namespace, {
-      limit: parseInt(limit, 10),
+      limit: parsedLimit,
       skip: parseInt(skip, 10),
     });
-    console.log(`[DEBUG] getBlockchainEvents response type:`, typeof response);
-    console.log(`[DEBUG] getBlockchainEvents response:`, JSON.stringify(response).substring(0, 500));
     const items = normalizeListResponse<Record<string, unknown>>(response);
-    console.log(`[DEBUG] normalized items count:`, items.length);
+    console.log(`[DEBUG] items from FireFly: ${items.length}`);
 
     return { items };
   }
