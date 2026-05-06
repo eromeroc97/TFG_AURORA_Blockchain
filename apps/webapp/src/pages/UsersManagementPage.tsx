@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, ChevronLeft, ChevronRight, Search, Users, X } from 'lucide-react'
 import Select from '../components/Select'
@@ -24,9 +24,10 @@ const formatBytes = (bytes: number): string => {
 }
 
 export default function UsersManagementPage() {
-  const { users, isLoading, error, actionLoading, approveUser, revokeUser, changeUserRole } = useUsersController()
+  const { users, isLoading, error, actionLoading, refreshUsers, approveUser, revokeUser, changeUserRole } = useUsersController()
   const { authClaims } = useAuth()
   const navigate = useNavigate()
+  const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedUserInfo, setSelectedUserInfo] = useState<User | null>(null)
   const [userEcosystems, setUserEcosystems] = useState<UserEcosystem[]>([])
   const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({})
@@ -199,6 +200,16 @@ export default function UsersManagementPage() {
     [filteredUsers, currentPage, pageSize],
   )
 
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      void refreshUsers()
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, refreshUsers])
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage)
@@ -253,6 +264,24 @@ export default function UsersManagementPage() {
               </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className="flex items-center gap-2"
+          >
+            <span className="text-xs text-slate-500">Actualizar automáticamente</span>
+            <span
+              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                autoRefresh ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                  autoRefresh ? 'translate-x-4' : 'translate-x-1'
+                }`}
+              />
+            </span>
+          </button>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
