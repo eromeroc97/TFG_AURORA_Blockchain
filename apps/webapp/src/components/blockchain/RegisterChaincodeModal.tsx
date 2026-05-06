@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileCode, Loader2, X } from 'lucide-react'
 import { registerChaincode } from '../../services/blockchain.service'
+import GoDragDropZone from './GoDragDropZone'
 
 interface RegisterChaincodeModalProps {
   isOpen: boolean
@@ -137,12 +138,17 @@ export default function RegisterChaincodeModal({
             <label className="block text-sm font-medium text-slate-700">
               JSON de la Interfaz (FFI)
             </label>
+            <div className="mt-1">
+              <GoDragDropZone
+                onJsonGenerated={(jsonString) => setFfiJson(jsonString)}
+              />
+            </div>
             <textarea
               value={ffiJson}
               onChange={(e) => setFfiJson(e.target.value)}
               placeholder='{"name": "...", "version": "...", "methods": [...]}'
               rows={8}
-              className="mt-1 w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent font-mono"
+              className="mt-2 w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent font-mono"
             />
           </div>
 

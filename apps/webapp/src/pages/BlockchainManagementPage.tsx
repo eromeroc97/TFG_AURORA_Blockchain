@@ -467,7 +467,7 @@ export default function BlockchainManagementPage() {
                 onClick={() => setIsRegisterModalOpen(true)}
                 className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent/80"
               >
-                <Server className="size-4" />
+                <Layers className="size-4" />
                 Registrar Smart Contract
               </button>
               <DeploymentHelpModal />

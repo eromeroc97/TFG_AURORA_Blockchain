@@ -83,3 +83,18 @@ input[data-password-input='true']::-webkit-caps-lock-indicator {
 .aurora-leaflet-map .leaflet-bottom {
   z-index: 1;
 }
+
+/* Thin scrollbar for modals */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 2px;
+}
