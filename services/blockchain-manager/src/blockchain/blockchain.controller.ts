@@ -1,6 +1,7 @@
-import { Controller, Get, Header, Options, UseGuards, Query, Header as NestHeader } from '@nestjs/common';
+import { Controller, Get, Post, Header, Options, UseGuards, Query, Header as NestHeader, Body } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FireflyService, FireflyNamespace, FireflyIdentity, FireflyPin } from '../firefly/firefly.service';
+import { RegisterChaincodeDto } from './dto/register-chaincode.dto';
 
 interface NetworkNodeResponse {
   id: string;
@@ -157,5 +158,49 @@ export class BlockchainController {
       height: pin?.sequence ?? 0,
       lastBlockTime: pin?.created ?? new Date().toISOString(),
     } as LedgerInfoResponse;
+  }
+
+  @Post('register-chaincode')
+  async registerChaincode(@Body() dto: RegisterChaincodeDto) {
+    const namespace = 'default';
+    let ffiId: string;
+
+    const parsedFfi = JSON.parse(dto.ffiJson);
+
+    const ffiResponse = await this.fireflyService.registerContractInterface(namespace, parsedFfi);
+    ffiId = ffiResponse.id;
+
+    await this.fireflyService.registerApi(namespace, {
+      name: dto.apiName,
+      interface: { id: ffiId },
+      location: {
+        channel: dto.channel,
+        chaincode: dto.chaincodeName,
+      },
+    });
+
+    await this.fireflyService.registerEventListener(namespace, {
+      name: 'escuchar-telemetria-anclada',
+      topic: 'auditoria-iot',
+      location: {
+        channel: dto.channel,
+        chaincode: dto.chaincodeName,
+      },
+      event: {
+        name: 'TelemetryAnchored',
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Chaincode registrado correctamente',
+      ffiId,
+    };
+  }
+
+  @Get('contracts/interface')
+  async getContractInterface(@Query('name') name: string) {
+    const response = await this.fireflyService.getContractInterface(name);
+    return response;
   }
 }

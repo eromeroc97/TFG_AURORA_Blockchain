@@ -201,3 +201,44 @@ export async function getBlockchainManagerStatus(): Promise<'Online' | 'Offline'
     return 'Offline'
   }
 }
+
+export interface RegisterChaincodeRequest {
+  apiName: string
+  channel: string
+  chaincodeName: string
+  ffiJson: string
+}
+
+export interface RegisterChaincodeResponse {
+  success: boolean
+  message: string
+  ffiId?: string
+}
+
+export async function registerChaincode(
+  data: RegisterChaincodeRequest
+): Promise<RegisterChaincodeResponse> {
+  const response = await apiClient.post<RegisterChaincodeResponse>(
+    '/blockchain/register-chaincode',
+    data
+  )
+  return response.data
+}
+
+export interface ContractInterfaceResponse {
+  id?: string
+  name?: string
+  version?: string
+  description?: string
+  methods?: unknown[]
+  events?: unknown[]
+  [key: string]: unknown
+}
+
+export async function getContractInterface(name: string): Promise<ContractInterfaceResponse> {
+  const response = await apiClient.get<ContractInterfaceResponse>(
+    '/blockchain/contracts/interface',
+    { params: { name } }
+  )
+  return response.data
+}

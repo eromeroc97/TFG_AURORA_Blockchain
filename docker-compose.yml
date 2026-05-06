@@ -218,7 +218,7 @@ services:
     image: caddy:2.8.4-alpine
     restart: unless-stopped
     # Inyectamos el fallback directamente en la línea de comandos
-    command: caddy reverse-proxy --from :80 --to ${FIREFLY_HOST:-https://number-try-physical-spotlight.trycloudflare.com} --change-host-header
+    command: caddy reverse-proxy --from :80 --to ${FIREFLY_HOST:-https://candidate-delhi-rugs-sending.trycloudflare.com} --change-host-header
     labels:
       - "traefik.enable=true"
       # 1. Atrapamos la ruta que llama el frontend

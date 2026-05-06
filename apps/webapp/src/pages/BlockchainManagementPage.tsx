@@ -1,14 +1,29 @@
-import { useState } from 'react'
-import { Cpu, Layers, Network, RefreshCw, Server, Activity, X } from 'lucide-react'
-import DeploySmartContractModal from '../components/blockchain/DeploySmartContractModal'
+import { useMemo, useState } from 'react'
+import { Cpu, Layers, Network, RefreshCw, Activity, X, Server, Search, ChevronLeft, ChevronRight, Filter, XCircle } from 'lucide-react'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
+import RegisterChaincodeModal from '../components/blockchain/RegisterChaincodeModal'
+import Select from '../components/Select'
 import { useBlockchainController } from '../controllers/useBlockchainController'
+import { getContractInterface, type SmartContract } from '../services/blockchain.service'
+
+const PAGE_SIZES = [10, 25, 50] as const
 
 type ModalType = 'organizations' | 'namespaces' | 'ledger' | null
 
 export default function BlockchainManagementPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false)
   const [detailModal, setDetailModal] = useState<ModalType>(null)
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
+  const [blocksPageSize, setBlocksPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+  const [blocksCurrentPage, setBlocksCurrentPage] = useState(1)
+  const [blocksSearchTerm, setBlocksSearchTerm] = useState('')
+  const [blocksMinTxs, setBlocksMinTxs] = useState<number | ''>('')
+  const [blocksMaxTxs, setBlocksMaxTxs] = useState<number | ''>('')
+  const [blocksDateFrom, setBlocksDateFrom] = useState('')
+  const [blocksDateTo, setBlocksDateTo] = useState('')
+  const [showBlocksFilters, setShowBlocksFilters] = useState(false)
+  const [selectedContract, setSelectedContract] = useState<SmartContract | null>(null)
+  const [contractInterfaceJson, setContractInterfaceJson] = useState<string | null>(null)
+  const [contractDetailLoading, setContractDetailLoading] = useState(false)
   const {
     smartContracts,
     networkNodes,
@@ -19,15 +34,8 @@ export default function BlockchainManagementPage() {
     managerStatus,
     isLoading,
     error,
-    deployLoading,
-    deploySuccess,
-    deploySmartContract,
+    refreshNetworkData,
   } = useBlockchainController()
-
-  const handleDeploy = async (data: { name: string; version: string; channel: string; package: File }) => {
-    await deploySmartContract(data)
-    setIsModalOpen(false)
-  }
 
   const openDetailModal = (type: ModalType) => {
     setDetailModal(type)
@@ -38,6 +46,67 @@ export default function BlockchainManagementPage() {
   }
 
   const cardClasses = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-teal-300"
+
+  const filteredBlocks = useMemo(() => {
+    return blocks.filter((block) => {
+      const searchLower = blocksSearchTerm.toLowerCase()
+      const matchesSearch = !blocksSearchTerm || 
+        block.blockHash.toLowerCase().includes(searchLower) ||
+        block.blockNumber.toString().includes(searchLower)
+
+      const minTxs = blocksMinTxs !== '' ? Number(blocksMinTxs) : null
+      const maxTxs = blocksMaxTxs !== '' ? Number(blocksMaxTxs) : null
+      const matchesTxs = (!minTxs || block.transactionCount >= minTxs) && 
+                         (!maxTxs || block.transactionCount <= maxTxs)
+
+      const blockDate = block.createdAt ? new Date(block.createdAt) : null
+      const matchesDateFrom = !blocksDateFrom || (blockDate && blockDate >= new Date(blocksDateFrom))
+      const matchesDateTo = !blocksDateTo || (blockDate && blockDate <= new Date(blocksDateTo + 'T23:59:59'))
+
+      return matchesSearch && matchesTxs && matchesDateFrom && matchesDateTo
+    })
+  }, [blocks, blocksSearchTerm, blocksMinTxs, blocksMaxTxs, blocksDateFrom, blocksDateTo])
+
+  const totalBlocksPages = Math.ceil(filteredBlocks.length / blocksPageSize)
+  const paginatedBlocks = useMemo(() => {
+    const start = (blocksCurrentPage - 1) * blocksPageSize
+    return filteredBlocks.slice(start, start + blocksPageSize)
+  }, [filteredBlocks, blocksCurrentPage, blocksPageSize])
+
+  const handleBlocksPageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalBlocksPages) {
+      setBlocksCurrentPage(newPage)
+    }
+  }
+
+  const handleBlocksPageSizeChange = (newSize: (typeof PAGE_SIZES)[number]) => {
+    setBlocksPageSize(newSize)
+    setBlocksCurrentPage(1)
+  }
+
+  const clearBlocksFilters = () => {
+    setBlocksSearchTerm('')
+    setBlocksMinTxs('')
+    setBlocksMaxTxs('')
+    setBlocksDateFrom('')
+    setBlocksDateTo('')
+    setBlocksCurrentPage(1)
+  }
+
+  const handleContractClick = async (contract: SmartContract) => {
+    setSelectedContract(contract)
+    setContractDetailLoading(true)
+    setContractInterfaceJson(null)
+    
+    try {
+      const response = await getContractInterface(contract.name)
+      setContractInterfaceJson(JSON.stringify(response, null, 2))
+    } catch (err) {
+      setContractInterfaceJson(JSON.stringify({ error: 'Error al obtener la interfaz del contrato' }, null, 2))
+    } finally {
+      setContractDetailLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen p-6">
@@ -52,15 +121,6 @@ export default function BlockchainManagementPage() {
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
-          >
-            <Server className="size-4" />
-            Desplegar Smart Contract
-          </button>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -145,12 +205,114 @@ export default function BlockchainManagementPage() {
         </div>
 
         <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Bloques Recientes</h2>
-            <span className="text-xs text-slate-500">
-              Mostrando {blocks.length} bloques
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-2xl border border-border bg-slate-50 px-3 py-2">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={blocksSearchTerm}
+                  onChange={(e) => {
+                    setBlocksSearchTerm(e.target.value)
+                    setBlocksCurrentPage(1)
+                  }}
+                  placeholder="Buscar por hash o número..."
+                  className="ml-2 w-40 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <Select
+                value={blocksPageSize}
+                onChange={(value) => handleBlocksPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
+                options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowBlocksFilters(!showBlocksFilters)}
+                className="inline-flex items-center gap-1 rounded-2xl border border-border px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                <Filter className="size-4" />
+                Filtros
+              </button>
+            </div>
           </div>
+
+          {showBlocksFilters && (
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    TXs Mínimo
+                  </label>
+                  <input
+                    type="number"
+                    value={blocksMinTxs}
+                    onChange={(e) => {
+                      setBlocksMinTxs(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))
+                      setBlocksCurrentPage(1)
+                    }}
+                    placeholder="0"
+                    min="0"
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    TXs Máximo
+                  </label>
+                  <input
+                    type="number"
+                    value={blocksMaxTxs}
+                    onChange={(e) => {
+                      setBlocksMaxTxs(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))
+                      setBlocksCurrentPage(1)
+                    }}
+                    placeholder="Sin límite"
+                    min="0"
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    Desde
+                  </label>
+                  <input
+                    type="date"
+                    value={blocksDateFrom}
+                    onChange={(e) => {
+                      setBlocksDateFrom(e.target.value)
+                      setBlocksCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    Hasta
+                  </label>
+                  <input
+                    type="date"
+                    value={blocksDateTo}
+                    onChange={(e) => {
+                      setBlocksDateTo(e.target.value)
+                      setBlocksCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={clearBlocksFilters}
+                  className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+                >
+                  <XCircle className="size-4" />
+                  Limpiar
+                </button>
+              </div>
+            </div>
+          )}
 
           {isLoading ? (
             <div className="space-y-3">
@@ -165,52 +327,117 @@ export default function BlockchainManagementPage() {
                 No hay bloques en el ledger
               </p>
             </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Bloque</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Hash</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">TXs</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {blocks.map((block) => (
-                    <tr key={block.blockNumber}>
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        #{block.blockNumber}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                        {block.blockHash.substring(0, 16)}...
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {block.transactionCount}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {block.createdAt
-                          ? new Date(block.createdAt).toLocaleString('es-ES')
-                          : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          ) : filteredBlocks.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+              <Cpu className="mx-auto size-8 text-slate-400" />
+              <p className="mt-2 text-sm font-medium text-slate-700">
+                No hay bloques para los filtros seleccionados
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                <span>
+                  Mostrando {paginatedBlocks.length} de {filteredBlocks.length} bloque
+                  {filteredBlocks.length === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleBlocksPageChange(blocksCurrentPage - 1)}
+                    disabled={blocksCurrentPage === 1}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span>
+                    Página {blocksCurrentPage} de {totalBlocksPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleBlocksPageChange(blocksCurrentPage + 1)}
+                    disabled={blocksCurrentPage === totalBlocksPages}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Bloque</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Hash</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">TXs</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {paginatedBlocks.map((block) => (
+                      <tr key={block.blockNumber}>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          #{block.blockNumber}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                          {block.blockHash.substring(0, 16)}...
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {block.transactionCount}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {block.createdAt
+                            ? new Date(block.createdAt).toLocaleString('es-ES')
+                            : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                <span>
+                  Mostrando {paginatedBlocks.length} de {filteredBlocks.length} bloque
+                  {filteredBlocks.length === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleBlocksPageChange(blocksCurrentPage - 1)}
+                    disabled={blocksCurrentPage === 1}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span>
+                    Página {blocksCurrentPage} de {totalBlocksPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleBlocksPageChange(blocksCurrentPage + 1)}
+                    disabled={blocksCurrentPage === totalBlocksPages}
+                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Smart Contracts</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {smartContracts.length === 1 ? 'Smart Contract' : 'Smart Contracts'}
+            </h2>
             <button
               type="button"
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => setIsRegisterModalOpen(true)}
               className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent/80"
             >
               <Server className="size-4" />
-              Desplegar nuevo
+              Registrar Chaincode
             </button>
           </div>
 
@@ -227,7 +454,7 @@ export default function BlockchainManagementPage() {
                 No hay smart contracts desplegados
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Despliega un nuevo smart contract para comenzar.
+                No hay smart contracts disponibles en la red.
               </p>
             </div>
           ) : (
@@ -237,14 +464,18 @@ export default function BlockchainManagementPage() {
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Nombre</th>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Versión</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Canal</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Estado</th>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {smartContracts.map((contract) => (
-                    <tr key={contract.id}>
+                    <tr 
+                      key={contract.id} 
+                      onClick={() => handleContractClick(contract)}
+                      className="cursor-pointer hover:bg-slate-50"
+                    >
                       <td className="px-4 py-3 font-medium text-slate-900">{contract.name}</td>
                       <td className="px-4 py-3 text-slate-600">{contract.version}</td>
                       <td className="px-4 py-3 text-slate-600">{contract.channel}</td>
@@ -276,21 +507,6 @@ export default function BlockchainManagementPage() {
           )}
         </div>
       </div>
-
-      <DeploySmartContractModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onDeploy={handleDeploy}
-        isLoading={deployLoading}
-      />
-
-      {deploySuccess && (
-        <div className="fixed bottom-6 right-6 z-[80] rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 shadow-lg">
-          <p className="text-sm font-medium text-accent">
-            Despliegue iniciado. Esperando consenso de la red...
-          </p>
-        </div>
-      )}
 
       {detailModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -360,6 +576,83 @@ export default function BlockchainManagementPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      <RegisterChaincodeModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => refreshNetworkData()}
+      />
+
+      {selectedContract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedContract(null)} />
+          <div className="relative z-10 w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl">
+            <button
+              onClick={() => setSelectedContract(null)}
+              className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X className="size-5" />
+            </button>
+
+            <h3 className="text-xl font-semibold text-slate-900">Detalle de Smart Contract</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {selectedContract.name}
+            </p>
+
+            <div className="mt-4 space-y-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Versión</p>
+                  <p className="text-sm text-slate-900">{selectedContract.version}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Namespace</p>
+                  <p className="text-sm text-slate-900">{selectedContract.channel}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Estado</p>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      selectedContract.status === 'active'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : selectedContract.status === 'deploying'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-rose-100 text-rose-700'
+                    }`}
+                  >
+                    {selectedContract.status === 'active'
+                      ? 'Activo'
+                      : selectedContract.status === 'deploying'
+                        ? 'Desplegando'
+                        : 'Fallido'}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Fecha</p>
+                  <p className="text-sm text-slate-900">
+                    {new Date(selectedContract.createdAt).toLocaleDateString('es-ES')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-medium text-slate-500 mb-2">Interfaz (FFI)</p>
+              {contractDetailLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="size-6 animate-spin text-slate-400" />
+                </div>
+              ) : contractInterfaceJson ? (
+                <pre className="max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700 font-mono whitespace-pre-wrap">
+                  {contractInterfaceJson}
+                </pre>
+              ) : (
+                <p className="text-sm text-slate-500">No se pudo cargar la interfaz</p>
+              )}
+            </div>
           </div>
         </div>
       )}

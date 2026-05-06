@@ -170,6 +170,8 @@ function GraphContent({ nodes, organizations }: { nodes: NetworkNode[]; organiza
       onEdgesChange={onEdgesChange}
       fitView
       attributionPosition="bottom-left"
+      zoomOnScroll={false}
+      nodesConnectable={false}
     >
       <Background color="#f1f5f9" gap={16} />
       <Controls />

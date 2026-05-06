@@ -106,6 +106,38 @@ export class FireflyService {
     // Keep this endpoint safe by returning an empty items list instead of failing backend requests.
     return { items: [] };
   }
+
+  async registerContractInterface(namespace: string, ffi: object): Promise<{ id: string }> {
+    const response = await this.client.post(
+      `/api/v1/namespaces/${namespace}/contracts/interfaces`,
+      ffi
+    );
+    return response.data;
+  }
+
+  async registerApi(namespace: string, apiData: object): Promise<{ id: string }> {
+    const response = await this.client.post(
+      `/api/v1/namespaces/${namespace}/apis`,
+      apiData
+    );
+    return response.data;
+  }
+
+  async registerEventListener(namespace: string, listenerData: object): Promise<{ id: string }> {
+    const response = await this.client.post(
+      `/api/v1/namespaces/${namespace}/contracts/listeners`,
+      listenerData
+    );
+    return response.data;
+  }
+
+  async getContractInterface(name: string, namespace = 'default'): Promise<any> {
+    const response = await this.client.get(
+      `/api/v1/namespaces/${namespace}/contracts/interfaces`,
+      { params: { name } }
+    );
+    return response.data;
+  }
 }
 
 @Module({
