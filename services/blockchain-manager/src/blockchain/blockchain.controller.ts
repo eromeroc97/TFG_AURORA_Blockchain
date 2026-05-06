@@ -141,13 +141,11 @@ export class BlockchainController {
     @Query('skip') skip = '0',
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : undefined
-    console.log(`[DEBUG] getEvents: namespace=${namespace}, limit=${parsedLimit}, skip=${skip}`);
     const response = await this.fireflyService.getBlockchainEvents(namespace, {
       limit: parsedLimit,
       skip: parseInt(skip, 10),
     });
     const items = normalizeListResponse<Record<string, unknown>>(response);
-    console.log(`[DEBUG] items from FireFly: ${items.length}`);
 
     return { items };
   }

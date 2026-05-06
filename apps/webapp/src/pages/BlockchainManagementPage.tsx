@@ -19,6 +19,12 @@ export default function BlockchainManagementPage() {
   const [eventsSearchTerm, setEventsSearchTerm] = useState('')
   const [eventsPageSize, setEventsPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
   const [eventsCurrentPage, setEventsCurrentPage] = useState(1)
+  const [eventsNamespaceFilter, setEventsNamespaceFilter] = useState('')
+  const [eventsSourceFilter, setEventsSourceFilter] = useState('')
+  const [eventsTxFilter, setEventsTxFilter] = useState('')
+  const [eventsDateFrom, setEventsDateFrom] = useState('')
+  const [eventsDateTo, setEventsDateTo] = useState('')
+  const [showEventsFilters, setShowEventsFilters] = useState(false)
   const [contractsSearchTerm, setContractsSearchTerm] = useState('')
   const [contractStatusFilter, setContractStatusFilter] = useState('')
   const [contractChannelFilter, setContractChannelFilter] = useState('')
@@ -82,15 +88,40 @@ export default function BlockchainManagementPage() {
   }, [filteredContracts, contractsCurrentPage, contractsPageSize])
 
   const filteredEvents = useMemo(() => {
-    if (!eventsSearchTerm) return events
-    const searchLower = eventsSearchTerm.toLowerCase()
-    return events.filter(event =>
-      event.name.toLowerCase().includes(searchLower) ||
-      event.protocolId?.toLowerCase().includes(searchLower) ||
-      event.id.toLowerCase().includes(searchLower) ||
-      event.source.toLowerCase().includes(searchLower)
-    )
-  }, [events, eventsSearchTerm])
+    return events.filter(event => {
+      if (eventsSearchTerm && !event.name.toLowerCase().includes(eventsSearchTerm.toLowerCase()) &&
+          !event.id.toLowerCase().includes(eventsSearchTerm.toLowerCase())) {
+        return false
+      }
+      if (eventsNamespaceFilter && event.namespace !== eventsNamespaceFilter) {
+        return false
+      }
+      if (eventsSourceFilter && event.source !== eventsSourceFilter) {
+        return false
+      }
+      if (eventsTxFilter) {
+        const txId = event.tx?.blockchainId || ''
+        if (!txId.toLowerCase().includes(eventsTxFilter.toLowerCase())) {
+          return false
+        }
+      }
+      if (eventsDateFrom || eventsDateTo) {
+        if (!event.timestamp) return false
+        const eventDate = new Date(event.timestamp)
+        if (eventsDateFrom) {
+          const from = new Date(eventsDateFrom)
+          from.setHours(0, 0, 0, 0)
+          if (eventDate < from) return false
+        }
+        if (eventsDateTo) {
+          const to = new Date(eventsDateTo)
+          to.setHours(23, 59, 59, 999)
+          if (eventDate > to) return false
+        }
+      }
+      return true
+    })
+  }, [events, eventsSearchTerm, eventsNamespaceFilter, eventsSourceFilter, eventsTxFilter, eventsDateFrom, eventsDateTo])
 
   const totalEventsPages = Math.ceil(filteredEvents.length / eventsPageSize)
   const paginatedEvents = useMemo(() => {
@@ -123,6 +154,16 @@ export default function BlockchainManagementPage() {
 
   const handleEventsPageSizeChange = (newSize: (typeof PAGE_SIZES)[number]) => {
     setEventsPageSize(newSize)
+    setEventsCurrentPage(1)
+  }
+
+  const clearEventsFilters = () => {
+    setEventsSearchTerm('')
+    setEventsNamespaceFilter('')
+    setEventsSourceFilter('')
+    setEventsTxFilter('')
+    setEventsDateFrom('')
+    setEventsDateTo('')
     setEventsCurrentPage(1)
   }
 
@@ -317,8 +358,110 @@ export default function BlockchainManagementPage() {
                 onChange={(value) => handleEventsPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
                 options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
               />
+              <button
+                type="button"
+                onClick={() => setShowEventsFilters(!showEventsFilters)}
+                className="inline-flex items-center gap-1 rounded-2xl border border-border px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                <Filter className="size-4" />
+                Filtros
+              </button>
             </div>
           </div>
+
+          {showEventsFilters && (
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="grid grid-cols-6 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    Namespace
+                  </label>
+                  <select
+                    value={eventsNamespaceFilter}
+                    onChange={(e) => {
+                      setEventsNamespaceFilter(e.target.value)
+                      setEventsCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  >
+                    <option value="">Todos</option>
+                    {namespaces.map((ns) => (
+                      <option key={ns.name} value={ns.name}>{ns.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    Fuente
+                  </label>
+                  <select
+                    value={eventsSourceFilter}
+                    onChange={(e) => {
+                      setEventsSourceFilter(e.target.value)
+                      setEventsCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  >
+                    <option value="">Todas</option>
+                    <option value="fabric">fabric</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    TX
+                  </label>
+                  <input
+                    type="text"
+                    value={eventsTxFilter}
+                    onChange={(e) => {
+                      setEventsTxFilter(e.target.value)
+                      setEventsCurrentPage(1)
+                    }}
+                    placeholder="Buscar TX..."
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                    Desde
+                  </label>
+                  <input
+                    type="date"
+                    value={eventsDateFrom}
+                    onChange={(e) => {
+                      setEventsDateFrom(e.target.value)
+                      setEventsCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                   Hasta
+                  </label>
+                  <input
+                    type="date"
+                    value={eventsDateTo}
+                    onChange={(e) => {
+                      setEventsDateTo(e.target.value)
+                      setEventsCurrentPage(1)
+                    }}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={clearEventsFilters}
+                  className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+                >
+                  <XCircle className="size-4" />
+                  Limpiar
+                </button>
+              </div>
+            </div>
+          )}
 
           {isLoading ? (
             <div className="space-y-3">
@@ -330,7 +473,9 @@ export default function BlockchainManagementPage() {
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
               <Cpu className="mx-auto size-8 text-slate-400" />
               <p className="mt-2 text-sm font-medium text-slate-700">
-                {eventsSearchTerm ? 'No hay eventos para los filtros seleccionados' : 'No hay eventos en el ledger'}
+                {eventsSearchTerm || eventsNamespaceFilter || eventsSourceFilter || eventsTxFilter || eventsDateFrom || eventsDateTo
+                  ? 'No hay eventos para los filtros seleccionados'
+                  : 'No hay eventos en el ledger'}
               </p>
             </div>
           ) : (
@@ -367,7 +512,7 @@ export default function BlockchainManagementPage() {
 <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Evento</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Protocol ID</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Fuente</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">TX</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
@@ -387,9 +532,7 @@ export default function BlockchainManagementPage() {
                           {event.name}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                          {event.protocolId
-                            ? event.protocolId.substring(0, 20) + '...'
-                            : '-'}
+                          {event.namespace || '-'}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {event.source}

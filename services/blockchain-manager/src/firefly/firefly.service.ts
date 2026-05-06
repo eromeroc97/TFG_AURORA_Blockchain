@@ -101,9 +101,7 @@ export class FireflyService {
     const url = queryString 
       ? `/api/v1/namespaces/${namespace}/blockchainevents?${queryString}`
       : `/api/v1/namespaces/${namespace}/blockchainevents`;
-    console.log(`[DEBUG] FireFly URL: ${this.client.defaults.baseURL}${url}`);
     const response = await this.client.get(url);
-    console.log(`[DEBUG] FireFly response items:`, response.data?.items?.length ?? response.data?.length ?? 'unknown');
     return response.data;
   }
 
