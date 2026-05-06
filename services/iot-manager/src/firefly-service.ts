@@ -1,87 +1,145 @@
-import type { AppConfig } from './config';
+type LogContext = Record<string, unknown>;
 
-/**
- * Respuesta de invocación de contrato vía FireFly.
- */
-export type FireFlyContractInvokeResponse = {
-  /** ID de la transacción Fabric */
-  id: string;
-  /** Estado de la operación */
-  status: string;
-};
+class Logger {
+  private readonly context: string;
 
-/**
- * Parámetros para anclar telemetría en Fabric vía FireFly.
- */
-export type AnchorTelemetryInput = {
-  /** ID único de ingesta de iot-manager */
+  constructor(context: string) {
+    this.context = context;
+  }
+
+  private write(level: string, message: string, ctx?: LogContext): void {
+    const timestamp = new Date().toISOString();
+    const ctxStr = ctx ? ` ${JSON.stringify(ctx)}` : '';
+    const msg = `[${timestamp}] [${level}] [${this.context}] ${message}${ctxStr}`;
+
+    if (level === 'ERROR') {
+      console.error(msg);
+    } else if (level === 'WARN') {
+      console.warn(msg);
+    } else {
+      console.log(msg);
+    }
+  }
+
+  log(message: string, ctx?: LogContext): void {
+    this.write('INFO', message, ctx);
+  }
+
+  error(message: string, ctx?: LogContext): void {
+    this.write('ERROR', message, ctx);
+  }
+
+  warn(message: string, ctx?: LogContext): void {
+    this.write('WARN', message, ctx);
+  }
+}
+
+export type AnchorTelemetryDto = {
   ingestId: string;
-  /** ID del ecosistema propietario */
   ecosystemId: string;
-  /** Hash SHA-256 del payload (incluye GPS) */
   telemetryHash: string;
-  /** Firma digital emitida por auth-service */
   signature: string;
-  /** Clave pública del firmante */
   publicKey: string;
 };
 
-/**
- * Servicio para interactuar con FireFly y anclar telemetría en Hyperledger Fabric.
- * Utiliza la API de contratos de FireFly para invocar el chaincode.
- */
-export class FireFlyService {
-  private readonly apiUrl: string;
-  private readonly contractId: string;
-  private readonly namespace: string;
+type FireFlyInvokeResponse = {
+  id?: string;
+  tx?: string;
+  status?: string;
+};
 
-  /**
-   * @param config - Configuración de la aplicación
-   */
-  constructor(config: AppConfig) {
-    this.apiUrl = config.fireflyApiUrl;
-    this.contractId = config.fireflyContractId ?? '';
-    this.namespace = config.fireflyNamespace ?? 'default';
+type FireFlyConfig = {
+  apiUrl: string;
+  namespace: string;
+  apiName: string;
+  methodName: string;
+};
+
+const loadFireFlyConfig = (): FireFlyConfig => {
+  const apiUrl = process.env.FIREFLY_API_URL?.trim();
+  const namespace = process.env.FIREFLY_NAMESPACE?.trim() || 'default';
+  const apiName = process.env.FIREFLY_API_NAME?.trim();
+  const methodName = process.env.FIREFLY_METHOD_NAME?.trim();
+
+  if (!apiUrl) {
+    throw new Error('FIREFLY_API_URL is required');
+  }
+  if (!apiName) {
+    throw new Error('FIREFLY_API_NAME is required');
+  }
+  if (!methodName) {
+    throw new Error('FIREFLY_METHOD_NAME is required');
   }
 
-  /**
-   * Invoca el chaincode para anclar telemetría en Fabric.
-   * POST /api/v1/namespaces/{namespace}/contracts/{contractId}/invoke/AnchorTelemetry
-   *
-   * @param input - Datos para anclar
-   * @returns Promise con el ID de transacción Fabric
-   */
-  async anchorTelemetry(input: AnchorTelemetryInput): Promise<string> {
-    if (!this.contractId) {
-      throw new Error('FIREFLY_CONTRACT_ID is not configured');
-    }
+  return { apiUrl, namespace, apiName, methodName };
+};
 
-    const url = `${this.apiUrl}/api/v1/namespaces/${this.namespace}/contracts/${this.contractId}/invoke/AnchorTelemetry`;
+export class FireFlyService {
+  private readonly logger = new Logger(FireFlyService.name);
+  private readonly config: FireFlyConfig;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: {
-          ingestId: input.ingestId,
-          ecosystemId: input.ecosystemId,
-          telemetryHash: input.telemetryHash,
-          signature: input.signature,
-          publicKey: input.publicKey,
+  constructor() {
+    this.config = loadFireFlyConfig();
+  }
+
+  async anchorTelemetry(data: AnchorTelemetryDto): Promise<string> {
+    const url = `${this.config.apiUrl}/namespaces/${this.config.namespace}/apis/${this.config.apiName}/invoke/${this.config.methodName}`;
+
+    this.logger.log('Anchoring telemetry to Fabric', { url, ingestId: data.ingestId });
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      }),
-    });
+        body: JSON.stringify({
+          input: {
+            ingestId: data.ingestId,
+            ecosystemId: data.ecosystemId,
+            telemetryHash: data.telemetryHash,
+            signature: data.signature,
+            publicKey: data.publicKey,
+          },
+        }),
+      });
+    } catch (networkError) {
+      this.logger.error('Network error calling FireFly', { error: String(networkError), ingestId: data.ingestId });
+      throw networkError;
+    }
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `FireFly contract invoke failed: ${response.status} ${response.statusText}: ${errorBody}`,
-      );
+      let errorBody: string;
+      try {
+        errorBody = await response.text();
+      } catch {
+        errorBody = '(unable to read error body)';
+      }
+
+      this.logger.error('FireFly contract invoke failed', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody,
+        ingestId: data.ingestId,
+      });
+
+      throw Object.assign(new Error(`FireFly invoke failed: ${response.status} ${response.statusText}`), {
+        status: response.status,
+        data: errorBody,
+      });
     }
 
-    const result = (await response.json()) as FireFlyContractInvokeResponse;
-    return result.id;
+    const result = (await response.json()) as FireFlyInvokeResponse;
+    const txId = result.id;
+
+    if (!txId) {
+      this.logger.warn('FireFly response missing id field', { result, ingestId: data.ingestId });
+      throw new Error('FireFly response missing operation ID');
+    }
+
+    this.logger.log('Telemetry anchored successfully', { txId, ingestId: data.ingestId });
+
+    return txId;
   }
 }

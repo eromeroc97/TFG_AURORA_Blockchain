@@ -111,10 +111,19 @@ const createJwtToken = (payload: Record<string, unknown>): string => {
 
 beforeEach(() => {
   fetchMock.mockReset()
-  fetchMock.mockResolvedValue({
-    ok: true,
-    json: async () => ({ signature: 'mock-signature', publicKey: 'mock-public-key' }),
-  } as any)
+  fetchMock.mockImplementation(async (url: string | URL) => {
+    const urlStr = String(url);
+    if (urlStr.includes('/apis/') && urlStr.includes('/invoke/')) {
+      return {
+        ok: true,
+        json: async () => ({ id: 'mock-op-id-123', tx: 'mock-tx-id-456' }),
+      } as Response
+    }
+    return {
+      ok: true,
+      json: async () => ({ signature: 'mock-signature', publicKey: 'mock-public-key' }),
+    } as Response
+  })
 })
 
 afterAll(() => {

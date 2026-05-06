@@ -304,7 +304,7 @@ export const buildApp = (options: AppOptions = {}) => {
   const telemetryStore = options.telemetryStore ?? new MongoTelemetryStore(config.mongoUri);
   const shouldCloseStore = !options.telemetryStore;
   const deviceDiscovery = new DeviceDiscoveryService(config);
-  const fireflyService = new FireFlyService(config);
+  const fireflyService = new FireFlyService();
 
   const apiKeyValidator = options.apiKeyValidator ?? buildDefaultApiKeyValidator(config);
   const positiveTtlMs = options.positiveTtlMs ?? config.iotApiKeyPositiveTtlMs ?? DEFAULT_POSITIVE_TTL_MS;
