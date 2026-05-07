@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { FireFlyService } from '../firefly/firefly.service';
+import { TelemetryService } from '../telemetry/telemetry.service';
 import { TimelineFiltersDto } from './dto/timeline-filters.dto';
 import type { AuditTimelineResponse, BlockchainStats, ChainVisualization, AuditTimelineItem } from './interfaces';
 
@@ -20,7 +21,10 @@ interface FireFlyEvent {
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly fireflyService: FireFlyService) {}
+  constructor(
+    private readonly fireflyService: FireFlyService,
+    private readonly telemetryService: TelemetryService,
+  ) {}
 
   private verifyEd25519Signature(
     telemetryHash: string,
@@ -62,7 +66,7 @@ export class AuditService {
         ? fireflyResponse 
         : (fireflyResponse.items || []);
 
-      const timeline: AuditTimelineItem[] = events.map((event: FireFlyEvent) => {
+      const timeline = await Promise.all(events.map(async (event: FireFlyEvent) => {
         const output = event.output || {};
         
         let actorName = 'Sistema';
@@ -101,6 +105,7 @@ export class AuditService {
 
         let signatureValid = false;
         let integrityStatus: 'VERIFIED' | 'DISCREPANCY' = 'VERIFIED';
+        let dbRecord: Record<string, unknown> | null = null;
 
         if (eventType === 'TELEMETRY' && telemetryHash && signature && publicKey) {
           signatureValid = this.verifyEd25519Signature(telemetryHash, signature, publicKey);
@@ -108,18 +113,22 @@ export class AuditService {
           if (!signatureValid) {
             integrityStatus = 'DISCREPANCY';
           } else {
-            // ========================================================
-            // TODO: INTEGRIDAD CON MONGODB (iot-manager)
-            // ========================================================
-            // Paso B: Obtener datos de MongoDB usando ingestId
-            // const dbData = await this.iotManagerService.getTelemetryByIngestId(ingestId);
-            // if (dbData) {
-            //   const dbHash = crypto.createHash('sha256').update(JSON.stringify(dbData)).digest('hex');
-            //   if (dbHash !== telemetryHash) {
-            //     integrityStatus = 'DISCREPANCY';
-            //   }
-            // }
-            // ========================================================
+            const ingestId = output.ingestId?.toString() || event.id;
+            if (ingestId) {
+              const telemetryDoc = await this.telemetryService.findByIngestId(ingestId);
+              if (telemetryDoc) {
+                dbRecord = {
+                  timestamp: telemetryDoc.timestamp,
+                  payload: telemetryDoc.payload,
+                  hash: telemetryDoc.hash,
+                  metadata: telemetryDoc.metadata,
+                };
+                const isIntegrityValid = await this.telemetryService.verifyIntegrity(telemetryHash, ingestId);
+                if (!isIntegrityValid) {
+                  integrityStatus = 'DISCREPANCY';
+                }
+              }
+            }
           }
         }
 
@@ -137,8 +146,9 @@ export class AuditService {
           ingestId: output.ingestId?.toString() || event.id,
           output: output,
           signatureValid,
+          dbRecord: dbRecord || {},
         };
-      });
+      }));
 
       let filteredTimeline = timeline;
       

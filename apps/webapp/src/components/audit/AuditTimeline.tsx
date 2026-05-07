@@ -23,7 +23,7 @@ const transformToAuditEvent = (item: AuditAnchor): AuditEvent => ({
       ecosystemId: item.ecosystemId,
       ingestId: item.ingestId,
     },
-    databaseRecord: {},
+    databaseRecord: item.dbRecord || {},
   },
 })
 

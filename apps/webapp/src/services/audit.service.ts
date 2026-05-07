@@ -14,6 +14,7 @@ export interface AuditAnchor {
   ingestId?: string
   output?: Record<string, unknown>
   signatureValid?: boolean
+  dbRecord?: Record<string, unknown>
 }
 
 export interface AuditTimelineResponse {

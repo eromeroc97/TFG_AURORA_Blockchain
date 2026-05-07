@@ -1,11 +1,109 @@
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, ShieldCheck, ShieldX } from 'lucide-react';
+import { X, ShieldCheck, ShieldX, Info } from 'lucide-react';
 import JsonViewer from './JsonViewer';
 import type { AuditEvent } from './types';
 
 interface EventDetailPanelProps {
   event: AuditEvent;
   onClose: () => void;
+}
+
+function IntegrityInfoModal() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="ml-1 p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute z-50 left-0 top-6 w-72 p-3 bg-white rounded-lg shadow-lg border border-slate-200"
+          >
+            <div className="text-xs font-medium text-slate-700 mb-2">
+              ¿Cómo se verifica la integridad?
+            </div>
+            <div className="text-xs text-slate-600 space-y-2">
+              <p>
+                <span className="font-medium">1. Relación de datos:</span> El evento de FireFly contiene <code className="bg-slate-100 px-1 rounded">ingestId</code>, que se corresponde con <code className="bg-slate-100 px-1 rounded">metadata.telemetryId</code> en MongoDB.
+              </p>
+              <p>
+                <span className="font-medium">2. Verificación de hash:</span> Se recalcula el hash SHA-256 del payload en MongoDB (payload + coordenadas GPS) y se compara con el <code className="bg-slate-100 px-1 rounded">telemetryHash</code> almacenado en la blockchain.
+              </p>
+              <p>
+                <span className="font-medium">3. Resultado:</span> Si los hashes coinciden, los datos son íntegros. Si difieren, hay una discrepancia que indica posible manipulación.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function SignatureInfoModal() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="ml-1 p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute z-50 left-0 top-6 w-72 p-3 bg-white rounded-lg shadow-lg border border-slate-200"
+          >
+            <div className="text-xs font-medium text-slate-700 mb-2">
+              ¿Cómo se verifica la firma?
+            </div>
+            <div className="text-xs text-slate-600 space-y-2">
+              <p>
+                <span className="font-medium">1. Datos Firmados:</span> El hash de telemetría (<code className="bg-slate-100 px-1 rounded">telemetryHash</code>) fue firmado criptográficamente por el dispositivo emisor usando su clave privada.
+              </p>
+              <p>
+                <span className="font-medium">2. Clave Pública:</span> Cada evento contiene la <code className="bg-slate-100 px-1 rounded">publicKey</code> del dispositivo en formato PEM, usada para verificar la firma sin revelar la clave privada.
+              </p>
+              <p>
+                <span className="font-medium">3. Verificación:</span> Se usa criptografía asimétrica (Ed25519) para verificar que la <code className="bg-slate-100 px-1 rounded">signature</code> coincide con el hash y fue creada por el dispositivo poseedor de la clave privada correspondiente.
+              </p>
+              <p>
+                <span className="font-medium">4. Resultado:</span> Si la verificación es exitosa, la firma es válida y el evento fue generado por el dispositivo legítimo. Si falla, la firma es inválida o los datos fueron alterados.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export default function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
@@ -51,21 +149,39 @@ export default function EventDetailPanel({ event, onClose }: EventDetailPanelPro
         </div>
 
         {hasSignatureData && (
-          <div className="px-4 py-3 border-b border-slate-200/50 flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">Verificación de Firma:</span>
-            {signatureValid === true ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                <ShieldCheck className="w-3 h-3" />
-                Firma válida
-              </span>
-            ) : signatureValid === false ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                <ShieldX className="w-3 h-3" />
-                Firma inválida
-              </span>
-            ) : (
-              <span className="text-xs text-slate-400">Sin datos para verificar</span>
-            )}
+          <div className="px-4 py-3 border-b border-slate-200/50 flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-500">Verificación de Firma:</span>
+              <SignatureInfoModal />
+              {signatureValid === true ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  <ShieldCheck className="w-3 h-3" />
+                  Firma válida
+                </span>
+              ) : signatureValid === false ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                  <ShieldX className="w-3 h-3" />
+                  Firma inválida
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400">Sin datos</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-500">Verificación de Integridad:</span>
+              <IntegrityInfoModal />
+              {event.integrityStatus === 'VERIFIED' ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  <ShieldCheck className="w-3 h-3" />
+                  Datos íntegros
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                  <ShieldX className="w-3 h-3" />
+                  Discrepancia
+                </span>
+              )}
+            </div>
           </div>
         )}
 
