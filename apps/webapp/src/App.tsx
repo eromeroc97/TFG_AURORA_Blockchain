@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthProvider'
 import AccountPage from './pages/Account'
+import AuditDashboardPage from './pages/AuditDashboardPage'
 import BlockchainManagementPage from './pages/BlockchainManagementPage'
 import EcosystemsManagementPage from './pages/EcosystemsManagementPage'
 import ErrorPage from './pages/Error'
@@ -12,6 +13,7 @@ import Register from './pages/Register'
 import Reset from './pages/Reset'
 import RequireAuth from './components/routes/RequireAuth'
 import RequireAdmin from './components/routes/RequireAdmin'
+import RequireAuditor from './components/routes/RequireAuditor'
 import UsersManagementPage from './pages/UsersManagementPage'
 import MainLayout from './layouts/MainLayout'
 
@@ -46,6 +48,9 @@ function App() {
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<MainDashboard />} />
+              <Route element={<RequireAuditor />}>
+                <Route path="/audit" element={<AuditDashboardPage />} />
+              </Route>
               <Route element={<RequireAdmin />}>
                 <Route path="/users" element={<UsersManagementPage />} />
               </Route>

@@ -12,6 +12,7 @@ type HeaderProps = {
 
 const navigationItems = [
   { label: 'Dashboard', to: '/dashboard', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
+  { label: 'Auditoría', to: '/audit', roles: ['AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Usuarios', to: '/users', roles: ['ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Ecosistemas', to: '/ecosystems', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Blockchain', to: '/blockchain', roles: ['ADMIN', 'GLOBAL_ADMIN'] },
