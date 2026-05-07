@@ -29,21 +29,21 @@ export class EcosystemsController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN, Role.AUDITOR)
+  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN)
   findAll(@Req() request: AuthenticatedRequest) {
     return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!, request.user?.role);
   }
 
   @Get('shared-with-me')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN, Role.AUDITOR)
+  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN)
   getSharedWithMe(@Req() request: AuthenticatedRequest) {
     return this.ecosystemsService.getUserAccesses(request.user?.sub!);
   }
 
   @Get('my-ecosystems')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN, Role.AUDITOR)
+  @Roles(Role.USER, Role.ADMIN, Role.GLOBAL_ADMIN)
   getMyEcosystems(@Req() request: AuthenticatedRequest) {
     return this.ecosystemsService.getEcosystemsWithAccessType(request.user?.sub!, request.user?.role);
   }
