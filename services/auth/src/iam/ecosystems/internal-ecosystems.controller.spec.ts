@@ -1,11 +1,11 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { InternalAuthController } from './internal-ecosystems.controller';
+import { InternalUsersController } from './internal-ecosystems.controller';
 import { EcosystemsService } from './ecosystems.service';
 
-describe('InternalAuthController', () => {
-  let controller: InternalAuthController;
+describe('InternalUsersController', () => {
+  let controller: InternalUsersController;
 
   const ecosystemsServiceMock = {
     validateApiKey: jest.fn(),
@@ -15,7 +15,7 @@ describe('InternalAuthController', () => {
     process.env.AUTH_INTERNAL_TOKEN = 'internal-token';
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [InternalAuthController],
+      controllers: [InternalUsersController],
       providers: [
         {
           provide: EcosystemsService,
@@ -24,7 +24,7 @@ describe('InternalAuthController', () => {
       ],
     }).compile();
 
-    controller = module.get<InternalAuthController>(InternalAuthController);
+    controller = module.get<InternalUsersController>(InternalUsersController);
     jest.clearAllMocks();
   });
 

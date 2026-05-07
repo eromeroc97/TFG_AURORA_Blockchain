@@ -12,7 +12,9 @@ describe('EcosystemsController', () => {
     create: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
+    findOneWithAccessCheck: jest.fn(),
     findDevicesForEcosystem: jest.fn(),
+    findDevicesForEcosystemWithAccessCheck: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
     updateHeartbeat: jest.fn(),
@@ -73,21 +75,22 @@ describe('EcosystemsController', () => {
 
   it('routes read/write methods to service', async () => {
     (ecosystemsServiceMock.findAll as any).mockResolvedValue([]);
-    (ecosystemsServiceMock.findOne as any).mockResolvedValue({ id: 'eco' });
+    (ecosystemsServiceMock.findOneWithAccessCheck as any).mockResolvedValue({ id: 'eco' });
+    (ecosystemsServiceMock.findDevicesForEcosystemWithAccessCheck as any).mockResolvedValue([]);
     (ecosystemsServiceMock.update as any).mockResolvedValue({ id: 'eco', name: 'new' });
     (ecosystemsServiceMock.updateHeartbeat as any).mockResolvedValue({ id: 'eco', isOnline: true });
     (ecosystemsServiceMock.remove as any).mockResolvedValue({ id: 'eco' });
 
-    await controller.findAll();
-    await controller.findDevices('eco');
-    await controller.findOne('eco');
+    await controller.findAll(userRequest);
+    await controller.findDevices('eco', userRequest);
+    await controller.findOne('eco', userRequest);
     await controller.update('eco', {}, userRequest);
     await controller.updateHeartbeat('eco');
     await controller.remove('eco', userRequest);
 
     expect(ecosystemsServiceMock.findAll).toHaveBeenCalled();
-    expect(ecosystemsServiceMock.findDevicesForEcosystem).toHaveBeenCalledWith('eco');
-    expect(ecosystemsServiceMock.findOne).toHaveBeenCalledWith('eco');
+    expect(ecosystemsServiceMock.findDevicesForEcosystemWithAccessCheck).toHaveBeenCalledWith('eco', userRequest.user.sub);
+    expect(ecosystemsServiceMock.findOneWithAccessCheck).toHaveBeenCalledWith('eco', userRequest.user.sub);
     expect(ecosystemsServiceMock.update).toHaveBeenCalledWith('eco', {}, userRequest.user.sub);
     expect(ecosystemsServiceMock.updateHeartbeat).toHaveBeenCalledWith('eco');
     expect(ecosystemsServiceMock.remove).toHaveBeenCalledWith('eco', userRequest.user.sub);

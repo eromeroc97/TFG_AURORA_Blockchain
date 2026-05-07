@@ -63,13 +63,15 @@ export class EcosystemsController {
   }
 
   @Get(':id/devices')
-  findDevices(@Param('id') id: string) {
-    return this.ecosystemsService.findDevicesForEcosystem(id);
+  @UseGuards(JwtAuthGuard)
+  findDevices(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.findDevicesForEcosystemWithAccessCheck(id, request.user?.sub ?? '', request.user?.role);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.ecosystemsService.findOne(id);
+  @UseGuards(JwtAuthGuard)
+  findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.ecosystemsService.findOneWithAccessCheck(id, request.user?.sub ?? '', request.user?.role);
   }
 
   @Patch(':id')

@@ -11,6 +11,7 @@ describe('DevicesController', () => {
     create: ReturnType<typeof jest.fn>;
     findAll: ReturnType<typeof jest.fn>;
     findOne: ReturnType<typeof jest.fn>;
+    findOneForUser: ReturnType<typeof jest.fn>;
     update: ReturnType<typeof jest.fn>;
     remove: ReturnType<typeof jest.fn>;
   };
@@ -19,6 +20,7 @@ describe('DevicesController', () => {
     create: jest.fn(),
     findAll: jest.fn(() => []),
     findOne: jest.fn((id: string) => ({ id })),
+    findOneForUser: jest.fn((id: string, userId: string) => ({ id })),
     update: jest.fn((id: string, dto: UpdateDeviceDto) => ({ id, ...dto })),
     remove: jest.fn((id: string) => ({ id })),
   };
@@ -55,9 +57,10 @@ describe('DevicesController', () => {
     expect(devicesService.findAll).toHaveBeenCalled();
   });
 
-  it('findOne should call DevicesService.findOne', async () => {
-    await controller.findOne('22222222-2222-4222-8222-222222222222');
-    expect(devicesService.findOne).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222');
+  it('findOne should call DevicesService.findOneForUser', async () => {
+    const mockRequest = { user: { sub: 'user-123' } };
+    await controller.findOne('22222222-2222-4222-8222-222222222222', mockRequest);
+    expect(devicesService.findOneForUser).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222', 'user-123');
   });
 
   it('update should call DevicesService.update', async () => {

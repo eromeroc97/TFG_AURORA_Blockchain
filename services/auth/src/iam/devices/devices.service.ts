@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
@@ -236,6 +236,44 @@ export class DevicesService {
     }
 
     return device;
+  }
+
+  async findOneForUser(id: string, userId: string, userRole?: Role) {
+    const isAdmin = userRole === Role.ADMIN || userRole === Role.GLOBAL_ADMIN;
+    
+    if (isAdmin) {
+      return this.findOne(id);
+    }
+
+    const device = await this.prisma.device.findUnique({
+      where: { id },
+      select: {
+        ...this.deviceSelect,
+        ecosystem: {
+          select: {
+            id: true,
+            ownerId: true,
+            accesses: {
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!device) {
+      throw new NotFoundException('Device not found');
+    }
+
+    const isOwner = device.ecosystem.ownerId === userId;
+    const hasAccess = device.ecosystem.accesses.some((a) => a.userId === userId);
+
+    if (!isOwner && !hasAccess) {
+      throw new NotFoundException('Device not found');
+    }
+
+    const { ecosystem: _ecosystem, ...deviceData } = device as typeof device & { ecosystem: { id: string; ownerId: string; accesses: { userId: string }[] } };
+    return deviceData;
   }
 
   async update(id: string, updateDeviceDto: UpdateDeviceDto) {

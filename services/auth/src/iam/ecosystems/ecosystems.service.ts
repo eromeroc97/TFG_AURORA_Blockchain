@@ -372,6 +372,90 @@ export class EcosystemsService {
     });
   }
 
+  async findOneWithAccessCheck(id: string, userId: string, userRole?: Role) {
+    const isAdmin = userRole === Role.ADMIN || userRole === Role.GLOBAL_ADMIN;
+    
+    if (isAdmin) {
+      return this.findOne(id);
+    }
+
+    const ecosystem = await this.prisma.ecosystem.findFirst({
+      where: {
+        id,
+        status: {
+          not: EcosystemStatus.REVOKED,
+        },
+      },
+      select: {
+        ...this.ecosystemSelect,
+        ownerId: true,
+        accesses: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!ecosystem) {
+      return null;
+    }
+
+    const isOwner = ecosystem.ownerId === userId;
+    const hasAccess = ecosystem.accesses.some((a) => a.userId === userId);
+
+    if (!isOwner && !hasAccess) {
+      return null;
+    }
+
+    const { ownerId: _ownerId, accesses: _accesses, ...ecosystemData } = ecosystem as typeof ecosystem & { ownerId: string; accesses: { userId: string }[] };
+    return ecosystemData;
+  }
+
+  async findDevicesForEcosystemWithAccessCheck(ecosystemId: string, userId: string, userRole?: Role) {
+    const isAdmin = userRole === Role.ADMIN || userRole === Role.GLOBAL_ADMIN;
+    
+    if (isAdmin) {
+      return this.findDevicesForEcosystem(ecosystemId);
+    }
+
+    const ecosystem = await this.prisma.ecosystem.findFirst({
+      where: {
+        id: ecosystemId,
+        status: {
+          not: EcosystemStatus.REVOKED,
+        },
+      },
+      select: {
+        ownerId: true,
+        accesses: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!ecosystem) {
+      return [];
+    }
+
+    const isOwner = ecosystem.ownerId === userId;
+    const hasAccess = ecosystem.accesses.some((a) => a.userId === userId);
+
+    if (!isOwner && !hasAccess) {
+      return [];
+    }
+
+    return this.prisma.device.findMany({
+      where: {
+        ecosystemId,
+        ecosystem: {
+          status: {
+            not: EcosystemStatus.REVOKED,
+          },
+        },
+      },
+      select: this.ecosystemDeviceSelect,
+    });
+  }
+
   findDevicesForEcosystem(ecosystemId: string) {
     return this.prisma.device.findMany({
       where: {
