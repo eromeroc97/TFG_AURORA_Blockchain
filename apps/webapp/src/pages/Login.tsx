@@ -21,9 +21,25 @@ export default function Login() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const getRoleFromToken = (token: string): string => {
+    try {
+      const [, payload] = token.split('.')
+      if (!payload) return ''
+      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+      const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4)
+      const parsed = JSON.parse(atob(padded))
+      return (parsed.role || '').toUpperCase()
+    } catch {
+      return ''
+    }
+  }
+
   useEffect(() => {
     if (!isHydrating && isAuthenticated) {
-      navigate('/dashboard', { replace: true })
+      const token = localStorage.getItem('aurora_token') || ''
+      const role = getRoleFromToken(token)
+      const redirectTo = role === 'AUDITOR' ? '/audit' : '/dashboard'
+      navigate(redirectTo, { replace: true })
     }
   }, [isAuthenticated, isHydrating, navigate])
 
@@ -35,7 +51,9 @@ export default function Login() {
     try {
       const response = await apiClient.post('/auth/login', { email, password })
       setSession(response.data.accessToken)
-      navigate('/dashboard', { replace: true })
+      const role = (localStorage.getItem('aurora_role') || '').toUpperCase()
+      const redirectTo = role === 'AUDITOR' ? '/audit' : '/dashboard'
+      navigate(redirectTo, { replace: true })
     } catch (error) {
       const backendMessage =
         axios.isAxiosError<{ message?: string | string[] }>(error) && error.response?.data?.message

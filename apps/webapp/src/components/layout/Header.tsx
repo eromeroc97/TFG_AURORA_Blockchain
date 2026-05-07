@@ -11,7 +11,7 @@ type HeaderProps = {
 }
 
 const navigationItems = [
-  { label: 'Dashboard', to: '/dashboard', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
+  { label: 'Dashboard', to: '/dashboard', roles: ['USER', 'ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Auditoría', to: '/audit', roles: ['AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Usuarios', to: '/users', roles: ['ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Ecosistemas', to: '/ecosystems', roles: ['USER', 'ADMIN', 'GLOBAL_ADMIN'] },
@@ -78,7 +78,7 @@ export default function Header({ onSignOut, userEmail, userRole, pendingCount = 
       <div className="pointer-events-none absolute inset-x-10 -bottom-3 h-6 rounded-full bg-primary/15 blur-xl" />
 
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
+        <Link to={role === 'AUDITOR' ? '/audit' : '/dashboard'} className="flex shrink-0 items-center gap-3">
           <div className="flex flex-col items-center">
             <img
               src={auroraLogo}
