@@ -31,6 +31,63 @@ enum EcosystemStatus {
   REVOKED
 }
 
+enum DeviceCategory {
+  SMART_BULB
+  SMART_PANEL
+  SMART_PLUG
+  ENERGY_METER
+  CAMERA
+  SMART_LOCK
+  CONTACT_SENSOR
+  MOTION_SENSOR
+  THERMOSTAT
+  HVAC
+  SMART_SPEAKER
+  SMART_TV
+  APPLIANCE
+  ROUTER
+  OTHER
+}
+
+enum AccessRole {
+  VIEWER
+  EDITOR
+}
+
+enum NotificationCategory {
+  READ_ONLY
+  ACTION_EXPECTED
+}
+
+enum NotificationType {
+  ECOSYSTEM_DELEGATION_REQUEST
+  ECOSYSTEM_DELEGATION_RESPONSE
+  ADMINISTRATOR_NOTIFICATION
+}
+
+enum NotificationStatus {
+  PENDING
+  READ
+  ACCEPTED
+  REJECTED
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+}
+
+enum TargetType {
+  INDIVIDUAL
+  GLOBAL
+}
+
+enum ReferenceType {
+  ECOSYSTEM
+  USER
+  DEVICE
+}
+
 model Identity {
   id String @id @default(uuid()) @db.Uuid
   type IdentityType
@@ -46,6 +103,23 @@ model Identity {
 
   user User?
   ecosystem Ecosystem?
+}
+
+model EcosystemAccess {
+  id          String      @id @default(uuid()) @db.Uuid
+  ecosystemId String      @db.Uuid
+  userId      String      @db.Uuid
+  role        AccessRole @default(VIEWER)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  ecosystem   Ecosystem   @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ecosystemId, userId])
+  @@index([ecosystemId])
+  @@index([userId])
 }
 
 model User {
@@ -65,7 +139,9 @@ model User {
   updatedAt DateTime @updatedAt
 
   ecosystems Ecosystem[]
+  accesses   EcosystemAccess[]
   passwordResetTokens PasswordResetToken[]
+  notifications Notification[]
 
   @@index([identityId])
 }
@@ -108,6 +184,7 @@ model Ecosystem {
   updatedAt DateTime @updatedAt
 
   devices Device[]
+  accesses EcosystemAccess[]
 
   @@index([ownerId])
 }
@@ -119,6 +196,8 @@ model Device {
   ecosystem Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
 
   name String
+  category DeviceCategory?
+  room String?
   macAddress String? @db.VarChar(255)
   vendor String?
 
@@ -127,4 +206,43 @@ model Device {
 
   @@index([ecosystemId])
   @@unique([ecosystemId, macAddress])
+}
+
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  category NotificationCategory
+  type NotificationType
+
+  targetType TargetType @default(INDIVIDUAL)
+
+  actorType ActorType @default(USER)
+  actorId String? @db.Uuid
+
+  userId String? @db.Uuid
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  referenceId String? @db.Uuid
+  referenceType ReferenceType?
+
+  title String
+  message String
+
+  status NotificationStatus @default(PENDING)
+
+  actionUrl String?
+  metadata Json?
+
+  readAt DateTime?
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([targetType, status])
+  @@index([category])
+  @@index([type])
+  @@index([createdAt])
 }

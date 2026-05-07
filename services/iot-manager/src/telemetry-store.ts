@@ -39,6 +39,8 @@ export type TelemetryDocument = {
   payload: Record<string, unknown>;
   /** Hash SHA-256 del payload */
   hash: string;
+  /** Tamaño en bytes del payload */
+  sizeBytes: number;
 };
 
 /**
@@ -61,6 +63,8 @@ export type SaveTelemetryInput = {
   publicKey?: string;
   /** Timestamp de la lectura */
   timestamp: Date;
+  /** Tamaño en bytes del JSON ingestado */
+  sizeBytes?: number;
 };
 
 /**
@@ -132,11 +136,28 @@ export interface TelemetryStore {
   findLastInteraction(deviceId: string, ecosystemId?: string): Promise<Date | null>;
 
   /**
+   * Obtiene el último payload de un dispositivo.
+   *
+   * @param macAddress - MAC del dispositivo
+   * @param ecosystemId - ID del ecosistema
+   * @returns Promise con el payload o null
+   */
+  findLatestPayload(macAddress: string, ecosystemId: string): Promise<Record<string, unknown> | null>;
+
+  /**
    * Obtiene métricas de telemetría para el dashboard.
    *
    * @param query - Parámetros de consulta de métricas
    */
   getMetrics(query: TelemetryMetricsQuery): Promise<TelemetryMetricsResult>;
+
+  /**
+   * Obtiene el volumen total de telemetría para ecosistemas específicos.
+   *
+   * @param ecosystemIds - IDs de los ecosistemas
+   * @returns Volumen total en bytes
+   */
+  getVolumeByEcosystemIds(ecosystemIds: string[]): Promise<number>;
 
   /**
    * Cierra la conexión al armazenamento.
@@ -234,6 +255,7 @@ export class MongoTelemetryStore implements TelemetryStore {
       },
       payload: input.payload,
       hash: input.hash,
+      sizeBytes: input.sizeBytes ?? 0,
     });
 
     return {
@@ -315,6 +337,57 @@ export class MongoTelemetryStore implements TelemetryStore {
     return document?.timestamp ?? null;
   }
 
+  /**
+   * Obtiene el último payload de un dispositivo.
+   *
+   * @param macAddress - MAC del dispositivo
+   * @param ecosystemId - ID del ecosistema
+   * @returns Promise con el payload o null
+   */
+  async findLatestPayload(macAddress: string, ecosystemId: string): Promise<Record<string, unknown> | null> {
+    const collection = await this.ensureCollection();
+
+    const normalizedMac = macAddress.trim().replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    if (!/^[A-F0-9]{12}$/.test(normalizedMac)) {
+      return null;
+    }
+
+    const macVariants = [
+      normalizedMac,
+      normalizedMac.match(/.{2}/g)?.join(':') ?? normalizedMac,
+      normalizedMac.match(/.{2}/g)?.join('-') ?? normalizedMac,
+      normalizedMac.match(/.{2}/g)?.join('.') ?? normalizedMac,
+    ];
+
+    const query: Record<string, unknown> = {
+      'payload.devices.mac_addr': { $in: macVariants },
+      'metadata.ecosystemId': ecosystemId.trim(),
+    };
+
+    const document = await collection
+      .find(query)
+      .sort({ timestamp: -1 })
+      .limit(1)
+      .project({ payload: 1 })
+      .next();
+
+    if (!document?.payload?.devices) {
+      return null;
+    }
+
+    const devicePayload = document.payload.devices.find((d: { mac_addr: string }) => {
+      const deviceMac = (d.mac_addr || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+      return deviceMac === normalizedMac
+    })
+
+    if (!devicePayload) {
+      return null
+    }
+
+    const { mac_addr, ...rest } = devicePayload as Record<string, unknown>
+    return rest
+  }
+
   async getMetrics(query: TelemetryMetricsQuery): Promise<TelemetryMetricsResult> {
     const collection = await this.ensureCollection();
     const filters: Record<string, unknown> = {
@@ -336,25 +409,26 @@ export class MongoTelemetryStore implements TelemetryStore {
                   _id: {
                     $dateTrunc: {
                       date: '$timestamp',
-                      unit: 'hour',
+                      unit: 'minute',
                     },
                   },
-                  tx: { $sum: 1 },
+                  tx: { $sum: { $ifNull: ['$sizeBytes', 0] } },
                 },
               },
               {
                 $project: {
                   _id: 0,
-                  hour: {
+                  timestamp: {
                     $dateToString: {
-                      format: '%H:00',
+                      format: '%Y-%m-%dT%H:%M:%S',
                       date: '$_id',
+                      timezone: 'Europe/Madrid',
                     },
                   },
-                  tx: 1,
+                  tx: '$tx',
                 },
               },
-              { $sort: { hour: 1 } },
+              { $sort: { timestamp: 1 } },
             ],
             successRatio: [
               {
@@ -436,5 +510,30 @@ export class MongoTelemetryStore implements TelemetryStore {
    */
   async close(): Promise<void> {
     await this.client.close();
+  }
+
+  /**
+   * Obtiene el volumen total de telemetría para ecosistemas específicos.
+   *
+   * @param ecosystemIds - IDs de los ecosistema
+   * @returns Volumen total en bytes
+   */
+  async getVolumeByEcosystemIds(ecosystemIds: string[]): Promise<number> {
+    if (!this.collection) {
+      await this.ensureCollection();
+    }
+
+    if (!this.collection) {
+      return 0;
+    }
+
+    const result = await this.collection
+      .aggregate([
+        { $match: { 'metadata.ecosystemId': { $in: ecosystemIds } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$sizeBytes', 0] } } } },
+      ])
+      .toArray();
+
+    return result[0]?.total ?? 0;
   }
 }

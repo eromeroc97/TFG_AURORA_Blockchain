@@ -55,8 +55,45 @@ const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryS
       ecosystemUsage: [],
       totalDevices: 0,
     }),
+    findLatestPayload: async (macAddress: string, ecosystemId: string) => {
+      const normalizedMac = macAddress.replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+      const found = savedInputs
+        .slice()
+        .reverse()
+        .find(
+          (input) =>
+            Array.isArray((input.payload as any).devices) &&
+            (input.payload as any).devices.some(
+              (device: any) => {
+                const deviceMac = (device?.mac_addr || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+                return deviceMac === normalizedMac
+              },
+            ),
+        )
+
+      if (!found?.payload?.devices) {
+        return null
+      }
+
+      const devicePayload = (found.payload as any).devices.find((device: any) => {
+        const deviceMac = (device?.mac_addr || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase()
+        return deviceMac === normalizedMac
+      })
+
+      if (!devicePayload) {
+        return null
+      }
+
+      const { mac_addr, ...rest } = devicePayload
+      return rest
+    },
     close: async () => {
       return
+    },
+    getVolumeByEcosystemIds: async (ecosystemIds: string[]) => {
+      return savedInputs
+        .filter((input) => ecosystemIds.includes(input.ecosystemId))
+        .reduce((sum, input) => sum + (input.sizeBytes ?? 0), 0)
     },
   }
 }
@@ -74,10 +111,19 @@ const createJwtToken = (payload: Record<string, unknown>): string => {
 
 beforeEach(() => {
   fetchMock.mockReset()
-  fetchMock.mockResolvedValue({
-    ok: true,
-    json: async () => ({ signature: 'mock-signature', publicKey: 'mock-public-key' }),
-  } as any)
+  fetchMock.mockImplementation(async (url: string | URL) => {
+    const urlStr = String(url);
+    if (urlStr.includes('/apis/') && urlStr.includes('/invoke/')) {
+      return {
+        ok: true,
+        json: async () => ({ id: 'mock-op-id-123', tx: 'mock-tx-id-456' }),
+      } as Response
+    }
+    return {
+      ok: true,
+      json: async () => ({ signature: 'mock-signature', publicKey: 'mock-public-key' }),
+    } as Response
+  })
 })
 
 afterAll(() => {

@@ -118,4 +118,60 @@ export class MailService {
 
     this.logger.log(`Account deleted email sent to ${email}`);
   }
+
+  async sendEcosystemDelegationRequestEmail(
+    email: string,
+    ecosystemName: string,
+    ownerEmail: string,
+    role: string,
+  ): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Petición de acceso a ecosistema en AURORA',
+      template: './ecosystem-delegation-request',
+      context: {
+        ecosystem_name: ecosystemName,
+        owner_email: ownerEmail,
+        role,
+        requested_at: new Date().toLocaleDateString('es-ES'),
+      },
+    });
+
+    this.logger.log(`Ecosystem delegation request email sent to ${email}`);
+  }
+
+  async sendNewNotificationEmail(email: string, notificationTitle: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Nueva notificación - AURORA',
+      template: './new-notification',
+      context: {
+        notification_title: notificationTitle,
+        action_url: 'http://localhost/notifications',
+      },
+    });
+
+    this.logger.log(`New notification email sent to ${email}`);
+  }
+
+  async sendEcosystemDelegationResponseEmail(
+    email: string,
+    ecosystemName: string,
+    responderEmail: string,
+    result: 'aceptada' | 'rechazada',
+  ): Promise<void> {
+    const notificationTitle = result === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud rechazada'
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Nueva notificación - AURORA',
+      template: './new-notification',
+      context: {
+        notification_title: notificationTitle,
+        action_url: 'http://localhost/notifications',
+      },
+    });
+
+    this.logger.log(`Ecosystem delegation response notification email sent to ${email}`);
+  }
 }

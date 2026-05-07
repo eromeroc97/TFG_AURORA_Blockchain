@@ -630,6 +630,23 @@ export class UsersService {
     return user;
   }
 
+  async findMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: this.userSelect,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status === UserStatus.REVOKED) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
   async findAuthUserById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -885,5 +902,37 @@ export class UsersService {
     await this.mailService.sendVerifyEmail(user.email, actionUrl);
 
     return approvedUser;
+  }
+
+  async getUserTelemetryVolume(userId: string): Promise<{ volume: number }> {
+    const iotManagerUrl = process.env.IOT_MANAGER_URL;
+
+    if (!iotManagerUrl) {
+      throw new InternalServerErrorException('IOT_MANAGER_URL not configured');
+    }
+
+    const ecosystems = await this.prisma.ecosystem.findMany({
+      where: { ownerId: userId },
+      select: { id: true },
+    });
+
+    if (ecosystems.length === 0) {
+      return { volume: 0 };
+    }
+
+    const ecosystemIds = ecosystems.map((e) => e.id);
+    const iotManagerInternalToken = process.env.IOT_MANAGER_INTERNAL_TOKEN;
+
+    try {
+      const response = await axios.get<{ volume: number }>(`${iotManagerUrl}/api/telemetry/v1/volume`, {
+        params: { ecosystemIds: ecosystemIds.join(',') },
+        headers: iotManagerInternalToken
+          ? { Authorization: `Bearer ${iotManagerInternalToken}` }
+          : undefined,
+      });
+      return { volume: response.data.volume ?? 0 };
+    } catch {
+      return { volume: 0 };
+    }
   }
 }

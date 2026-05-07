@@ -2,10 +2,11 @@ import L from 'leaflet'
 import { useMemo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Brain, House } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAuth } from '../../context/auth-context'
-import { ACCESS_MAP_ECOSYSTEMS_MOCK, type AccessMapEcosystem } from './access-map.data'
+import type { AccessMapEcosystem } from '../../services/ecosystems.service'
 
 /**
  * Rol de acceso a ecosistema.
@@ -75,33 +76,26 @@ const centralShieldIcon = L.divIcon({
 
 export default function AccessMap({ ecosystems }: AccessMapProps) {
   const { authClaims } = useAuth()
+  const navigate = useNavigate()
   const role = (authClaims?.role?.toUpperCase() ?? 'USER') as AccessRole
   const currentUserId = authClaims?.sub ?? 'anonymous-user'
-  const sourceNodes = ecosystems ?? ACCESS_MAP_ECOSYSTEMS_MOCK
+  const sourceNodes = ecosystems ?? []
   const mapNodes = sourceNodes.filter(
     (node): node is AccessMapEcosystem & { lat: number; lng: number } =>
-      node.lat !== null && node.lng !== null,
+      node.lat != null && node.lng != null,
   )
 
   const visibleNodes = useMemo(() => {
     if (role === 'USER') {
-      return mapNodes.filter((node) => node.ownerId === currentUserId || node.isShared)
+      return mapNodes.filter((node) => 
+        node.ownerId === currentUserId || 
+        node.isShared ||
+        node.accessType === 'DELEGATED'
+      )
     }
 
     return mapNodes
   }, [currentUserId, mapNodes, role])
-
-  const canViewDevices = (node: AccessMapEcosystem) => {
-    if (role === 'AUDITOR') {
-      return true
-    }
-
-    if (role === 'USER') {
-      return node.ownerId === currentUserId
-    }
-
-    return false
-  }
 
   return (
     <div className="relative z-0 mt-5 h-[520px] w-full overflow-hidden rounded-[1.25rem] border border-primary/10 bg-white shadow-aurora">
@@ -126,35 +120,34 @@ export default function AccessMap({ ecosystems }: AccessMapProps) {
           <Marker
             key={node.id}
             position={[node.lat, node.lng]}
-            icon={createHouseIcon(node.ownerId === currentUserId)}
+            icon={createHouseIcon(node.ownerId === currentUserId || node.accessType === 'OWNER')}
           >
             <Popup>
-              <div className="space-y-2 text-primary">
+              <div className="space-y-2 text-primary" style={{ textAlign: 'center' }}>
                 <p className="text-sm font-semibold">{node.name}</p>
                 <p className="text-xs text-muted">
-                  Ubicación: {node.lat.toFixed(3)}, {node.lng.toFixed(3)}
+                  Ubicación: {typeof node.lat === 'number' && typeof node.lng === 'number'
+                    ? `${node.lat.toFixed(3)}, ${node.lng.toFixed(3)}`
+                    : 'No disponible'}
                 </p>
 
-                {canViewDevices(node) ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-                      Dispositivos
-                    </p>
-                    {node.devices.length > 0 ? (
-                      <ul className="mt-1 list-disc pl-4 text-xs text-muted">
-                        {node.devices.map((device) => (
-                          <li key={device.id}>{device.name}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-1 text-xs text-muted">No hay dispositivos registrados.</p>
-                    )}
-                  </div>
-                ) : role === 'ADMIN' || role === 'GLOBAL_ADMIN' ? (
-                  <p className="text-xs font-semibold text-rose-700">Acceso a dispositivos restringido</p>
-                ) : (
-                  <p className="text-xs text-muted">No tienes permisos para ver los dispositivos.</p>
-                )}
+                <button
+                  type="button"
+                  style={{
+                    marginTop: '8px',
+                    borderRadius: '6px',
+                    backgroundColor: '#14B8A6',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => navigate('/ecosystems', { state: { selectedId: node.id }, replace: true })}
+                >
+                  Más información
+                </button>
               </div>
             </Popup>
           </Marker>

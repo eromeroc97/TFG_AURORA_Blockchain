@@ -1,10 +1,11 @@
 import 'dotenv/config';
-import { createHash } from 'crypto';
+import { createHash, createVerify, createPublicKey, type Verify } from 'crypto';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { buildApiKeyCache, type ApiKeyCache } from './api-key-cache';
 import { loadConfig, type AppConfig } from './config';
 import { DeviceDiscoveryService } from './device-discovery';
 import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
+import { FireFlyService } from './firefly-service';
 
 /**
  * Resultado de validación de API key.
@@ -257,7 +258,10 @@ const buildDefaultApiKeyValidator = (config: AppConfig) => {
       });
 
       if (!response.ok) {
-        throw new Error(`Auth API key validation failed with status ${response.status}`);
+        const errorBody = await response.text();
+        throw new Error(
+          `Auth API key validation failed with status ${response.status} ${response.statusText}: ${errorBody}`,
+        );
       }
 
       const payload = (await response.json()) as ApiKeyValidationResult;
@@ -300,6 +304,7 @@ export const buildApp = (options: AppOptions = {}) => {
   const telemetryStore = options.telemetryStore ?? new MongoTelemetryStore(config.mongoUri);
   const shouldCloseStore = !options.telemetryStore;
   const deviceDiscovery = new DeviceDiscoveryService(config);
+  const fireflyService = new FireFlyService();
 
   const apiKeyValidator = options.apiKeyValidator ?? buildDefaultApiKeyValidator(config);
   const positiveTtlMs = options.positiveTtlMs ?? config.iotApiKeyPositiveTtlMs ?? DEFAULT_POSITIVE_TTL_MS;
@@ -319,12 +324,23 @@ export const buildApp = (options: AppOptions = {}) => {
     }
   });
 
-  app.get('/health', async () => {
-    return {
-      status: 'UP',
-      service: 'iot-manager',
-    };
-  });
+  app.options('/health', async (_, reply) => {
+    reply
+      .header('Access-Control-Allow-Origin', '*')
+      .header('Access-Control-Allow-Methods', 'GET,OPTIONS')
+      .header('Access-Control-Allow-Headers', 'Content-Type,Accept')
+      .send()
+  })
+
+  app.get('/health', async (_, reply) => {
+    reply
+      .header('Access-Control-Allow-Origin', '*')
+      .code(200)
+      .send({
+        status: 'UP',
+        service: 'iot-manager',
+      })
+  })
 
   const sendLastInteractionResponse = async (
     reply: FastifyReply,
@@ -376,14 +392,48 @@ export const buildApp = (options: AppOptions = {}) => {
   app.get('/iot/devices/:deviceId/last-interaction', readParamLastInteraction);
   app.get('/devices/:deviceId/last-interaction', readParamLastInteraction);
 
-  const telemetryMetricsHandler = async (request: FastifyRequest, reply: FastifyReply) => {
+  const readDeviceDetails = async (
+    request: FastifyRequest<{ Querystring: { macAddress?: string; ecosystemId?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const macAddress = request.query.macAddress?.trim();
+    const ecosystemId = request.query.ecosystemId?.trim();
+
+    if (!macAddress || !ecosystemId) {
+      return reply.code(400).send({
+        error: 'INVALID_REQUEST',
+        message: 'macAddress and ecosystemId query parameters are required',
+      });
+    }
+
+    const payload = await telemetryStore.findLatestPayload(macAddress, ecosystemId);
+    return reply.code(200).send({
+      payload,
+    });
+  };
+
+  app.get('/devices/device-details', readDeviceDetails);
+
+  const telemetryMetricsHandler = async (request: FastifyRequest<{ Querystring: { range?: string } }>, reply: FastifyReply) => {
     const context = await resolveTelemetryRequestContext(request, reply);
     if (!context) {
       return;
     }
 
+    const queryRange = request.query.range as string | undefined;
+    const rangeMs: Record<string, number> = {
+      '30m': 30 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '12h': 12 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '1w': 7 * 24 * 60 * 60 * 1000,
+      '1M': 30 * 24 * 60 * 60 * 1000,
+      '1y': 365 * 24 * 60 * 60 * 1000,
+    };
+    const range = queryRange && rangeMs[queryRange] ? rangeMs[queryRange] : 24 * 60 * 60 * 1000;
+
     const metrics = await telemetryStore.getMetrics({
-      from: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      from: new Date(Date.now() - range),
       ecosystemIds: context.role === 'USER' ? context.ecosystemIds ?? [] : undefined,
     });
 
@@ -392,6 +442,64 @@ export const buildApp = (options: AppOptions = {}) => {
 
   app.get('/v1/metrics', telemetryMetricsHandler);
   app.get('/api/telemetry/v1/metrics', telemetryMetricsHandler);
+
+  const telemetryVolumeHandler = async (
+    request: FastifyRequest<{ Querystring: { ecosystemIds?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const iotManagerInternalToken = config.iotManagerInternalToken;
+    const token = getBearerTokenFromHeader(request);
+
+    let context: TelemetryRequestContext | null = null;
+
+    if (token && iotManagerInternalToken && token === iotManagerInternalToken) {
+      context = {
+        role: 'ADMIN',
+        userId: 'internal',
+        ecosystemIds: null,
+      };
+    } else {
+      context = await resolveTelemetryRequestContext(request, reply);
+    }
+
+    if (!context) {
+      return;
+    }
+
+    const ecosystemIdsParam = request.query.ecosystemIds?.trim();
+    if (!ecosystemIdsParam) {
+      return reply.code(400).send({
+        error: 'INVALID_REQUEST',
+        message: 'ecosystemIds query parameter is required',
+      });
+    }
+
+    const ecosystemIds = ecosystemIdsParam.split(',').map((id) => id.trim()).filter(Boolean);
+    if (ecosystemIds.length === 0) {
+      return reply.code(400).send({
+        error: 'INVALID_REQUEST',
+        message: 'At least one ecosystemId is required',
+      });
+    }
+
+    const validEcosystemIds = context.role === 'GLOBAL_ADMIN' || context.role === 'ADMIN'
+      ? ecosystemIds
+      : ecosystemIds.filter((id) => context.ecosystemIds?.includes(id));
+
+    if (validEcosystemIds.length === 0) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        message: 'No access to the specified ecosystems',
+      });
+    }
+
+    const volume = await telemetryStore.getVolumeByEcosystemIds(validEcosystemIds);
+
+    return reply.code(200).send({ volume });
+  };
+
+  app.get('/v1/volume', telemetryVolumeHandler);
+  app.get('/api/telemetry/v1/volume', telemetryVolumeHandler);
 
   const authenticateApiKey = async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply: FastifyReply) => {
     const apiKey = getApiKeyFromHeader(request);
@@ -481,14 +589,58 @@ export const buildApp = (options: AppOptions = {}) => {
     return value.replace(/-/g, '+').replace(/_/g, '/').padEnd(value.length + (4 - (value.length % 4)) % 4, '=');
   };
 
+  const convertPublicKeyToSpki = (key: string): string => {
+    try {
+      let pem = key;
+      
+      if (!pem.includes('-----BEGIN')) {
+        const keyBuffer = Buffer.from(key, 'base64');
+        pem = keyBuffer.toString('utf8');
+      }
+      
+      if (!pem.includes('-----BEGIN')) {
+        return key;
+      }
+      
+      const publicKey = createPublicKey(pem);
+      return publicKey.export({ type: 'spki', format: 'pem' }) as string;
+    } catch (err) {
+      console.error('Key conversion error:', err);
+      return key;
+    }
+  };
+
   const decodeJwtPayload = (token: string): TelemetrySessionClaims | null => {
     const parts = token.split('.');
     if (parts.length !== 3) {
       return null;
     }
 
+    const [headerSegment, payloadSegment, signatureSegment] = parts;
+    let jwtPublicKey = config.jwtPublicKey;
+
+    if (jwtPublicKey) {
+      jwtPublicKey = convertPublicKeyToSpki(jwtPublicKey);
+
+      try {
+        const message = `${headerSegment}.${payloadSegment}`;
+        const signature = parseBase64Url(signatureSegment);
+        
+        const verifier = createVerify('RSA-SHA256');
+        verifier.update(message, 'utf8');
+        const isValid = verifier.verify(jwtPublicKey, signature, 'base64');
+        
+        if (!isValid) {
+          console.error('JWT signature verification failed');
+          return null;
+        }
+      } catch (err) {
+        console.error('JWT verification error:', err);
+        return null;
+      }
+    }
+
     try {
-      const payloadSegment = parts[1];
       const decoded = Buffer.from(parseBase64Url(payloadSegment), 'base64').toString('utf8');
       return JSON.parse(decoded) as TelemetrySessionClaims;
     } catch {
@@ -566,7 +718,9 @@ export const buildApp = (options: AppOptions = {}) => {
 
     let ecosystemIds: string[] | null = null;
 
-    if (role === 'USER') {
+    const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN';
+
+    if (!isAdminOrGlobalAdmin) {
       ecosystemIds = claimEcosystemIds ?? null;
 
       if (!ecosystemIds || ecosystemIds.length === 0) {
@@ -608,14 +762,14 @@ export const buildApp = (options: AppOptions = {}) => {
           });
           return null;
         }
-      }
 
-      if (!ecosystemIds || ecosystemIds.length === 0) {
-        reply.code(403).send({
-          error: 'NO_ECOSYSTEM_ACCESS',
-          message: 'User has no associated ecosystems',
-        });
-        return null;
+        if (!isAdminOrGlobalAdmin && (!ecosystemIds || ecosystemIds.length === 0)) {
+          reply.code(403).send({
+            error: 'NO_ECOSYSTEM_ACCESS',
+            message: 'User has no associated ecosystems',
+          });
+          return null;
+        }
       }
     }
 
@@ -624,27 +778,6 @@ export const buildApp = (options: AppOptions = {}) => {
       userId,
       ecosystemIds,
     };
-  };
-
-  const broadcastTelemetryMock = async (
-    hash: string,
-    signature: string,
-    publicKey: string,
-    ecosystemId: string,
-  ): Promise<{ txId: string }> => {
-    // TODO: Replace with actual FireFly communication
-    // This is a temporary mock that simulates network delay and returns success
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const txId = `mock-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    app.log.info({
-      msg: '[MOCK] Broadcast to FireFly',
-      hash,
-      signature: signature.slice(0, 20) + '...',
-      publicKey: publicKey.slice(0, 20) + '...',
-      ecosystemId,
-      txId,
-    });
-    return { txId };
   };
 
   app.post(
@@ -703,6 +836,9 @@ export const buildApp = (options: AppOptions = {}) => {
       // Step 4: Calculate SHA-256 hash (payload + GPS)
       const hash = buildPayloadHash(payload, request.body.latitude, request.body.longitude);
 
+      // Calculate size in bytes of the ingested JSON
+      const rawBodyBytes = Buffer.byteLength(JSON.stringify(request.body));
+
       // Step 3: Persist with PENDING_ANCHOR status
       const savedTelemetry = await telemetryStore.save({
         ecosystemId,
@@ -711,6 +847,7 @@ export const buildApp = (options: AppOptions = {}) => {
         payload,
         hash,
         timestamp: eventTimestamp,
+        sizeBytes: rawBodyBytes,
       });
 
       // Step 5: Request signature from auth-service (KMS)
@@ -728,7 +865,10 @@ export const buildApp = (options: AppOptions = {}) => {
         });
 
         if (!signResponse.ok) {
-          throw new Error(`Sign request failed: ${signResponse.status}`);
+          const errorBody = await signResponse.text();
+          throw new Error(
+            `Sign request failed: ${signResponse.status} ${signResponse.statusText}: ${errorBody}`,
+          );
         }
 
         const signResult = await signResponse.json() as { signature: string; publicKey: string };
@@ -743,19 +883,24 @@ export const buildApp = (options: AppOptions = {}) => {
         });
       }
 
-      // Step 7: Broadcast to FireFly (mock)
-      let txId: string;
-      try {
-        const broadcastResult = await broadcastTelemetryMock(hash, signature, signingPublicKey, ecosystemId);
-        txId = broadcastResult.txId;
-      } catch (broadcastError) {
-        request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly');
-        await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
-        return reply.code(500).send({
-          error: 'BROADCAST_FAILED',
-          message: 'Failed to broadcast telemetry to blockchain',
-        });
-      }
+  // Step 7: Invocar FireFly para anclar en Fabric (reemplaza el mock)
+  let txId: string;
+  try {
+    txId = await fireflyService.anchorTelemetry({
+      ingestId: savedTelemetry.id,
+      ecosystemId,
+      telemetryHash: hash,
+      signature,
+      publicKey: signingPublicKey,
+    });
+  } catch (broadcastError) {
+    request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly/Fabric');
+    await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
+    return reply.code(500).send({
+      error: 'BROADCAST_FAILED',
+      message: 'Failed to broadcast telemetry to blockchain',
+    });
+  }
 
       // Step 8: Update status to ANCHORED
       await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'ANCHORED', signature, signingPublicKey, txId);

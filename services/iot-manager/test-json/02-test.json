@@ -1,0 +1,22 @@
+{
+  "latitude": 39.860000,
+  "longitude": -4.020000,
+  "devices": [
+    {
+      "mac_addr": "00:1A:7D:DA:71:13",
+      "device_id": "sensor-toledo-01",
+      "type": "temperature",
+      "battery_level": 92,
+      "status": "active",
+      "last_seen": "2026-04-28T12:05:00Z"
+    },
+    {
+      "mac_addr": "F4:5C:89:12:AB:34",
+      "device_id": "tracker-toledo-07",
+      "type": "gps",
+      "battery_level": 68,
+      "status": "online",
+      "last_seen": "2026-04-28T12:08:10Z"
+    }
+  ]
+}

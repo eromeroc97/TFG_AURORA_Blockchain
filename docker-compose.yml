@@ -12,7 +12,7 @@ services:
       - seq
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`) || PathPrefix(`/api/devices`)"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/ecosystems`) || PathPrefix(`/api/devices`) || PathPrefix(`/api/notifications`)"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
       - "traefik.http.services.auth.loadbalancer.server.port=3001"
@@ -20,6 +20,12 @@ services:
       - "traefik.http.routers.auth.middlewares=auth-strip"
       - "traefik.http.routers.auth-internal.service=auth"
       - "traefik.http.routers.auth-internal.priority=200"
+      - "traefik.http.routers.auth-health.rule=PathPrefix(`/api/auth/health`)"
+      - "traefik.http.routers.auth-health.entrypoints=web"
+      - "traefik.http.routers.auth-health.priority=201"
+      - "traefik.http.routers.auth-health.service=auth"
+      - "traefik.http.middlewares.auth-health-strip.stripprefix.prefixes=/api/auth"
+      - "traefik.http.routers.auth-health.middlewares=auth-health-strip"
       - "traefik.docker.network=aurora-secure-net"
     networks:
       - aurora-secure-net
@@ -73,6 +79,12 @@ services:
       - "traefik.http.services.telemetry.loadbalancer.server.port=3002"
       - "traefik.http.middlewares.telemetry-strip.stripprefix.prefixes=/api/telemetry,/api/iot"
       - "traefik.http.routers.telemetry.middlewares=telemetry-strip"
+      - "traefik.http.routers.telemetry-health.rule=PathPrefix(`/api/iot/health`) || PathPrefix(`/api/telemetry/health`)"
+      - "traefik.http.routers.telemetry-health.entrypoints=web"
+      - "traefik.http.routers.telemetry-health.priority=202"
+      - "traefik.http.routers.telemetry-health.service=telemetry"
+      - "traefik.http.middlewares.telemetry-health-strip.stripprefix.prefixes=/api/iot,/api/telemetry"
+      - "traefik.http.routers.telemetry-health.middlewares=telemetry-health-strip"
       - "traefik.docker.network=aurora-secure-net"
     networks:
       - aurora-secure-net
@@ -80,6 +92,43 @@ services:
       - "3002"
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3002/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  blockchain-manager:
+    build:
+      context: ./services/blockchain-manager
+      dockerfile: Dockerfile
+    env_file:
+      - ./services/blockchain-manager/.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.blockchain.rule=PathPrefix(`/api/blockchain`)"
+      - "traefik.http.routers.blockchain.entrypoints=web"
+      - "traefik.http.routers.blockchain.priority=100"
+      - "traefik.http.services.blockchain.loadbalancer.server.port=3004"
+      - "traefik.http.middlewares.blockchain-strip.stripprefix.prefixes=/api"
+      - "traefik.http.routers.blockchain.middlewares=blockchain-strip"
+      - "traefik.http.routers.blockchain-events.rule=PathPrefix(`/api/blockchain/events`)"
+      - "traefik.http.routers.blockchain-events.entrypoints=web"
+      - "traefik.http.routers.blockchain-events.priority=200"
+      - "traefik.http.routers.blockchain-events.service=blockchain"
+      - "traefik.http.routers.blockchain-events.middlewares=blockchain-strip"
+      - "traefik.http.routers.blockchain-health.rule=PathPrefix(`/api/blockchain/health`)"
+      - "traefik.http.routers.blockchain-health.entrypoints=web"
+      - "traefik.http.routers.blockchain-health.priority=204"
+      - "traefik.http.routers.blockchain-health.service=blockchain"
+      - "traefik.http.middlewares.blockchain-health-strip.stripprefix.prefixes=/api/blockchain"
+      - "traefik.http.routers.blockchain-health.middlewares=blockchain-health-strip"
+      - "traefik.docker.network=aurora-secure-net"
+    networks:
+      - aurora-secure-net
+    expose:
+      - "3004"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3004/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -166,6 +215,28 @@ services:
       - "traefik.http.routers.traefik-api.entrypoints=web"
       - "traefik.http.routers.traefik-api.priority=1"
       - "traefik.http.routers.traefik-api.service=api@internal"
+      - "traefik.docker.network=aurora-secure-net"
+    networks:
+      - aurora-secure-net
+
+  firefly-proxy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    # Inyectamos el fallback directamente en la línea de comandos
+    command: caddy reverse-proxy --from :80 --to ${FIREFLY_HOST:-https://candidate-delhi-rugs-sending.trycloudflare.com} --change-host-header
+    labels:
+      - "traefik.enable=true"
+      # 1. Atrapamos la ruta que llama el frontend
+      - "traefik.http.routers.firefly-health.rule=Path(`/api/firefly/health`)"
+      - "traefik.http.routers.firefly-health.entrypoints=web"
+      - "traefik.http.routers.firefly-health.priority=150"
+      
+      # 2. Reescribimos la ruta de forma estricta (sin Regex)
+      - "traefik.http.middlewares.firefly-rewrite.replacepath.path=/api/v1/status"
+      - "traefik.http.routers.firefly-health.middlewares=firefly-rewrite"
+      
+      # 3. Mandamos el tráfico al puerto interno de Caddy
+      - "traefik.http.services.firefly-health.loadbalancer.server.port=80"
       - "traefik.docker.network=aurora-secure-net"
     networks:
       - aurora-secure-net

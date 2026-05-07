@@ -1,16 +1,25 @@
+import { useEffect, useState, type FormEvent } from 'react'
 import axios from 'axios'
 import { ArrowRight, Mail } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
+import { useAuth } from '../context/auth-context'
 
 export default function Recover() {
+  const navigate = useNavigate()
   const location = useLocation()
+  const { isAuthenticated, isHydrating } = useAuth()
   const [email, setEmail] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!isHydrating && isAuthenticated) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [isAuthenticated, isHydrating, navigate])
 
   useEffect(() => {
     const state = location.state as

@@ -27,6 +27,8 @@ export class DevicesService {
   private readonly deviceSelect = {
     id: true,
     name: true,
+    category: true,
+    room: true,
     macAddress: true,
     vendor: true,
     ecosystemId: true,
@@ -64,6 +66,8 @@ export class DevicesService {
       data: {
         name: createDeviceDto.name,
         ecosystemId: createDeviceDto.ecosystemId,
+        category: createDeviceDto.category as any ?? null,
+        room: createDeviceDto.room ?? null,
         macAddress: this.normalizeMacAddress(createDeviceDto.macAddress),
         vendor: createDeviceDto.vendor ?? null,
       },
@@ -128,7 +132,7 @@ export class DevicesService {
       return existingDevice;
     }
 
-    const name = preferredName?.trim() || 'Nuevo dispositivo';
+    const name = preferredName?.trim() || await this.generateNextDefaultName(ecosystemId);
 
     return this.prisma.device.create({
       data: {
@@ -139,6 +143,42 @@ export class DevicesService {
       },
       select: this.deviceSelect,
     });
+  }
+
+  private async generateNextDefaultName(ecosystemId: string): Promise<string> {
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id: ecosystemId },
+      select: { ownerId: true },
+    });
+
+    if (!ecosystem) {
+      return 'Nuevo dispositivo 1';
+    }
+
+    const devices = await this.prisma.device.findMany({
+      where: {
+        ecosystem: {
+          ownerId: ecosystem.ownerId,
+        },
+        name: {
+          startsWith: 'Nuevo dispositivo ',
+        },
+      },
+      select: { name: true },
+    });
+
+    let maxNumber = 0;
+    for (const device of devices) {
+      const match = device.name.match(/^Nuevo dispositivo (\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    }
+
+    return `Nuevo dispositivo ${maxNumber + 1}`;
   }
 
   async updateVendorIfMissing(ecosystemId: string, macAddress: string, vendor: string) {
@@ -203,11 +243,14 @@ export class DevicesService {
       ? this.normalizeMacAddress(updateDeviceDto.macAddress)
       : undefined;
 
+    const { ecosystemId: _ignore, ...updateData } = updateDeviceDto;
+
     try {
       return await this.prisma.device.update({
         where: { id },
         data: {
-          ...updateDeviceDto,
+          ...updateData,
+          category: updateData.category as any,
           ...(normalizedMacAddress && { macAddress: normalizedMacAddress }),
         },
         select: this.deviceSelect,

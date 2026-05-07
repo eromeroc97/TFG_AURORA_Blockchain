@@ -1,0 +1,22 @@
+import { Controller, Get, Header, Options, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
+@Controller()
+export class HealthController {
+  @Options('health')
+  @Header('Access-Control-Allow-Origin', '*')
+  @Header('Access-Control-Allow-Methods', 'GET,OPTIONS')
+  @Header('Access-Control-Allow-Headers', 'Content-Type,Accept,Authorization')
+  optionsHealth() {
+    return '';
+  }
+
+  @Get('health')
+  @Header('Access-Control-Allow-Origin', '*')
+  getHealth() {
+    return {
+      status: 'UP',
+      service: 'blockchain-manager',
+    };
+  }
+}

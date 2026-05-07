@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Shield, UserCircle2 } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, Shield, UserCircle2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import auroraLogo from '../../assets/aurora-logo.png'
@@ -7,16 +7,23 @@ type HeaderProps = {
   onSignOut: () => Promise<void> | void
   userEmail?: string | null
   userRole?: string | null
+  pendingCount?: number
 }
 
 const navigationItems = [
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Telemetría', to: '/telemetry' },
-  { label: 'Auditoría', to: '/dashboard#auditoria' },
+  { label: 'Dashboard', to: '/dashboard', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
+  { label: 'Usuarios', to: '/users', roles: ['ADMIN', 'GLOBAL_ADMIN'] },
+  { label: 'Ecosistemas', to: '/ecosystems', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
+  { label: 'Blockchain', to: '/blockchain', roles: ['GLOBAL_ADMIN'] },
 ] as const
 
-export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) {
+export default function Header({ onSignOut, userEmail, userRole, pendingCount = 0 }: HeaderProps) {
   const location = useLocation()
+  const role = (userRole ?? 'USER').toUpperCase()
+
+  const visibleNavigationItems = navigationItems.filter((item) =>
+    item.roles.some((r) => r === role),
+  )
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -50,10 +57,7 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
   }, [])
 
   const getLinkClassName = (to: string) => {
-    const isDashboard = to === '/dashboard'
-    const isActive = isDashboard
-      ? location.pathname === '/dashboard'
-      : `${location.pathname}${location.hash}` === to
+    const isActive = location.pathname === to
 
     return [
       'rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200',
@@ -74,15 +78,20 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
 
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex shrink-0 items-center gap-3">
-          <img
-            src={auroraLogo}
-            alt="AURORA"
-            className="h-11 w-auto drop-shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
-          />
+          <div className="flex flex-col items-center">
+            <img
+              src={auroraLogo}
+              alt="AURORA"
+              className="h-11 w-auto drop-shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
+            />
+            <span className="text-[0.6rem] font-bold tracking-[0.35em] text-primary -mt-1">
+              SMART HOME
+            </span>
+          </div>
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-2 rounded-full bg-white/70 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] md:flex">
-          {navigationItems.map((item) => (
+          {visibleNavigationItems.map((item) => (
             <Link key={item.label} to={item.to} className={getLinkClassName(item.to)}>
               {item.label}
             </Link>
@@ -98,8 +107,13 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
             aria-expanded={isProfileMenuOpen}
             className="inline-flex items-center gap-3 rounded-full bg-white/85 px-3 py-2 text-left shadow-[0_10px_24px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-md transition-colors hover:bg-white"
           >
-            <div className="flex size-9 items-center justify-center rounded-full bg-primary text-surface">
+            <div className="relative flex size-9 items-center justify-center rounded-full bg-primary text-surface">
               <UserCircle2 className="size-5" />
+              {pendingCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-bold text-white">
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </span>
+              )}
             </div>
             <div className="hidden text-left sm:block">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-muted">
@@ -139,6 +153,21 @@ export default function Header({ onSignOut, userEmail, userRole }: HeaderProps) 
                 >
                   <Shield className="size-4 text-accent" />
                   Ir a mi perfil
+                </Link>
+
+                <Link
+                  to="/notifications"
+                  role="menuitem"
+                  onClick={() => setIsProfileMenuOpen(false)}
+                  className="inline-flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/5 hover:text-primary"
+                >
+                  <Bell className="size-4 text-accent" />
+                  Notificaciones
+                  {pendingCount > 0 && (
+                    <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-red-500 text-[0.65rem] font-bold text-white">
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </span>
+                  )}
                 </Link>
 
                 <button

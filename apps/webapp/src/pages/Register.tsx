@@ -1,15 +1,24 @@
+import { useEffect, useState, type FormEvent } from 'react'
 import axios from 'axios'
 import { ArrowRight, Mail } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import AuthPageShell from '../components/auth/AuthPageShell'
+import { useAuth } from '../context/auth-context'
 
 export default function Register() {
+  const navigate = useNavigate()
+  const { isAuthenticated, isHydrating } = useAuth()
   const [email, setEmail] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!isHydrating && isAuthenticated) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [isAuthenticated, isHydrating, navigate])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

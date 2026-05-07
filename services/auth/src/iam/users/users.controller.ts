@@ -25,6 +25,12 @@ type AuthenticatedRequest = {
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  findMe(@Req() request: AuthenticatedRequest) {
+    return this.usersService.findMe(request.user?.sub ?? '');
+  }
+
   @Post()
   @ApiOperation({ summary: 'Registrar un nuevo usuario (solo USER, PENDING)' })
   @ApiCreatedResponse({
@@ -43,6 +49,13 @@ export class UsersController {
   @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
   findAll(@Req() request: AuthenticatedRequest) {
     return this.usersService.findAll(request.user?.role, request.user?.sub);
+  }
+
+  @Get('by-email/:email')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  findByEmail(@Param('email') email: string) {
+    return this.usersService.findByEmail(email);
   }
 
   @Get(':id')
@@ -88,5 +101,12 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.usersService.remove(id, request.user?.sub ?? id, request.user?.role);
+  }
+
+  @Get(':id/telemetry-volume')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  getUserTelemetryVolume(@Param('id') id: string) {
+    return this.usersService.getUserTelemetryVolume(id);
   }
 }

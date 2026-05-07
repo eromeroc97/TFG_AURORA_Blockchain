@@ -1,0 +1,6 @@
+bordered: false
+createdAt: 2026-05-01T00:00:00.000Z
+description: "add_administrator_notification_type"
+migrationEngineVersion: 7.7.0-7fc370e4b71314706f800d1aa50a359733822a2f
+originalRevision: null
+finishedAt: null
