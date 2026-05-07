@@ -18,25 +18,6 @@ export class AuditController {
     return this.auditService.getStats();
   }
 
-  @Get('ingest/:ingestId')
-  async getByIngestId(@Param('ingestId') ingestId: string) {
-    return this.auditService.getByIngestId(ingestId);
-  }
-
-  @Get('hash/:hash')
-  async getByHash(@Param('hash') hash: string) {
-    return this.auditService.getByHash(hash);
-  }
-
-  @Get('ecosystem/:ecosystemId')
-  async getByEcosystem(
-    @Param('ecosystemId') ecosystemId: string,
-    @Query('startTime') startTime?: string,
-    @Query('endTime') endTime?: string,
-  ) {
-    return this.auditService.getByEcosystem(ecosystemId, startTime, endTime);
-  }
-
   @Get('chain/visual')
   async getChainVisualization(
     @Query('startBlock') startBlock?: number,

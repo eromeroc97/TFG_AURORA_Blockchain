@@ -35,8 +35,7 @@ export class AuditService {
         }
       }
 
-      const namespace = this.fireflyService.getNamespace();
-      const fireflyResponse = await this.fireflyService.getEvents(namespace, params);
+      const fireflyResponse = await this.fireflyService.getEvents(params);
 
       const events: FireFlyEvent[] = Array.isArray(fireflyResponse) 
         ? fireflyResponse 
@@ -119,22 +118,6 @@ export class AuditService {
       lastBlockNumber: 0,
       lastBlockTime: '',
     };
-  }
-
-  async getByIngestId(ingestId: string): Promise<any> {
-    return this.fireflyService.queryChaincode('QueryByIngestID', { ingestId });
-  }
-
-  async getByHash(hash: string): Promise<any> {
-    return this.fireflyService.queryChaincode('QueryByHash', { telemetryHash: hash });
-  }
-
-  async getByEcosystem(ecosystemId: string, startTime?: string, endTime?: string): Promise<any> {
-    return this.fireflyService.queryChaincode('QueryByEcosystem', {
-      ecosystemId,
-      startTime,
-      endTime,
-    });
   }
 
   async getChainVisualization(startBlock?: number, endBlock?: number, limit: number = 50): Promise<ChainVisualization> {
