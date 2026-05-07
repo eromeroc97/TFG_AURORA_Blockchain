@@ -3,9 +3,10 @@ import { Copy, Check, X, Info } from 'lucide-react'
 
 interface DeploymentHelpModalProps {
   className?: string
+  disabled?: boolean
 }
 
-export default function DeploymentHelpModal({ className }: DeploymentHelpModalProps) {
+export default function DeploymentHelpModal({ className, disabled }: DeploymentHelpModalProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
 
@@ -33,8 +34,9 @@ export default function DeploymentHelpModal({ className }: DeploymentHelpModalPr
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
-        className={`inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors ${className || ''}`}
+        onClick={() => !disabled && setIsOpen(true)}
+        disabled={disabled}
+        className={`inline-flex items-center gap-1 text-sm transition-colors ${disabled ? 'cursor-not-allowed text-slate-300' : 'text-slate-500 hover:text-slate-700'} ${className || ''}`}
       >
         <Info className="size-4" />
         ¿Cómo despliego un Smart Contract?

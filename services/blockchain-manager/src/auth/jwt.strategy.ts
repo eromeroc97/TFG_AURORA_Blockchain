@@ -15,8 +15,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: { sub: string; role: string }) {
-    if (payload.role !== 'GLOBAL_ADMIN') {
-      throw new UnauthorizedException('Only GLOBAL_ADMIN role can access this service');
+    if (payload.role !== 'GLOBAL_ADMIN' && payload.role !== 'ADMIN') {
+      throw new UnauthorizedException('Only GLOBAL_ADMIN or ADMIN role can access this service');
     }
 
     return payload;

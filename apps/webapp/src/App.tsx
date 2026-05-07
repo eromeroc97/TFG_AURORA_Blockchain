@@ -12,7 +12,6 @@ import Register from './pages/Register'
 import Reset from './pages/Reset'
 import RequireAuth from './components/routes/RequireAuth'
 import RequireAdmin from './components/routes/RequireAdmin'
-import RequireGlobalAdmin from './components/routes/RequireGlobalAdmin'
 import UsersManagementPage from './pages/UsersManagementPage'
 import MainLayout from './layouts/MainLayout'
 
@@ -50,7 +49,7 @@ function App() {
               <Route element={<RequireAdmin />}>
                 <Route path="/users" element={<UsersManagementPage />} />
               </Route>
-              <Route element={<RequireGlobalAdmin />}>
+              <Route element={<RequireAdmin />}>
                 <Route path="/blockchain" element={<BlockchainManagementPage />} />
               </Route>
               <Route path="/ecosystems" element={<EcosystemsManagementPage />} />

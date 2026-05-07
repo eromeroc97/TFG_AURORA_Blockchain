@@ -23,8 +23,6 @@ export default function EcosystemsManagementPage() {
   const isUser = role === 'USER'
   const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
-  const [autoRefresh, setAutoRefresh] = useState(true)
-
   const { myEcosystems, sharedWithMe, isLoading, error, isCreating, refreshMyEcosystems, refreshSharedWithMe, createEcosystem, addAccess, removeAccess, changeAccessRole, fetchAccesses } = useEcosystemsController()
   const [visibleEcosystems, setVisibleEcosystems] = useState<AccessMapEcosystem[]>([])
   const [selectedEcosystem, setSelectedEcosystem] = useState<AccessMapEcosystem | null>(null)
@@ -234,19 +232,6 @@ export default function EcosystemsManagementPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, refreshMyEcosystems, refreshSharedWithMe])
-
-  useEffect(() => {
-    if (!autoRefresh) return
-
-    const interval = setInterval(() => {
-      void refreshMyEcosystems()
-      if (activeTab === 'shared-with-me') {
-        void refreshSharedWithMe()
-      }
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [autoRefresh, activeTab, refreshMyEcosystems, refreshSharedWithMe])
 
   const maskApiKey = (key: string) => {
     if (key.length <= 8) return '••••••••'
@@ -534,24 +519,6 @@ export default function EcosystemsManagementPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className="flex items-center gap-2"
-          >
-            <span className="text-xs text-slate-500">Actualizar automáticamente</span>
-            <span
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
-                autoRefresh ? 'bg-emerald-500' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                  autoRefresh ? 'translate-x-4' : 'translate-x-1'
-                }`}
-              />
-            </span>
-          </button>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
