@@ -14,7 +14,7 @@ const navigationItems = [
   { label: 'Dashboard', to: '/dashboard', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Usuarios', to: '/users', roles: ['ADMIN', 'GLOBAL_ADMIN'] },
   { label: 'Ecosistemas', to: '/ecosystems', roles: ['USER', 'AUDITOR', 'ADMIN', 'GLOBAL_ADMIN'] },
-  { label: 'Blockchain', to: '/blockchain', roles: ['GLOBAL_ADMIN'] },
+  { label: 'Blockchain', to: '/blockchain', roles: ['ADMIN', 'GLOBAL_ADMIN'] },
 ] as const
 
 export default function Header({ onSignOut, userEmail, userRole, pendingCount = 0 }: HeaderProps) {

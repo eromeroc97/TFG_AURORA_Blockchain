@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { Cpu, Layers, Network, RefreshCw, Activity, X, Server, Search, ChevronLeft, ChevronRight, Filter, XCircle } from 'lucide-react'
+import { useAuth } from '../context/auth-context'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
 import RegisterChaincodeModal from '../components/blockchain/RegisterChaincodeModal'
 import DeploymentHelpModal from '../components/blockchain/DeploymentHelpModal'
@@ -14,7 +15,6 @@ type ModalType = 'organizations' | 'namespaces' | 'ledger' | 'event' | null
 export default function BlockchainManagementPage() {
   const [detailModal, setDetailModal] = useState<ModalType>(null)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<BlockchainEvent | null>(null)
   const [eventsSearchTerm, setEventsSearchTerm] = useState('')
   const [eventsPageSize, setEventsPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
@@ -47,6 +47,11 @@ export default function BlockchainManagementPage() {
     refreshNetworkData,
   } = useBlockchainController()
 
+  const { authClaims } = useAuth()
+  const role = (authClaims?.role ?? 'USER').toUpperCase()
+  const isGlobalAdmin = role === 'GLOBAL_ADMIN'
+  const isAdmin = role === 'ADMIN'
+
   const openDetailModal = (type: ModalType) => {
     setDetailModal(type)
   }
@@ -54,16 +59,6 @@ export default function BlockchainManagementPage() {
   const closeDetailModal = () => {
     setDetailModal(null)
   }
-
-  useEffect(() => {
-    if (!autoRefresh) return
-
-    const interval = setInterval(() => {
-      refreshNetworkData()
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [autoRefresh, refreshNetworkData])
 
   const cardClasses = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-teal-300"
 
@@ -235,24 +230,6 @@ export default function BlockchainManagementPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className="flex items-center gap-2"
-          >
-            <span className="text-xs text-slate-500">Actualizar automáticamente</span>
-            <span
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
-                autoRefresh ? 'bg-emerald-500' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                  autoRefresh ? 'translate-x-4' : 'translate-x-1'
-                }`}
-              />
-            </span>
-          </button>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -589,15 +566,18 @@ export default function BlockchainManagementPage() {
               Smart Contracts
             </h2>
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsRegisterModalOpen(true)}
-                className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent/80"
-              >
-                <Layers className="size-4" />
-                Registrar Smart Contract
-              </button>
-              <DeploymentHelpModal />
+              {(isGlobalAdmin || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={() => !isAdmin && setIsRegisterModalOpen(true)}
+                  disabled={isAdmin}
+                  className={`inline-flex items-center gap-1 text-sm font-medium transition-colors ${isAdmin ? 'cursor-not-allowed text-slate-300' : 'text-accent hover:text-accent/80'}`}
+                >
+                  <Layers className="size-4" />
+                  Registrar Smart Contract
+                </button>
+              )}
+              <DeploymentHelpModal disabled={isAdmin} />
             </div>
           </div>
 
