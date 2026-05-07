@@ -7,7 +7,8 @@ interface FireFlyEvent {
   id: string;
   name: string;
   namespace: string;
-  timestamp: string;
+  created: string;
+  timestamp?: string;
   tx?: {
     id: string;
     blockchainId?: string;
@@ -41,6 +42,8 @@ export class AuditService {
         ? fireflyResponse 
         : (fireflyResponse.items || []);
 
+      console.log('[DEBUG] FireFly events:', JSON.stringify(events.slice(0, 2), null, 2));
+
       const timeline: AuditTimelineItem[] = events.map((event: FireFlyEvent) => {
         const output = event.output || {};
         
@@ -58,9 +61,18 @@ export class AuditService {
                                   eventName.toLowerCase().includes('anchor') ||
                                   eventName.toLowerCase().includes('pin');
 
+        const formatTimestamp = (ts: string | number | undefined): string => {
+          if (!ts) return new Date().toISOString();
+          if (typeof ts === 'number') {
+            return new Date(ts > 9999999999 ? ts : ts * 1000).toISOString();
+          }
+          const date = new Date(ts);
+          return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+        };
+
         return {
           eventId: event.id,
-          timestamp: event.timestamp,
+          timestamp: formatTimestamp(event.created),
           action: eventName,
           actorName,
           type: isTelemetryEvent ? 'TELEMETRY' : 'ADMIN',

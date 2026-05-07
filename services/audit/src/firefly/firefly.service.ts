@@ -33,7 +33,7 @@ export class FireFlyService {
     if (options?.filter) params.append('filter', options.filter);
     params.append('sort', '-timestamp');
 
-    const url = `${this.baseUrl}/api/v1/namespaces/${this.namespace}/events?${params}`;
+    const url = `${this.baseUrl}/api/v1/namespaces/${this.namespace}/blockchainevents?${params}`;
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
