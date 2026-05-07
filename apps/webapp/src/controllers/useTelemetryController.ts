@@ -52,7 +52,7 @@ const fillTimeRange = (range: TelemetryRange, data: DailyVolumeItem[]): DailyVol
   return result
 }
 
-export function useTelemetryController(initialRange: TelemetryRange = '24h') {
+export function useTelemetryController(initialRange: TelemetryRange = '1M') {
   const [data, setData] = useState<TelemetryMetrics>({
     dailyVolume: [],
     rawDailyVolume: [],

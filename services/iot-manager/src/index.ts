@@ -430,7 +430,8 @@ export const buildApp = (options: AppOptions = {}) => {
       '1M': 30 * 24 * 60 * 60 * 1000,
       '1y': 365 * 24 * 60 * 60 * 1000,
     };
-    const range = queryRange && rangeMs[queryRange] ? rangeMs[queryRange] : 24 * 60 * 60 * 1000;
+    
+    const range = queryRange && rangeMs[queryRange] ? rangeMs[queryRange] : 24 * 60 * 60 * 1000
 
     const metrics = await telemetryStore.getMetrics({
       from: new Date(Date.now() - range),

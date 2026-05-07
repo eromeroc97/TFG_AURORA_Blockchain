@@ -102,7 +102,7 @@ export type TelemetryMetricsResult = {
 };
 
 export type TelemetryMetricsQuery = {
-  from: Date;
+  from?: Date;
   ecosystemIds?: string[];
 };
 
@@ -390,9 +390,11 @@ export class MongoTelemetryStore implements TelemetryStore {
 
   async getMetrics(query: TelemetryMetricsQuery): Promise<TelemetryMetricsResult> {
     const collection = await this.ensureCollection();
-    const filters: Record<string, unknown> = {
-      timestamp: { $gte: query.from },
-    };
+    const filters: Record<string, unknown> = {};
+
+    if (query.from) {
+      filters.timestamp = { $gte: query.from };
+    }
 
     if (query.ecosystemIds?.length) {
       filters['metadata.ecosystemId'] = { $in: query.ecosystemIds };

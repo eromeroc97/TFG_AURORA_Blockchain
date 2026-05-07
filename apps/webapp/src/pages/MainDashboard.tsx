@@ -212,21 +212,21 @@ export default function MainDashboard() {
                 <BarChart3 className="h-7 w-7 text-blue-600" />
                 <div>
                   <p className="text-sm font-medium text-slate-500">Volumen transaccional</p>
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    {range === '30m'
-                      ? 'Últimos 30 minutos'
-                      : range === '1h'
-                        ? 'Última hora'
-                        : range === '12h'
-                          ? 'Últimas 12 horas'
-                          : range === '24h'
-                            ? 'Últimas 24 horas'
-                            : range === '1w'
-                              ? 'Última semana'
-                              : range === '1M'
-                                ? 'Último mes'
-                                : 'Último año'}
-                  </h2>
+<h2 className="text-xl font-semibold text-slate-900">
+                      {range === '30m'
+                        ? 'Últimos 30 minutos'
+                        : range === '1h'
+                          ? 'Última hora'
+                          : range === '12h'
+                            ? 'Últimas 12 horas'
+                            : range === '24h'
+                              ? 'Últimas 24 horas'
+                              : range === '1w'
+                                ? 'Última semana'
+                                : range === '1M'
+                                  ? 'Último mes'
+                                  : 'Último año'}
+                    </h2>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -281,7 +281,12 @@ export default function MainDashboard() {
                         second: '2-digit',
                       })
                     }}
-                    formatter={(value: number) => [`${value} transacciones`, 'Volumen']}
+                    formatter={(value: number) => {
+                      const bytes = value
+                      if (bytes < 1024) return [`${bytes} B`, 'Volumen']
+                      if (bytes < 1024 * 1024) return [`${(bytes / 1024).toFixed(1)} KB`, 'Volumen']
+                      return [`${(bytes / (1024 * 1024)).toFixed(1)} MB`, 'Volumen']
+                    }}
                   />
                   <Line type="monotone" dataKey="tx" stroke="#2563eb" strokeWidth={2} dot={false} />
                 </LineChart>
@@ -329,7 +334,16 @@ export default function MainDashboard() {
                   <BarChart data={data.ecosystemUsage} margin={{ top: 10, right: 18, left: 0, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
                     <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#0f172a', fontSize: 12 }} interval={0} angle={-45} textAnchor="end" />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+<YAxis 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tick={{ fill: '#64748b', fontSize: 12 }}
+                      tickFormatter={(value: number) => {
+                        if (value < 1024) return `${value} B`
+                        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+                        return `${(value / (1024 * 1024)).toFixed(1)} MB`
+                      }}
+                    />
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
                     <Bar dataKey="anchors" radius={[4, 4, 0, 0]} fill="#7c3aed">
                       {data.ecosystemUsage.map((_, index) => (
