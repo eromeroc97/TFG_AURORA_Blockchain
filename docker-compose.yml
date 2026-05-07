@@ -140,6 +140,9 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./services/audit/.env
+    depends_on:
+      - postgres-db
+      - mongo-db
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.audit.rule=PathPrefix(`/api/audit`)"
