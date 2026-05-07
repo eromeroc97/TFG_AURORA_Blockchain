@@ -3,13 +3,14 @@ export interface AuditTimelineItem {
   timestamp: string;
   action: string;
   actorName: string;
-  type: 'TELEMETRY' | 'ADMIN';
+  type: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY';
   integrityStatus: 'VERIFIED' | 'DISCREPANCY';
   blockchainTxId: string;
   blockNumber?: number;
   telemetryHash?: string;
   ecosystemId?: string;
   ingestId?: string;
+  output?: Record<string, unknown>;
 }
 
 export interface AuditTimelineResponse {

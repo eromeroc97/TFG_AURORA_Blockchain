@@ -31,7 +31,7 @@ export class AuditService {
       if (filters.eventType) {
         if (filters.eventType === 'TELEMETRY') {
           params.filter = 'name=~Telemetry';
-        } else if (filters.eventType === 'ADMIN') {
+        } else if (filters.eventType === 'ADMINISTRATIVE') {
           params.filter = 'name=~';
         }
       }
@@ -41,8 +41,6 @@ export class AuditService {
       const events: FireFlyEvent[] = Array.isArray(fireflyResponse) 
         ? fireflyResponse 
         : (fireflyResponse.items || []);
-
-      console.log('[DEBUG] FireFly events:', JSON.stringify(events.slice(0, 2), null, 2));
 
       const timeline: AuditTimelineItem[] = events.map((event: FireFlyEvent) => {
         const output = event.output || {};
@@ -54,12 +52,19 @@ export class AuditService {
           actorName = `Usuario ${output.userId}`;
         } else if (output.ingestId) {
           actorName = `Ingesta ${output.ingestId}`;
+        } else if (output.signer && typeof output.signer === 'string') {
+          const signerParts = output.signer.split('::');
+          actorName = signerParts[0] || 'FireFly System';
         }
 
         const eventName = event.name || 'Evento Blockchain';
-        const isTelemetryEvent = eventName.toLowerCase().includes('telemetry') || 
-                                  eventName.toLowerCase().includes('anchor') ||
-                                  eventName.toLowerCase().includes('pin');
+        
+        let eventType: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY' = 'ADMINISTRATIVE';
+        if (eventName.toLowerCase().includes('telemetry') || eventName.toLowerCase().includes('anchor')) {
+          eventType = 'TELEMETRY';
+        } else if (eventName.toLowerCase().includes('batchpin') || eventName.toLowerCase().includes('batch_pin')) {
+          eventType = 'FIREFLY';
+        }
 
         const formatTimestamp = (ts: string | number | undefined): string => {
           if (!ts) return new Date().toISOString();
@@ -72,16 +77,17 @@ export class AuditService {
 
         return {
           eventId: event.id,
-          timestamp: formatTimestamp(event.created),
+          timestamp: formatTimestamp(event.timestamp),
           action: eventName,
           actorName,
-          type: isTelemetryEvent ? 'TELEMETRY' : 'ADMIN',
+          type: eventType,
           integrityStatus: 'VERIFIED',
           blockchainTxId: event.tx?.blockchainId || event.tx?.id || '',
           blockNumber: undefined,
           telemetryHash: output.hash?.toString() || output.telemetryHash?.toString() || '',
           ecosystemId: output.ecosystemId?.toString() || '',
           ingestId: output.ingestId?.toString() || event.id,
+          output: output,
         };
       });
 

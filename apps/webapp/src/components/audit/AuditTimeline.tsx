@@ -14,7 +14,7 @@ const transformToAuditEvent = (item: AuditAnchor): AuditEvent => ({
   integrityStatus: item.integrityStatus,
   blockchainTxId: item.blockchainTxId,
   details: {
-    blockchainRecord: {
+    blockchainRecord: item.output || {
       eventId: item.eventId,
       timestamp: item.timestamp,
       txId: item.blockchainTxId,
@@ -176,7 +176,8 @@ export default function AuditTimeline() {
                 >
                   <option value="ALL">Todos</option>
                   <option value="TELEMETRY">Telemetría</option>
-                  <option value="ADMIN">Administrativo</option>
+                  <option value="ADMINISTRATIVE">Administrativo</option>
+                  <option value="FIREFLY">FireFly</option>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
               </div>

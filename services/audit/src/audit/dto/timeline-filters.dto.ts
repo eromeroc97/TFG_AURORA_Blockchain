@@ -15,8 +15,8 @@ export class TimelineFiltersDto {
   endDate?: string;
 
   @IsOptional()
-  @IsIn(['TELEMETRY', 'ADMIN'])
-  eventType?: 'TELEMETRY' | 'ADMIN';
+  @IsIn(['TELEMETRY', 'ADMINISTRATIVE', 'FIREFLY'])
+  eventType?: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY';
 
   @IsOptional()
   @Type(() => Number)

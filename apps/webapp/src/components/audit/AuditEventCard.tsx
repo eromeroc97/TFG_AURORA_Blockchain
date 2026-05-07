@@ -31,7 +31,9 @@ export default function AuditEventCard({ event, isExpanded, onToggle }: AuditEve
   };
 
   const getTypeLabel = () => {
-    return event.type === 'ADMIN' ? 'Administrativo' : 'Telemetry';
+    if (event.type === 'ADMINISTRATIVE') return 'Administrativo';
+    if (event.type === 'FIREFLY') return 'FireFly';
+    return 'Telemetría';
   };
 
   return (
