@@ -13,6 +13,7 @@ const transformToAuditEvent = (item: AuditAnchor): AuditEvent => ({
   type: item.type,
   integrityStatus: item.integrityStatus,
   blockchainTxId: item.blockchainTxId,
+  signatureValid: item.signatureValid,
   details: {
     blockchainRecord: item.output || {
       eventId: item.eventId,
@@ -224,7 +225,7 @@ export default function AuditTimeline() {
           </div>
         ) : (
           <Virtuoso
-            style={{ height: '500px' }}
+            style={{ height: '600px' }}
             totalCount={events.length}
             itemContent={(index) => {
               const event = events[index]

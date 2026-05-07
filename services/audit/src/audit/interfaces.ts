@@ -11,6 +11,7 @@ export interface AuditTimelineItem {
   ecosystemId?: string;
   ingestId?: string;
   output?: Record<string, unknown>;
+  signatureValid?: boolean;
 }
 
 export interface AuditTimelineResponse {

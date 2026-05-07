@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, ShieldCheck, ShieldX } from 'lucide-react';
 import JsonViewer from './JsonViewer';
 import type { AuditEvent } from './types';
 
@@ -10,6 +10,10 @@ interface EventDetailPanelProps {
 
 export default function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
   const isDiscrepancy = event.integrityStatus === 'DISCREPANCY';
+  
+  const blockchainRecord = event.details.blockchainRecord as Record<string, unknown>;
+  const hasSignatureData = !!blockchainRecord.signature && !!blockchainRecord.publicKey;
+  const signatureValid = event.signatureValid;
 
   return (
     <AnimatePresence>
@@ -45,6 +49,25 @@ export default function EventDetailPanel({ event, onClose }: EventDetailPanelPro
             <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
+
+        {hasSignatureData && (
+          <div className="px-4 py-3 border-b border-slate-200/50 flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Verificación de Firma:</span>
+            {signatureValid === true ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                <ShieldCheck className="w-3 h-3" />
+                Firma válida
+              </span>
+            ) : signatureValid === false ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                <ShieldX className="w-3 h-3" />
+                Firma inválida
+              </span>
+            ) : (
+              <span className="text-xs text-slate-400">Sin datos para verificar</span>
+            )}
+          </div>
+        )}
 
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

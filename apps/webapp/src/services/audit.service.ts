@@ -5,7 +5,7 @@ export interface AuditAnchor {
   timestamp: string
   action: string
   actorName: string
-  type: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY' | 'FIREFLY'
+  type: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY'
   integrityStatus: 'VERIFIED' | 'DISCREPANCY'
   blockchainTxId: string
   blockNumber?: number
@@ -13,6 +13,7 @@ export interface AuditAnchor {
   ecosystemId?: string
   ingestId?: string
   output?: Record<string, unknown>
+  signatureValid?: boolean
 }
 
 export interface AuditTimelineResponse {

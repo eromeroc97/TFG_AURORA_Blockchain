@@ -6,6 +6,7 @@ export interface AuditEvent {
   type: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY';
   integrityStatus: 'VERIFIED' | 'DISCREPANCY';
   blockchainTxId: string;
+  signatureValid?: boolean;
   details: {
     blockchainRecord: Record<string, unknown>;
     databaseRecord: Record<string, unknown>;
@@ -25,4 +26,5 @@ export interface AuditTimelineItem {
   ecosystemId?: string;
   ingestId?: string;
   output?: Record<string, unknown>;
+  signatureValid?: boolean;
 }

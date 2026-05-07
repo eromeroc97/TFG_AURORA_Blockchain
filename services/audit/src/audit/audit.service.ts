@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { FireFlyService } from '../firefly/firefly.service';
 import { TimelineFiltersDto } from './dto/timeline-filters.dto';
 import type { AuditTimelineResponse, BlockchainStats, ChainVisualization, AuditTimelineItem } from './interfaces';
@@ -20,6 +21,25 @@ interface FireFlyEvent {
 @Injectable()
 export class AuditService {
   constructor(private readonly fireflyService: FireFlyService) {}
+
+  private verifyEd25519Signature(
+    telemetryHash: string,
+    signatureB64: string,
+    publicKeyPem: string,
+  ): boolean {
+    try {
+      const isValid = crypto.verify(
+        undefined,
+        Buffer.from(telemetryHash),
+        { key: publicKeyPem, format: 'pem' },
+        Buffer.from(signatureB64, 'base64'),
+      );
+      return isValid;
+    } catch (error) {
+      console.error('[SIGNATURE_VERIFY_ERROR]', error.message);
+      return false;
+    }
+  }
 
   async getTimeline(filters: TimelineFiltersDto): Promise<AuditTimelineResponse> {
     try {
@@ -75,19 +95,48 @@ export class AuditService {
           return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
         };
 
+        const telemetryHash = output.telemetryHash?.toString() || output.hash?.toString() || '';
+        const signature = output.signature?.toString() || '';
+        const publicKey = output.publicKey?.toString() || '';
+
+        let signatureValid = false;
+        let integrityStatus: 'VERIFIED' | 'DISCREPANCY' = 'VERIFIED';
+
+        if (eventType === 'TELEMETRY' && telemetryHash && signature && publicKey) {
+          signatureValid = this.verifyEd25519Signature(telemetryHash, signature, publicKey);
+
+          if (!signatureValid) {
+            integrityStatus = 'DISCREPANCY';
+          } else {
+            // ========================================================
+            // TODO: INTEGRIDAD CON MONGODB (iot-manager)
+            // ========================================================
+            // Paso B: Obtener datos de MongoDB usando ingestId
+            // const dbData = await this.iotManagerService.getTelemetryByIngestId(ingestId);
+            // if (dbData) {
+            //   const dbHash = crypto.createHash('sha256').update(JSON.stringify(dbData)).digest('hex');
+            //   if (dbHash !== telemetryHash) {
+            //     integrityStatus = 'DISCREPANCY';
+            //   }
+            // }
+            // ========================================================
+          }
+        }
+
         return {
           eventId: event.id,
           timestamp: formatTimestamp(event.timestamp),
           action: eventName,
           actorName,
           type: eventType,
-          integrityStatus: 'VERIFIED',
+          integrityStatus,
           blockchainTxId: event.tx?.blockchainId || event.tx?.id || '',
           blockNumber: undefined,
-          telemetryHash: output.hash?.toString() || output.telemetryHash?.toString() || '',
+          telemetryHash,
           ecosystemId: output.ecosystemId?.toString() || '',
           ingestId: output.ingestId?.toString() || event.id,
           output: output,
+          signatureValid,
         };
       });
 
