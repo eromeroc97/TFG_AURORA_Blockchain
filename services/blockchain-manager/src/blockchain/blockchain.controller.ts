@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Header, Options, UseGuards, Query, Header as NestHeader, Body } from '@nestjs/common';
+import { Controller, Get, Post, Header, Options, UseGuards, Query, Header as NestHeader, Body, Req, ForbiddenException, Request } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FireflyService, FireflyNamespace, FireflyIdentity, FireflyPin } from '../firefly/firefly.service';
 import { RegisterChaincodeDto } from './dto/register-chaincode.dto';
@@ -177,7 +177,11 @@ export class BlockchainController {
   }
 
   @Post('register-chaincode')
-  async registerChaincode(@Body() dto: RegisterChaincodeDto) {
+  async registerChaincode(@Body() dto: RegisterChaincodeDto, @Req() req: Request & { user: { role: string } }) {
+    if (req.user?.role !== 'GLOBAL_ADMIN') {
+      throw new ForbiddenException('Only GLOBAL_ADMIN can register chaincodes');
+    }
+
     const namespace = 'default';
     let ffiId: string;
 
