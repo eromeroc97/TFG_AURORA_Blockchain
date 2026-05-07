@@ -1,10 +1,15 @@
 export interface AuditTimelineItem {
+  eventId: string;
   timestamp: string;
-  ingestId: string;
-  ecosystemId: string;
-  telemetryHash: string;
-  txId: string;
+  action: string;
+  actorName: string;
+  type: 'TELEMETRY' | 'ADMIN';
+  integrityStatus: 'VERIFIED' | 'DISCREPANCY';
+  blockchainTxId: string;
   blockNumber?: number;
+  telemetryHash?: string;
+  ecosystemId?: string;
+  ingestId?: string;
 }
 
 export interface AuditTimelineResponse {

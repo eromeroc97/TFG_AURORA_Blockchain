@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, IsString, Min, Max } from 'class-validator';
+import { IsOptional, IsNumber, IsString, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class TimelineFiltersDto {
@@ -8,11 +8,15 @@ export class TimelineFiltersDto {
 
   @IsOptional()
   @IsString()
-  startTime?: string;
+  startDate?: string;
 
   @IsOptional()
   @IsString()
-  endTime?: string;
+  endDate?: string;
+
+  @IsOptional()
+  @IsIn(['TELEMETRY', 'ADMIN'])
+  eventType?: 'TELEMETRY' | 'ADMIN';
 
   @IsOptional()
   @Type(() => Number)

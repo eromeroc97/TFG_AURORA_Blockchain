@@ -1,4 +1,5 @@
 import { FileSearch } from 'lucide-react'
+import { AuditTimeline } from '../components/audit'
 
 export default function AuditDashboardPage() {
   return (
@@ -16,11 +17,7 @@ export default function AuditDashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-slate-500 text-center py-12">
-            Dashboard de auditoría en construcción. Define los componentes que necesitas.
-          </p>
-        </div>
+        <AuditTimeline />
       </div>
     </div>
   )

@@ -17,6 +17,10 @@ export class FireFlyService {
     this.namespace = configService.get<string>('FIREFLY_NAMESPACE') || 'default';
   }
 
+  getNamespace(): string {
+    return this.namespace;
+  }
+
   async queryChaincode<T>(method: string, params: Record<string, any> = {}): Promise<T> {
     if (!this.contractId) {
       throw new Error('FIREFLY_CONTRACT_ID is not configured');
@@ -57,6 +61,27 @@ export class FireFlyService {
       return response.data;
     } catch (error) {
       throw new Error(`FireFly operations query failed: ${error.message}`);
+    }
+  }
+
+  async getEvents(namespace: string, options?: { 
+    limit?: number; 
+    skip?: number; 
+    filter?: string; 
+  }): Promise<any> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.skip) params.append('skip', options.skip.toString());
+    if (options?.filter) params.append('filter', options.filter);
+    params.append('sort', '-timestamp');
+
+    const url = `${this.baseUrl}/api/v1/namespaces/${namespace}/events?${params}`;
+    
+    try {
+      const response = await firstValueFrom(this.httpService.get(url));
+      return response.data;
+    } catch (error) {
+      throw new Error(`FireFly events query failed: ${error.message}`);
     }
   }
 }

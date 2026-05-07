@@ -1,34 +1,16 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { JwtStrategy } from './jwt.strategy';
+import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
-export class JwtAuthGuard extends JwtStrategy implements CanActivate {
-  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const token = this.extractToken(request);
-    
-    if (!token) {
-      throw new UnauthorizedException('Token de autorización requerido');
-    }
-
-    try {
-      const payload = this.validate(token);
-      request.user = payload;
-      return true;
-    } catch (err) {
-      throw new UnauthorizedException('Token inválido o expirado');
-    }
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  canActivate(context: ExecutionContext) {
+    return super.canActivate(context);
   }
 
-  private extractToken(request: any): string | null {
-    const authHeader = request.headers?.authorization;
-    if (!authHeader) return null;
-    
-    const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
-      return null;
+  handleRequest(err: any, user: any, info: any) {
+    if (err || !user) {
+      throw err || new UnauthorizedException('Token inválido o expirado');
     }
-    return parts[1];
+    return user;
   }
 }

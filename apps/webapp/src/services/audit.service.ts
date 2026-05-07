@@ -1,13 +1,17 @@
 import { apiClient } from '../api/axios'
 
 export interface AuditAnchor {
+  eventId: string
   timestamp: string
-  type: string
-  ingestId: string
-  ecosystemId: string
-  telemetryHash: string
-  txId: string
-  blockNumber: number
+  action: string
+  actorName: string
+  type: 'TELEMETRY' | 'ADMIN'
+  integrityStatus: 'VERIFIED' | 'DISCREPANCY'
+  blockchainTxId: string
+  blockNumber?: number
+  telemetryHash?: string
+  ecosystemId?: string
+  ingestId?: string
 }
 
 export interface AuditTimelineResponse {
@@ -54,8 +58,9 @@ export interface ChainVisualization {
 
 export interface AuditFilters {
   ecosystemId?: string
-  start?: string
-  end?: string
+  startDate?: string
+  endDate?: string
+  eventType?: 'TELEMETRY' | 'ADMIN'
   limit?: number
   offset?: number
 }
@@ -63,10 +68,18 @@ export interface AuditFilters {
 export async function getAuditTimeline(filters: AuditFilters): Promise<AuditTimelineResponse> {
   try {
     const response = await apiClient.get<AuditTimelineResponse>('/audit/timeline', {
-      params: filters,
+      params: {
+        ecosystemId: filters.ecosystemId,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        eventType: filters.eventType,
+        limit: filters.limit || 50,
+        offset: filters.offset || 0,
+      },
     })
     return response.data
-  } catch {
+  } catch (error) {
+    console.error('Error fetching audit timeline:', error)
     return { timeline: [], pagination: { total: 0, limit: 50, offset: 0 } }
   }
 }

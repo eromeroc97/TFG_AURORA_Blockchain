@@ -134,6 +134,38 @@ services:
       retries: 3
       start_period: 10s
 
+  audit-service:
+    build:
+      context: ./services/audit
+      dockerfile: Dockerfile
+    env_file:
+      - ./services/audit/.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.audit.rule=PathPrefix(`/api/audit`)"
+      - "traefik.http.routers.audit.entrypoints=web"
+      - "traefik.http.routers.audit.priority=100"
+      - "traefik.http.services.audit.loadbalancer.server.port=3003"
+      - "traefik.http.middlewares.audit-strip.stripprefix.prefixes=/api"
+      - "traefik.http.routers.audit.middlewares=audit-strip"
+      - "traefik.http.routers.audit-health.rule=PathPrefix(`/api/audit/health`)"
+      - "traefik.http.routers.audit-health.entrypoints=web"
+      - "traefik.http.routers.audit-health.priority=201"
+      - "traefik.http.routers.audit-health.service=audit"
+      - "traefik.http.middlewares.audit-health-strip.stripprefix.prefixes=/api/audit"
+      - "traefik.http.routers.audit-health.middlewares=audit-health-strip"
+      - "traefik.docker.network=aurora-secure-net"
+    networks:
+      - aurora-secure-net
+    expose:
+      - "3003"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3003/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   webapp:
     image: caddy:2.8.4-alpine
     depends_on:
