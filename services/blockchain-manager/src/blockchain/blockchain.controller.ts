@@ -26,7 +26,7 @@ interface LedgerInfoResponse {
   lastBlockTime: string;
 }
 
-function normalizeListResponse<T>(response: unknown): T[] {
+export function normalizeListResponse<T>(response: unknown): T[] {
   if (Array.isArray(response)) {
     return response
   }
@@ -136,8 +136,8 @@ export class BlockchainController {
 
   @Get('events')
   async getEvents(
-    @Query('namespace') namespace = 'default',
-    @Query('limit') limit: string | undefined,
+    @Query('namespace') namespace: string = 'default',
+    @Query('limit') limit: string | undefined = undefined,
     @Query('skip') skip = '0',
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : undefined
