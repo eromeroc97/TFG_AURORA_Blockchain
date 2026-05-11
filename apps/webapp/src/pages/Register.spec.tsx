@@ -10,6 +10,12 @@ jest.mock('../api/axios', () => ({
   },
 }))
 
+jest.mock('../context/auth-context', () => ({
+  useAuth: () => ({
+    setSession: jest.fn(),
+  }),
+}))
+
 const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>
 
 describe('Register page', () => {

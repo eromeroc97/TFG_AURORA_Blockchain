@@ -10,6 +10,10 @@ jest.mock('./api/axios', () => ({
   },
 }))
 
+jest.mock('./controllers/useServiceHealthController', () => ({
+  useServiceHealthController: () => ({}),
+}))
+
 const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>
 
 describe('App routing', () => {

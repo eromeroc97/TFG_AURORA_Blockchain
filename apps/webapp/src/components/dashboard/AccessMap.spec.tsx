@@ -15,6 +15,10 @@ jest.mock('../../context/auth-context', () => ({
   }),
 }))
 
+jest.mock('react-router-dom', () => ({
+  useNavigate: () => jest.fn(),
+}))
+
 jest.mock('leaflet', () => ({
   __esModule: true,
   default: {
@@ -112,18 +116,15 @@ describe('AccessMap', () => {
     expect(screen.getByTestId('map-container')).toBeInTheDocument()
   })
 
-  it('shows owned and shared ecosystems for a user and hides shared devices', () => {
+  it('shows owned and shared ecosystems for a user', () => {
     render(<AccessMap ecosystems={ecosystems} />)
 
     expect(screen.getByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
     expect(screen.getByText(/Laboratorio Domótico - Campus UCLM/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sensores de movimiento/i)).toBeInTheDocument()
-    expect(screen.getByText(/Cámara interior/i)).toBeInTheDocument()
-    expect(screen.getByText(/No tienes permisos para ver los dispositivos/i)).toBeInTheDocument()
-    expect(screen.queryByText(/Gateway IoT/i)).not.toBeInTheDocument()
+    expect(screen.getAllByText(/Más información/i)).toHaveLength(2)
   })
 
-  it('shows all devices for an auditor', () => {
+  it('shows all ecosystems for an auditor', () => {
     mockAuthClaims = {
       sub: 'auditor-1',
       role: 'AUDITOR',
@@ -132,12 +133,11 @@ describe('AccessMap', () => {
 
     render(<AccessMap ecosystems={ecosystems} />)
 
-    expect(screen.getByText(/Gateway IoT/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sensor de apertura/i)).toBeInTheDocument()
-    expect(screen.queryByText(/No tienes permisos para ver los dispositivos/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
+    expect(screen.getByText(/Laboratorio Domótico - Campus UCLM/i)).toBeInTheDocument()
   })
 
-  it('shows restricted devices and the central node for a global admin', () => {
+  it('shows the central node for a global admin', () => {
     mockAuthClaims = {
       sub: 'global-admin-1',
       role: 'GLOBAL_ADMIN',
@@ -146,12 +146,11 @@ describe('AccessMap', () => {
 
     render(<AccessMap ecosystems={[ecosystems[0]]} />)
 
-    expect(screen.getByText(/Acceso a dispositivos restringido/i)).toBeInTheDocument()
-    expect(screen.queryByText(/Sensores de movimiento/i)).not.toBeInTheDocument()
     expect(screen.getByText(/Cerebro Central/i)).toBeInTheDocument()
+    expect(screen.getByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
   })
 
-  it('shows restricted devices for admin users', () => {
+  it('shows ecosystems for admin users', () => {
     mockAuthClaims = {
       sub: 'admin-1',
       role: 'ADMIN',
@@ -160,7 +159,6 @@ describe('AccessMap', () => {
 
     render(<AccessMap ecosystems={[ecosystems[0]]} />)
 
-    expect(screen.getByText(/Acceso a dispositivos restringido/i)).toBeInTheDocument()
-    expect(screen.queryByText(/Sensores de movimiento/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/Hogar Inteligente - Toledo Norte/i)).toBeInTheDocument()
   })
 })

@@ -26,7 +26,7 @@ describe('telemetry service', () => {
 
     const metrics = await getTelemetryMetrics()
 
-    expect(mockedApiClient.get).toHaveBeenCalledWith('/telemetry/v1/metrics')
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/telemetry/v1/metrics', { params: { range: '24h' } })
     expect(metrics).toEqual(responseData)
   })
 })
