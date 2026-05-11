@@ -5,6 +5,8 @@ import { EcosystemStatus, IdentityType, Prisma, Role, UserStatus } from '@prisma
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { CryptoService } from '../../crypto/crypto.service';
+import { MailService } from '../../shared/mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { EcosystemsService } from './ecosystems.service';
@@ -31,10 +33,19 @@ describe('EcosystemsService', () => {
     decryptPrivateKey: jest.fn(),
     sign: jest.fn(),
   };
+  const mailMock = { sendTemplate: jest.fn(), sendWelcomeEcosystem: jest.fn() };
+  const notificationsMock = { createNotification: jest.fn(), createSystemNotification: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EcosystemsService, { provide: PrismaService, useValue: prismaMock }, { provide: FireflyService, useValue: fireflyMock }, { provide: CryptoService, useValue: cryptoMock }],
+      providers: [
+        EcosystemsService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: FireflyService, useValue: fireflyMock },
+        { provide: CryptoService, useValue: cryptoMock },
+        { provide: MailService, useValue: mailMock },
+        { provide: NotificationsService, useValue: notificationsMock },
+      ],
     }).compile();
     service = module.get<EcosystemsService>(EcosystemsService);
     jest.clearAllMocks();

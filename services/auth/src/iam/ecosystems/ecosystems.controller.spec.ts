@@ -19,6 +19,7 @@ describe('EcosystemsController', () => {
     remove: jest.fn(),
     updateHeartbeat: jest.fn(),
     getApiKey: jest.fn(),
+    getEcosystemsWithAccessType: jest.fn(),
   };
 
   const userRequest = {
@@ -74,7 +75,7 @@ describe('EcosystemsController', () => {
   });
 
   it('routes read/write methods to service', async () => {
-    (ecosystemsServiceMock.findAll as any).mockResolvedValue([]);
+    (ecosystemsServiceMock.getEcosystemsWithAccessType as any).mockResolvedValue([]);
     (ecosystemsServiceMock.findOneWithAccessCheck as any).mockResolvedValue({ id: 'eco' });
     (ecosystemsServiceMock.findDevicesForEcosystemWithAccessCheck as any).mockResolvedValue([]);
     (ecosystemsServiceMock.update as any).mockResolvedValue({ id: 'eco', name: 'new' });
@@ -88,9 +89,9 @@ describe('EcosystemsController', () => {
     await controller.updateHeartbeat('eco');
     await controller.remove('eco', userRequest);
 
-    expect(ecosystemsServiceMock.findAll).toHaveBeenCalled();
-    expect(ecosystemsServiceMock.findDevicesForEcosystemWithAccessCheck).toHaveBeenCalledWith('eco', userRequest.user.sub);
-    expect(ecosystemsServiceMock.findOneWithAccessCheck).toHaveBeenCalledWith('eco', userRequest.user.sub);
+    expect(ecosystemsServiceMock.getEcosystemsWithAccessType).toHaveBeenCalledWith(userRequest.user.sub, userRequest.user.role);
+    expect(ecosystemsServiceMock.findDevicesForEcosystemWithAccessCheck).toHaveBeenCalledWith('eco', userRequest.user.sub, userRequest.user.role);
+    expect(ecosystemsServiceMock.findOneWithAccessCheck).toHaveBeenCalledWith('eco', userRequest.user.sub, userRequest.user.role);
     expect(ecosystemsServiceMock.update).toHaveBeenCalledWith('eco', {}, userRequest.user.sub);
     expect(ecosystemsServiceMock.updateHeartbeat).toHaveBeenCalledWith('eco');
     expect(ecosystemsServiceMock.remove).toHaveBeenCalledWith('eco', userRequest.user.sub);

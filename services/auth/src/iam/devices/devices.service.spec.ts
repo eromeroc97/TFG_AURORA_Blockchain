@@ -17,6 +17,9 @@ describe('DevicesService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    ecosystem: {
+      findUnique: jest.fn(),
+    },
   };
 
   const createDto: CreateDeviceDto = {
@@ -48,12 +51,16 @@ describe('DevicesService', () => {
       data: {
         name: createDto.name,
         ecosystemId: createDto.ecosystemId,
+        category: null,
+        room: null,
         macAddress: null,
         vendor: null,
       },
       select: {
         id: true,
         name: true,
+        category: true,
+        room: true,
         macAddress: true,
         vendor: true,
         ecosystemId: true,
@@ -75,12 +82,16 @@ describe('DevicesService', () => {
       data: {
         name: createDto.name,
         ecosystemId: createDto.ecosystemId,
+        category: null,
+        room: null,
         macAddress: 'AA:BB:CC:DD:EE:FF',
         vendor: null,
       },
       select: {
         id: true,
         name: true,
+        category: true,
+        room: true,
         macAddress: true,
         vendor: true,
         ecosystemId: true,
@@ -117,6 +128,8 @@ describe('DevicesService', () => {
 
   it('registerFromDiscovery creates a device when it does not exist', async () => {
     (prismaMock.device.findUnique as any).mockResolvedValue(null);
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({ id: 'eco-id', ownerId: 'owner-id' });
+    (prismaMock.device.findMany as any).mockResolvedValue([]);
     (prismaMock.device.create as any).mockResolvedValue({ id: 'device-id' });
 
     await service.registerFromDiscovery('eco-id', 'aa-bb-cc-dd-ee-ff', 'Cisco', 'sensor-humedad-01');
@@ -140,6 +153,8 @@ describe('DevicesService', () => {
       select: {
         id: true,
         name: true,
+        category: true,
+        room: true,
         macAddress: true,
         vendor: true,
         ecosystemId: true,
@@ -151,6 +166,8 @@ describe('DevicesService', () => {
 
   it('registerFromDiscovery uses the default name when no preferred name is provided', async () => {
     (prismaMock.device.findUnique as any).mockResolvedValue(null);
+    (prismaMock.ecosystem.findUnique as any).mockResolvedValue({ id: 'eco-id', ownerId: 'owner-id' });
+    (prismaMock.device.findMany as any).mockResolvedValue([]);
     (prismaMock.device.create as any).mockResolvedValue({ id: 'device-id' });
 
     await service.registerFromDiscovery('eco-id', 'aa-bb-cc-dd-ee-ff', 'Cisco');
@@ -158,13 +175,15 @@ describe('DevicesService', () => {
     expect(prismaMock.device.create).toHaveBeenCalledWith({
       data: {
         ecosystemId: 'eco-id',
-        name: 'Nuevo dispositivo',
+        name: 'Nuevo dispositivo 1',
         macAddress: 'AA:BB:CC:DD:EE:FF',
         vendor: 'Cisco',
       },
       select: {
         id: true,
         name: true,
+        category: true,
+        room: true,
         macAddress: true,
         vendor: true,
         ecosystemId: true,
@@ -199,6 +218,8 @@ describe('DevicesService', () => {
       select: {
         id: true,
         name: true,
+        category: true,
+        room: true,
         macAddress: true,
         vendor: true,
         ecosystemId: true,
@@ -219,6 +240,8 @@ describe('DevicesService', () => {
       select: {
         id: true,
         name: true,
+        category: true,
+        room: true,
         macAddress: true,
         vendor: true,
         ecosystemId: true,

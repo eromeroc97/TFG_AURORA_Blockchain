@@ -60,7 +60,7 @@ describe('DevicesController', () => {
   it('findOne should call DevicesService.findOneForUser', async () => {
     const mockRequest = { user: { sub: 'user-123' } };
     await controller.findOne('22222222-2222-4222-8222-222222222222', mockRequest);
-    expect(devicesService.findOneForUser).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222', 'user-123');
+    expect(devicesService.findOneForUser).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222', 'user-123', undefined);
   });
 
   it('update should call DevicesService.update', async () => {
