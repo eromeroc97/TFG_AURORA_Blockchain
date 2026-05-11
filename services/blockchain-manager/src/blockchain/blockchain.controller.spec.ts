@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { BlockchainController } from './blockchain.controller';
 import { FireflyService, FireflyNamespace, FireflyIdentity, FireflyPin } from '../firefly/firefly.service';
 import { normalizeListResponse } from './blockchain.controller';
@@ -18,6 +18,9 @@ describe('BlockchainController', () => {
     registerApi: jest.Mock;
     registerEventListener: jest.Mock;
     getContractInterface: jest.Mock;
+    deleteContractApi: jest.Mock;
+    getContractListenersByLocation: jest.Mock;
+    deleteContractListener: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -33,6 +36,9 @@ describe('BlockchainController', () => {
       registerApi: jest.fn(),
       registerEventListener: jest.fn(),
       getContractInterface: jest.fn(),
+      deleteContractApi: jest.fn(),
+      getContractListenersByLocation: jest.fn(),
+      deleteContractListener: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -329,6 +335,8 @@ describe('BlockchainController', () => {
       channel: 'my-channel',
       chaincodeName: 'my-chaincode',
       ffiJson: JSON.stringify({ name: 'TestFFI', namespace: 'default' }),
+      eventName: 'TelemetryAnchored',
+      topic: 'auditoria-iot',
     };
 
     it('should throw ForbiddenException for non-GLOBAL_ADMIN', async () => {
@@ -345,7 +353,7 @@ describe('BlockchainController', () => {
         .rejects.toThrow(ForbiddenException);
     });
 
-    it('should register chaincode for GLOBAL_ADMIN', async () => {
+    it('should register chaincode with listener for GLOBAL_ADMIN when eventName is provided', async () => {
       const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
       mockFireflyService.registerContractInterface.mockResolvedValue({ id: 'ffi-123' });
       mockFireflyService.registerApi.mockResolvedValue({ id: 'api-123' });
@@ -364,12 +372,57 @@ describe('BlockchainController', () => {
       expect(mockFireflyService.registerEventListener).toHaveBeenCalledWith(
         'default',
         expect.objectContaining({
-          name: 'escuchar-telemetria-anclada',
+          name: expect.stringContaining('listener-my-api-'),
           topic: 'auditoria-iot',
+          event: expect.objectContaining({ name: 'TelemetryAnchored' }),
         })
       );
       expect(result.success).toBe(true);
       expect(result.ffiId).toBe('ffi-123');
+    });
+
+    it('should register chaincode without listener when eventName is not provided', async () => {
+      const dtoWithoutEvent = {
+        apiName: 'my-api',
+        channel: 'my-channel',
+        chaincodeName: 'my-chaincode',
+        ffiJson: JSON.stringify({ name: 'TestFFI', namespace: 'default' }),
+      };
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.registerContractInterface.mockResolvedValue({ id: 'ffi-456' });
+      mockFireflyService.registerApi.mockResolvedValue({ id: 'api-456' });
+
+      const result = await controller.registerChaincode(dtoWithoutEvent, mockRequest as any);
+
+      expect(mockFireflyService.registerContractInterface).toHaveBeenCalled();
+      expect(mockFireflyService.registerApi).toHaveBeenCalled();
+      expect(mockFireflyService.registerEventListener).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+    });
+
+    it('should use default topic when eventName is provided but topic is not', async () => {
+      const dtoWithEventOnly = {
+        apiName: 'my-api',
+        channel: 'my-channel',
+        chaincodeName: 'my-chaincode',
+        ffiJson: JSON.stringify({ name: 'TestFFI', namespace: 'default' }),
+        eventName: 'ActionAnchored',
+      };
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.registerContractInterface.mockResolvedValue({ id: 'ffi-789' });
+      mockFireflyService.registerApi.mockResolvedValue({ id: 'api-789' });
+      mockFireflyService.registerEventListener.mockResolvedValue({ id: 'listener-789' });
+
+      await controller.registerChaincode(dtoWithEventOnly, mockRequest as any);
+
+      expect(mockFireflyService.registerEventListener).toHaveBeenCalledWith(
+        'default',
+        expect.objectContaining({
+          name: expect.stringContaining('listener-my-api-'),
+          topic: 'default',
+          event: expect.objectContaining({ name: 'ActionAnchored' }),
+        })
+      );
     });
 
     it('should throw error for invalid JSON in ffiJson', async () => {
@@ -385,6 +438,132 @@ describe('BlockchainController', () => {
 
       await expect(controller.registerChaincode(validDto, mockRequest as any))
         .rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('deleteChaincode', () => {
+    it('should delete chaincode and associated listeners for GLOBAL_ADMIN', async () => {
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.getContracts.mockResolvedValue({
+        items: [{
+          id: 'contract-id',
+          name: 'my-contract',
+          location: { channel: 'firefly', chaincode: 'my-chaincode' },
+        }],
+      });
+      mockFireflyService.getContractListenersByLocation.mockResolvedValue([
+        { id: 'listener-1', name: 'listener-1' },
+        { id: 'listener-2', name: 'listener-2' },
+      ]);
+      mockFireflyService.deleteContractListener.mockResolvedValue(undefined);
+      mockFireflyService.deleteContractApi.mockResolvedValue(undefined);
+
+      const result = await controller.deleteChaincode('my-contract', mockRequest as any);
+
+      expect(mockFireflyService.getContracts).toHaveBeenCalled();
+      expect(mockFireflyService.getContractListenersByLocation).toHaveBeenCalledWith(
+        'default',
+        { channel: 'firefly', chaincode: 'my-chaincode' }
+      );
+      expect(mockFireflyService.deleteContractListener).toHaveBeenCalledTimes(2);
+      expect(mockFireflyService.deleteContractListener).toHaveBeenCalledWith('default', 'listener-1');
+      expect(mockFireflyService.deleteContractListener).toHaveBeenCalledWith('default', 'listener-2');
+      expect(mockFireflyService.deleteContractApi).toHaveBeenCalledWith('my-contract', 'default');
+      expect(result).toEqual({
+        success: true,
+        message: "Chaincode 'my-contract' deleted successfully",
+      });
+    });
+
+    it('should delete chaincode even if no listeners exist', async () => {
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.getContracts.mockResolvedValue({
+        items: [{
+          id: 'contract-id',
+          name: 'orphan-contract',
+          location: { channel: 'firefly', chaincode: 'orphan-chaincode' },
+        }],
+      });
+      mockFireflyService.getContractListenersByLocation.mockResolvedValue([]);
+      mockFireflyService.deleteContractApi.mockResolvedValue(undefined);
+
+      const result = await controller.deleteChaincode('orphan-contract', mockRequest as any);
+
+      expect(mockFireflyService.getContractListenersByLocation).toHaveBeenCalled();
+      expect(mockFireflyService.deleteContractListener).not.toHaveBeenCalled();
+      expect(mockFireflyService.deleteContractApi).toHaveBeenCalledWith('orphan-contract', 'default');
+      expect(result.success).toBe(true);
+    });
+
+    it('should throw ForbiddenException for non-GLOBAL_ADMIN', async () => {
+      const mockRequest = { user: { role: 'ADMIN' } };
+
+      await expect(controller.deleteChaincode('my-contract', mockRequest as any))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException for USER role', async () => {
+      const mockRequest = { user: { role: 'USER' } };
+
+      await expect(controller.deleteChaincode('my-contract', mockRequest as any))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException when chaincode is not found', async () => {
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.getContracts.mockResolvedValue({ items: [] });
+
+      await expect(controller.deleteChaincode('non-existent', mockRequest as any))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when contracts response has no items', async () => {
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.getContracts.mockResolvedValue({});
+
+      await expect(controller.deleteChaincode('non-existent', mockRequest as any))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('should use default location when contract has no location', async () => {
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.getContracts.mockResolvedValue({
+        items: [{ id: 'contract-id', name: 'my-contract' }],
+      });
+      mockFireflyService.getContractListenersByLocation.mockResolvedValue([]);
+      mockFireflyService.deleteContractApi.mockResolvedValue(undefined);
+
+      await controller.deleteChaincode('my-contract', mockRequest as any);
+
+      expect(mockFireflyService.getContractListenersByLocation).toHaveBeenCalledWith(
+        'default',
+        { channel: 'firefly', chaincode: 'my-contract' }
+      );
+    });
+
+    it('should continue deleting other listeners if one fails', async () => {
+      const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
+      mockFireflyService.getContracts.mockResolvedValue({
+        items: [{
+          id: 'contract-id',
+          name: 'my-contract',
+          location: { channel: 'firefly', chaincode: 'my-chaincode' },
+        }],
+      });
+      mockFireflyService.getContractListenersByLocation.mockResolvedValue([
+        { id: 'listener-1', name: 'listener-1' },
+        { id: 'listener-2', name: 'listener-2' },
+      ]);
+      mockFireflyService.deleteContractListener
+        .mockRejectedValueOnce(new Error('listener already gone'))
+        .mockResolvedValueOnce(undefined);
+      mockFireflyService.deleteContractApi.mockResolvedValue(undefined);
+
+      const result = await controller.deleteChaincode('my-contract', mockRequest as any);
+
+      expect(mockFireflyService.deleteContractListener).toHaveBeenCalledTimes(2);
+      expect(mockFireflyService.deleteContractApi).toHaveBeenCalled();
+      expect(result.success).toBe(true);
     });
   });
 
