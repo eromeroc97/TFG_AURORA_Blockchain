@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Upload, FileCode, AlertCircle } from 'lucide-react'
-import { parseGoCodeToFFI } from '../../utils/goParser'
+import { parseGoCodeToFFI, ContractAPIError } from '../../utils/goParser'
 
 interface GoDragDropZoneProps {
   onJsonGenerated: (jsonString: string) => void
@@ -37,8 +37,14 @@ export default function GoDragDropZone({ onJsonGenerated }: GoDragDropZoneProps)
           const content = await file.text()
           const ffi = parseGoCodeToFFI(content)
           onJsonGenerated(JSON.stringify(ffi, null, 2))
-        } catch {
-          setError('Error al procesar el archivo')
+        } catch (err) {
+          if (err instanceof ContractAPIError) {
+            setError(
+              'El smart contract no utiliza el estilo Contract API de Hyperledger Fabric. Para generar la interfaz FFI automáticamente, el código debe implementar contractapi.Contract. Si desea continuar, puede crear manualmente el JSON de registro en FireFly.',
+            )
+          } else {
+            setError('Error al procesar el archivo')
+          }
         }
       } else {
         setError('Solo se admiten archivos .go')
@@ -56,8 +62,14 @@ export default function GoDragDropZone({ onJsonGenerated }: GoDragDropZoneProps)
           const content = await file.text()
           const ffi = parseGoCodeToFFI(content)
           onJsonGenerated(JSON.stringify(ffi, null, 2))
-        } catch {
-          setError('Error al procesar el archivo')
+        } catch (err) {
+          if (err instanceof ContractAPIError) {
+            setError(
+              'El smart contract no utiliza el estilo Contract API de Hyperledger Fabric. Para generar la interfaz FFI automáticamente, el código debe implementar contractapi.Contract. Si desea continuar, puede crear manualmente el JSON de registro en FireFly.',
+            )
+          } else {
+            setError('Error al procesar el archivo')
+          }
         }
       } else {
         setError('Solo se admiten archivos .go')

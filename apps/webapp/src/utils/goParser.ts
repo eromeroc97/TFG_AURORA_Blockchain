@@ -1,5 +1,12 @@
 import type { FireFlyFFI, FireFlyMethod, FireFlyParam } from '../types/ffi.types'
 
+export class ContractAPIError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ContractAPIError'
+  }
+}
+
 const GO_TYPE_MAP: Record<string, string> = {
   string: 'string',
   int: 'integer',
@@ -14,6 +21,7 @@ const GO_TYPE_MAP: Record<string, string> = {
 }
 
 const CTX_KW = ['TransactionContext', 'TransactionContextInterface', 'ChaincodeStubInterface']
+const CONTRACT_API_IMPORT = 'contractapi.Contract'
 
 function toJsonType(go: string): string {
   return GO_TYPE_MAP[go.toLowerCase()] || 'string'
@@ -21,6 +29,10 @@ function toJsonType(go: string): string {
 
 function isCtx(arg: string): boolean {
   return CTX_KW.some(k => arg.includes(k))
+}
+
+function detectContractAPI(code: string): boolean {
+  return code.includes(CONTRACT_API_IMPORT)
 }
 
 // Representa un parámetro extraído antes de expandir agrupaciones
@@ -99,6 +111,12 @@ function parseParameterBlock(paramStr: string): FireFlyParam[] {
  * Busca firmas de métodos públicos asociados a un receptor (Contract API).
  */
 export function parseGoCodeToFFI(code: string): FireFlyFFI {
+  if (!detectContractAPI(code)) {
+    throw new ContractAPIError(
+      'El código fuente no usa el estilo Contract API (contractapi.Contract). El parser solo es compatible con chaincodes que implementan contractapi.Contract.',
+    )
+  }
+
   const methods: FireFlyMethod[] = []
   
   let cursor = 0
