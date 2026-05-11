@@ -31,5 +31,6 @@ export interface AnchorParams {
   signature: string;
   publicKey: string;
   nonce: string;
+  anchoredAt: string;
   metadata?: Record<string, string>;
 }

@@ -9,6 +9,10 @@ import (
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
+func parseRFC3339(ts string) (time.Time, error) {
+	return time.Parse(time.RFC3339, ts)
+}
+
 type ActionType string
 
 const (
@@ -99,6 +103,7 @@ func (s *AuroraActionAnchorContract) AnchorAction(
 	signature string,
 	publicKey string,
 	nonce string,
+	anchoredAt string,
 	metadataJSON string,
 ) error {
 	if strings.TrimSpace(actionID) == "" {
@@ -124,6 +129,12 @@ func (s *AuroraActionAnchorContract) AnchorAction(
 	}
 	if strings.TrimSpace(nonce) == "" {
 		return fmt.Errorf("nonce es obligatorio")
+	}
+	if strings.TrimSpace(anchoredAt) == "" {
+		return fmt.Errorf("anchoredAt es obligatorio")
+	}
+	if _, err := parseRFC3339(anchoredAt); err != nil {
+		return fmt.Errorf("anchoredAt debe estar en formato RFC3339: %v", err)
 	}
 
 	if !IsValidActionType(ActionType(actionType)) {
@@ -175,7 +186,6 @@ func (s *AuroraActionAnchorContract) AnchorAction(
 	}
 
 	txID := ctx.GetStub().GetTxID()
-	now := time.Now().UTC().Format(time.RFC3339)
 
 	anchor := AuroraActionAnchor{
 		ActionID:            actionID,
@@ -183,13 +193,13 @@ func (s *AuroraActionAnchorContract) AnchorAction(
 		TargetID:            targetID,
 		ActionType:          actionType,
 		ParentActionID:      parentActionID,
-		ReadableDescription:  readableDescription,
+		ReadableDescription: readableDescription,
 		Signature:           signature,
 		PublicKey:           publicKey,
 		Nonce:               nonce,
 		Metadata:            metadata,
 		AnchorTxID:          txID,
-		AnchoredAt:          now,
+		AnchoredAt:          anchoredAt,
 	}
 
 	anchorJSON, err := json.Marshal(anchor)
@@ -206,23 +216,23 @@ func (s *AuroraActionAnchorContract) AnchorAction(
 		return fmt.Errorf("error al indexar nonce: %v", err)
 	}
 
-	actorIndexKey, _ := ctx.GetStub().CreateCompositeKey("actor", []string{actorID, now, actionID})
+	actorIndexKey, _ := ctx.GetStub().CreateCompositeKey("actor", []string{actorID, anchoredAt, actionID})
 	if err := ctx.GetStub().PutState(actorIndexKey, []byte{0x00}); err != nil {
 		return fmt.Errorf("error al indexar por actor: %v", err)
 	}
 
-	typeIndexKey, _ := ctx.GetStub().CreateCompositeKey("type", []string{actionType, now, actionID})
+	typeIndexKey, _ := ctx.GetStub().CreateCompositeKey("type", []string{actionType, anchoredAt, actionID})
 	if err := ctx.GetStub().PutState(typeIndexKey, []byte{0x00}); err != nil {
 		return fmt.Errorf("error al indexar por tipo: %v", err)
 	}
 
-	targetIndexKey, _ := ctx.GetStub().CreateCompositeKey("target", []string{targetID, now, actionID})
+	targetIndexKey, _ := ctx.GetStub().CreateCompositeKey("target", []string{targetID, anchoredAt, actionID})
 	if err := ctx.GetStub().PutState(targetIndexKey, []byte{0x00}); err != nil {
 		return fmt.Errorf("error al indexar por target: %v", err)
 	}
 
 	if parentActionID != "" {
-		parentIndexKey, _ := ctx.GetStub().CreateCompositeKey("parent", []string{parentActionID, now, actionID})
+		parentIndexKey, _ := ctx.GetStub().CreateCompositeKey("parent", []string{parentActionID, anchoredAt, actionID})
 		if err := ctx.GetStub().PutState(parentIndexKey, []byte{0x00}); err != nil {
 			return fmt.Errorf("error al indexar por padre: %v", err)
 		}

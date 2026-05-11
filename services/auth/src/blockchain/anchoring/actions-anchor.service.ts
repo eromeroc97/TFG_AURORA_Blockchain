@@ -111,6 +111,7 @@ export class ActionsAnchorService {
   }): Promise<{ id: string } | null> {
     const actionId = params.actionId ?? generateUUID();
     const nonce = randomBytes(16).toString('hex');
+    const anchoredAt = new Date().toISOString();
 
     const { publicKey, privateKey } = await this.resolveActorKeys(params.actorId);
 
@@ -142,6 +143,7 @@ export class ActionsAnchorService {
             signature,
             publicKey,
             nonce,
+            anchoredAt,
             metadataJSON,
           },
         }).pipe(
