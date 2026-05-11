@@ -49,13 +49,6 @@ export default function AuditDashboardPage() {
     }
   }, [events])
 
-  const globalStatus = useMemo(() => {
-    if (summaryCards.totalTelemetry === 0) return 'Sin datos'
-    if (summaryCards.percentage === 0) return 'Correcto'
-    if (summaryCards.percentage < 50) return 'Advertencia'
-    return 'Discrepancia'
-  }, [summaryCards.percentage, summaryCards.totalTelemetry])
-
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">

@@ -1,38 +1,56 @@
-import { useState } from 'react'
-import { FileCode, Loader2, X } from 'lucide-react'
-import { registerChaincode } from '../../services/blockchain.service'
+import { useState, useEffect } from 'react'
+import { FileCode, Loader2, X, Lock } from 'lucide-react'
+import { registerChaincode, type SmartContract } from '../../services/blockchain.service'
 import GoDragDropZone from './GoDragDropZone'
 
 interface RegisterChaincodeModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: () => void
+  initialContract?: SmartContract
 }
 
 export default function RegisterChaincodeModal({
   isOpen,
   onClose,
   onSuccess,
+  initialContract,
 }: RegisterChaincodeModalProps) {
+  const isUpgrade = !!initialContract
+
   const [apiName, setApiName] = useState('')
   const [channel, setChannel] = useState('firefly')
   const [chaincodeName, setChaincodeName] = useState('')
   const [ffiJson, setFfiJson] = useState('')
+  const [eventName, setEventName] = useState('')
+  const [topic, setTopic] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  const resetForm = () => {
-    setApiName('')
-    setChannel('firefly')
-    setChaincodeName('')
-    setFfiJson('')
-    setError(null)
-    setSuccess(false)
-  }
+  useEffect(() => {
+    if (isOpen) {
+      if (isUpgrade && initialContract) {
+        setApiName(initialContract.name)
+        setChannel(initialContract.channel)
+        setChaincodeName(initialContract.name)
+        setFfiJson('')
+        setEventName('')
+        setTopic('')
+      } else {
+        setApiName('')
+        setChannel('firefly')
+        setChaincodeName('')
+        setFfiJson('')
+        setEventName('')
+        setTopic('')
+      }
+      setError(null)
+      setSuccess(false)
+    }
+  }, [isOpen, isUpgrade, initialContract])
 
   const handleClose = () => {
-    resetForm()
     onClose()
   }
 
@@ -48,6 +66,8 @@ export default function RegisterChaincodeModal({
         channel: channel.trim(),
         chaincodeName: chaincodeName.trim(),
         ffiJson: ffiJson.trim(),
+        eventName: eventName.trim() || undefined,
+        topic: topic.trim() || undefined,
       })
       setSuccess(true)
       onSuccess?.()
@@ -55,18 +75,18 @@ export default function RegisterChaincodeModal({
         handleClose()
       }, 1500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al registrar el chaincode')
+      setError(err instanceof Error ? err.message : 'Error al procesar el chaincode')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const isFormValid =
-    apiName.trim() &&
-    channel.trim() &&
-    chaincodeName.trim() &&
-    ffiJson.trim() &&
-    !error
+  const isFormValid = (() => {
+    if (!apiName.trim() || !channel.trim() || !chaincodeName.trim()) return false
+    if (!ffiJson.trim()) return false
+    if (isUpgrade) return true
+    return true
+  })()
 
   if (!isOpen) return null
 
@@ -79,9 +99,13 @@ export default function RegisterChaincodeModal({
               <FileCode className="size-5" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Registrar Chaincode</h3>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {isUpgrade ? 'Actualizar Smart Contract' : 'Registrar Smart Contract'}
+              </h3>
               <p className="text-sm text-slate-500">
-                Vincula un chaincode instalado en la red Hyperledger Fabric
+                {isUpgrade
+                  ? `Actualizando ${initialContract?.name}`
+                  : 'Vincula un chaincode instalado en la red Hyperledger Fabric'}
               </p>
             </div>
           </div>
@@ -99,44 +123,105 @@ export default function RegisterChaincodeModal({
             <label className="block text-sm font-medium text-slate-700">
               Nombre de la API Lógica
             </label>
-            <input
-              type="text"
-              value={apiName}
-              onChange={(e) => setApiName(e.target.value)}
-              placeholder="ej. aurora-telemetry-api"
-              className="mt-1 w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
-            />
+            {isUpgrade ? (
+              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
+                <Lock className="size-4" />
+                {apiName}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={apiName}
+                onChange={(e) => setApiName(e.target.value)}
+                placeholder="ej. aurora-telemetry-api"
+                className="w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Nombre del Canal de Fabric
             </label>
-            <input
-              type="text"
-              value={channel}
-              onChange={(e) => setChannel(e.target.value)}
-              placeholder="ej. firefly"
-              className="mt-1 w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
-            />
+            {isUpgrade ? (
+              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
+                <Lock className="size-4" />
+                {channel}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                placeholder="ej. firefly"
+                className="w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700">
               Nombre del Chaincode Físico
             </label>
+            {isUpgrade ? (
+              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
+                <Lock className="size-4" />
+                {chaincodeName}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={chaincodeName}
+                onChange={(e) => setChaincodeName(e.target.value)}
+                placeholder="ej. aurora-telemetry-anchor"
+                className="w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            )}
+          </div>
+
+          {isUpgrade && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-700">
+                Se registrará una nueva versión de la interfaz (FFI). El canal y nombre del chaincode no cambiarán.
+              </p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              Nombre del Evento <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
             <input
               type="text"
-              value={chaincodeName}
-              onChange={(e) => setChaincodeName(e.target.value)}
-              placeholder="ej. aurora-telemetry-anchor"
+              value={eventName}
+              onChange={(e) => setEventName(e.target.value)}
+              placeholder="ej. ActionAnchored, TelemetryAnchored"
               className="mt-1 w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
             />
+            <p className="mt-1 text-xs text-slate-400">
+              Nombre del evento que emite el chaincode. Se creará un listener para escucharlo.
+            </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              JSON de la Interfaz (FFI)
+              Topic <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="ej. auditoria-iot"
+              className="mt-1 w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Tópico de FireFly para el listener de eventos.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              JSON de la Interfaz (FFI) <span className="text-rose-500">*</span>
             </label>
             <div className="mt-1">
               <GoDragDropZone
@@ -161,7 +246,7 @@ export default function RegisterChaincodeModal({
           {success && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
               <p className="text-sm text-emerald-700">
-                Chaincode registrado correctamente
+                {isUpgrade ? 'Smart Contract actualizado correctamente' : 'Chaincode registrado correctamente'}
               </p>
             </div>
           )}
@@ -182,8 +267,10 @@ export default function RegisterChaincodeModal({
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Registrando...
+                  {isUpgrade ? 'Actualizando...' : 'Registrando...'}
                 </>
+              ) : isUpgrade ? (
+                'Actualizar'
               ) : (
                 'Registrar'
               )}

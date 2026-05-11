@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class RegisterChaincodeDto {
   @IsString()
@@ -16,4 +16,12 @@ export class RegisterChaincodeDto {
   @IsString()
   @IsNotEmpty()
   ffiJson: string;
+
+  @IsString()
+  @IsOptional()
+  eventName?: string;
+
+  @IsString()
+  @IsOptional()
+  topic?: string;
 }

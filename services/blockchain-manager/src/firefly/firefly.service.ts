@@ -129,6 +129,28 @@ export class FireflyService {
     return response.data;
   }
 
+  async deleteContractApi(apiName: string, namespace = 'default'): Promise<void> {
+    await this.client.delete(`/api/v1/namespaces/${namespace}/apis/${apiName}`);
+  }
+
+  async getContractListenersByLocation(namespace: string, location: { channel: string; chaincode: string }): Promise<{ id: string; name: string }[]> {
+    const params = new URLSearchParams({
+      'location.channel': location.channel,
+      'location.chaincode': location.chaincode,
+    });
+    const response = await this.client.get(
+      `/api/v1/namespaces/${namespace}/contracts/listeners?${params}`
+    );
+    const data = response.data as { items?: { id: string; name: string }[] } | { id: string; name: string }[];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.items)) return data.items;
+    return [];
+  }
+
+  async deleteContractListener(namespace: string, listenerId: string): Promise<void> {
+    await this.client.delete(`/api/v1/namespaces/${namespace}/contracts/listeners/${listenerId}`);
+  }
+
   async registerApi(namespace: string, apiData: object): Promise<{ id: string }> {
     const response = await this.client.post(
       `/api/v1/namespaces/${namespace}/apis`,

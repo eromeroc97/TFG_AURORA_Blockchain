@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Cpu, Layers, Network, RefreshCw, Activity, X, Server, Search, ChevronLeft, ChevronRight, Filter, XCircle } from 'lucide-react'
+import { Cpu, Layers, Network, RefreshCw, Activity, X, Server, Search, ChevronLeft, ChevronRight, Filter, XCircle, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/auth-context'
 import BlockchainTopologyGraph from '../components/blockchain/BlockchainTopologyGraph'
 import RegisterChaincodeModal from '../components/blockchain/RegisterChaincodeModal'
 import DeploymentHelpModal from '../components/blockchain/DeploymentHelpModal'
 import Select from '../components/Select'
 import { useBlockchainController } from '../controllers/useBlockchainController'
-import { getContractInterface, type SmartContract, type BlockchainEvent } from '../services/blockchain.service'
+import { getContractInterface, deleteChaincode, type SmartContract, type BlockchainEvent } from '../services/blockchain.service'
 
 const PAGE_SIZES = [10, 25, 50] as const
 
@@ -15,6 +15,8 @@ type ModalType = 'organizations' | 'namespaces' | 'ledger' | 'event' | null
 export default function BlockchainManagementPage() {
   const [detailModal, setDetailModal] = useState<ModalType>(null)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; name: string }>({ open: false, name: '' })
   const [selectedEvent, setSelectedEvent] = useState<BlockchainEvent | null>(null)
   const [eventsSearchTerm, setEventsSearchTerm] = useState('')
   const [eventsPageSize, setEventsPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
@@ -948,17 +950,46 @@ export default function BlockchainManagementPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedContract(null)} />
           <div className="relative z-10 w-[80vw] max-h-[90vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl flex flex-col">
-            <button
-              onClick={() => setSelectedContract(null)}
-              className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            >
-              <X className="size-5" />
-            </button>
-
-            <h3 className="text-xl font-semibold text-slate-900">Detalle de Smart Contract</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {selectedContract.name}
-            </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">Detalle de Smart Contract</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedContract.name}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {isGlobalAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUpgradeModalOpen(true)
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                    >
+                      <Pencil className="size-4" />
+                      Actualizar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDelete({ open: true, name: selectedContract.name })
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100"
+                    >
+                      <Trash2 className="size-4" />
+                      Eliminar
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedContract(null)}
+                  className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
 
             <div className="mt-4 space-y-2">
               <div className="grid grid-cols-2 gap-4">
@@ -1016,6 +1047,64 @@ export default function BlockchainManagementPage() {
           </div>
         </div>
       )}
+
+      {confirmDelete.open && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete({ open: false, name: '' })} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">Eliminar Smart Contract</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              ¿Estás seguro de que quieres eliminar <strong>{confirmDelete.name}</strong>? Esta acción eliminará la API y todos los listeners asociados en FireFly.
+            </p>
+            <p className="mt-2 text-xs text-rose-500">
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete({ open: false, name: '' })}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await deleteChaincode(confirmDelete.name)
+                    setConfirmDelete({ open: false, name: '' })
+                    setSelectedContract(null)
+                    refreshNetworkData()
+                  } catch {
+                    setConfirmDelete({ open: false, name: '' })
+                  }
+                }}
+                className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <RegisterChaincodeModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => refreshNetworkData()}
+      />
+
+      <RegisterChaincodeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onSuccess={() => {
+          setIsUpgradeModalOpen(false)
+          setSelectedContract(null)
+          refreshNetworkData()
+        }}
+        initialContract={selectedContract ?? undefined}
+      />
+
     </div>
   )
 }

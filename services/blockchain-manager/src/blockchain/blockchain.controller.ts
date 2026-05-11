@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Header, Options, UseGuards, Query, Header as NestHeader, Body, Req, ForbiddenException, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Header, Options, UseGuards, Query, Header as NestHeader, Body, Req, ForbiddenException, Request, NotFoundException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FireflyService, FireflyNamespace, FireflyIdentity, FireflyPin } from '../firefly/firefly.service';
 import { RegisterChaincodeDto } from './dto/register-chaincode.dto';
@@ -199,17 +199,19 @@ export class BlockchainController {
       },
     });
 
-    await this.fireflyService.registerEventListener(namespace, {
-      name: 'escuchar-telemetria-anclada',
-      topic: 'auditoria-iot',
-      location: {
-        channel: dto.channel,
-        chaincode: dto.chaincodeName,
-      },
-      event: {
-        name: 'TelemetryAnchored',
-      },
-    });
+    if (dto.eventName) {
+      await this.fireflyService.registerEventListener(namespace, {
+        name: `listener-${dto.apiName}-${Date.now()}`,
+        topic: dto.topic ?? 'default',
+        location: {
+          channel: dto.channel,
+          chaincode: dto.chaincodeName,
+        },
+        event: {
+          name: dto.eventName,
+        },
+      });
+    }
 
     return {
       success: true,
@@ -222,5 +224,43 @@ export class BlockchainController {
   async getContractInterface(@Query('name') name: string) {
     const response = await this.fireflyService.getContractInterface(name);
     return response;
+  }
+
+  @Delete('chaincodes/:apiName')
+  async deleteChaincode(
+    @Param('apiName') apiName: string,
+    @Req() req: Request & { user: { role: string } },
+  ) {
+    if (req.user?.role !== 'GLOBAL_ADMIN') {
+      throw new ForbiddenException('Only GLOBAL_ADMIN can delete chaincodes');
+    }
+
+    const namespace = 'default';
+
+    const contracts = await this.fireflyService.getContracts();
+    const items = normalizeListResponse<{ id?: string; name: string; location?: { channel?: string; chaincode?: string } }>(contracts);
+    const contract = items.find(c => c.name === apiName);
+
+    if (!contract) {
+      throw new NotFoundException(`Chaincode '${apiName}' not found`);
+    }
+
+    const location = contract.location ?? { channel: 'firefly', chaincode: apiName };
+    const listeners = await this.fireflyService.getContractListenersByLocation(namespace, {
+      channel: String(location.channel ?? 'firefly'),
+      chaincode: String(location.chaincode ?? apiName),
+    });
+
+    for (const listener of listeners) {
+      try {
+        await this.fireflyService.deleteContractListener(namespace, listener.id);
+      } catch {
+        // Listener may already be deleted; continue
+      }
+    }
+
+    await this.fireflyService.deleteContractApi(apiName, namespace);
+
+    return { success: true, message: `Chaincode '${apiName}' deleted successfully` };
   }
 }

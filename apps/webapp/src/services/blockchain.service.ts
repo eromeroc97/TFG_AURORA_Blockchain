@@ -230,6 +230,8 @@ export interface RegisterChaincodeRequest {
   channel: string
   chaincodeName: string
   ffiJson: string
+  eventName?: string
+  topic?: string
 }
 
 export interface RegisterChaincodeResponse {
@@ -272,7 +274,7 @@ export async function getContractInterface(name: string): Promise<ContractInterf
 
 export async function getContractVersions(contracts: SmartContract[]): Promise<Record<string, string>> {
   const versions: Record<string, string> = {}
-  
+
   await Promise.allSettled(
     contracts.map(async (contract) => {
       try {
@@ -285,6 +287,10 @@ export async function getContractVersions(contracts: SmartContract[]): Promise<R
       }
     })
   )
-  
+
   return versions
+}
+
+export async function deleteChaincode(apiName: string): Promise<void> {
+  await apiClient.delete(`/blockchain/chaincodes/${encodeURIComponent(apiName)}`)
 }
