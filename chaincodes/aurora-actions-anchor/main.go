@@ -192,12 +192,12 @@ func anchorAction(stub shim.ChaincodeStubInterface, args []string) peer.Response
 		return shim.Error(fmt.Sprintf("Error al deserializar JSON: %s", err))
 	}
 
-	if err := validateInput(input); err != nil {
-		return shim.Error(string(err))
+	if errCode := validateInput(input); errCode != "" {
+		return shim.Error(string(errCode))
 	}
 
-	if err := validateActionType(input.ActionType); err != nil {
-		return shim.Error(string(err))
+	if errCode := validateActionType(input.ActionType); errCode != "" {
+		return shim.Error(string(errCode))
 	}
 
 	payload := ActionPayload{
@@ -214,16 +214,16 @@ func anchorAction(stub shim.ChaincodeStubInterface, args []string) peer.Response
 		return shim.Error(fmt.Sprintf("Error al calcular payload hash: %s", err))
 	}
 
-	if err := verifySignature(payloadHash, input.Signature, input.PublicKey); err != nil {
+	if !verifySignature(payloadHash, input.Signature, input.PublicKey) {
 		return shim.Error(string(ErrInvalidSignature))
 	}
 
-	if err := validateUniqueness(stub, input.ActionID, input.Nonce); err != nil {
-		return shim.Error(string(err))
+	if errCode := validateUniqueness(stub, input.ActionID, input.Nonce); errCode != "" {
+		return shim.Error(string(errCode))
 	}
 
-	if err := validateParentAction(stub, input.ParentActionID, input.ActionType, input.ActorID); err != nil {
-		return shim.Error(string(err))
+	if errCode := validateParentAction(stub, input.ParentActionID, input.ActionType, input.ActorID); errCode != "" {
+		return shim.Error(string(errCode))
 	}
 
 	txTimestamp, err := stub.GetTxTimestamp()
@@ -261,7 +261,7 @@ func anchorAction(stub shim.ChaincodeStubInterface, args []string) peer.Response
 		"payload_hash":          action.PayloadHash,
 		"signature":             action.Signature,
 		"tx_id":                stub.GetTxID(),
-		"block_number":         stub.GetChaincodeHeader().GetBlockNumber(),
+		"block_number":         0,
 		"nonce":                action.Nonce,
 		"canonical_payload_json": canonicalJSON(payload),
 	}
@@ -342,7 +342,7 @@ func getActionsByType(stub shim.ChaincodeStubInterface, args []string) peer.Resp
 		return shim.Error("Argumento inválido: se espera ActionType")
 	}
 
-	if err := validateActionType(args[0]); err != nil {
+	if errCode := validateActionType(args[0]); errCode != "" {
 		return shim.Error(string(ErrInvalidActionType))
 	}
 
@@ -436,11 +436,12 @@ func computePayloadHash(payload ActionPayload) (string, error) {
 // canonicalJSON serializa el payload como JSON canónico (RFC 8785).
 // Ordena las claves alfabéticamente y sin espacios innecesarios.
 func canonicalJSON(payload ActionPayload) string {
-	encoder := json.NewEncoder(strings.Builder{})
+	var builder strings.Builder
+	encoder := json.NewEncoder(&builder)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "")
-	canonical, _ := encoder.Encode(payload)
-	return strings.TrimSpace(string(canonical))
+	_ = encoder.Encode(payload)
+	return strings.TrimSpace(builder.String())
 }
 
 // verifySignature verifica la firma digital usando Ed25519.
@@ -578,11 +579,11 @@ func retrieveActionsByIndex(stub shim.ChaincodeStubInterface, prefix, value stri
 
 	var actionIDs []string
 	for iterator.HasNext() {
-		_, result, err := iterator.Next()
+		queryRes, err := iterator.Next()
 		if err != nil {
 			return nil, err
 		}
-		actionIDs = append(actionIDs, string(result))
+		actionIDs = append(actionIDs, string(queryRes.Value))
 	}
 
 	return actionIDs, nil
