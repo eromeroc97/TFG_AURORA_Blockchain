@@ -5,6 +5,8 @@ import * as argon2 from 'argon2';
 import { StringValue } from 'ms';
 import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
+import { ActionType } from '../../blockchain/anchoring/action-types.enum';
 import { decodeRsaPublicKey } from './jwt-key.util';
 
 /**
@@ -40,11 +42,12 @@ interface AuthPayload {
  */
 @Injectable()
 export class AuthService {
-	constructor(
-		private readonly usersService: UsersService,
-		private readonly jwtService: JwtService,
-		private readonly redisService: RedisService,
-	) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+    private readonly redisService: RedisService,
+    private readonly anchoringService: ActionsAnchorService,
+  ) {}
 
 	async requestPasswordRecovery(email: string): Promise<void> {
 		await this.usersService.createPasswordResetToken(email);
@@ -139,17 +142,6 @@ export class AuthService {
 		}
 	}
 
-	async updateRefreshToken(userId: string, refreshToken: string) {
-		const hashedRefreshToken = await argon2.hash(refreshToken);
-		await this.usersService.updateRefreshTokenHash(userId, hashedRefreshToken);
-	}
-
-	async login(user: { id: string; email: string; role: string }) {
-		const tokens = await this.generateTokens(user);
-		await this.updateRefreshToken(user.id, tokens.refreshToken);
-		return tokens;
-	}
-
 	async refreshTokens(userId: string, refreshToken: string) {
 		const tokenUserId = await this.resolveUserIdFromRefreshToken(refreshToken);
 		if (tokenUserId !== userId) {
@@ -178,9 +170,32 @@ export class AuthService {
 		return tokens;
 	}
 
+	async updateRefreshToken(userId: string, refreshToken: string) {
+		const hashedRefreshToken = await argon2.hash(refreshToken);
+		await this.usersService.updateRefreshTokenHash(userId, hashedRefreshToken);
+	}
+
+	async login(user: { id: string; email: string; role: string }) {
+		const tokens = await this.generateTokens(user);
+		await this.updateRefreshToken(user.id, tokens.refreshToken);
+		await this.anchoringService.anchorAction({
+			actionType: ActionType.AUTH_LOGIN,
+			actorId: user.id,
+			targetId: user.id,
+			readableDescription: `User ${user.email} logged in`,
+		});
+		return tokens;
+	}
+
 	async logout(userId: string) {
 		await this.usersService.updateRefreshTokenHash(userId, null);
 		await this.redisService.addToBlacklist(userId, 300);
+		await this.anchoringService.anchorAction({
+			actionType: ActionType.AUTH_LOGOUT,
+			actorId: userId,
+			targetId: userId,
+			readableDescription: `User logged out`,
+		});
 		return { success: true };
 	}
 }

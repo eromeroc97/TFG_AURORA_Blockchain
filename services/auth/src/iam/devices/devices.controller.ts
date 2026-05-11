@@ -23,8 +23,8 @@ export class DevicesController {
   @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
   @ApiOperation({ summary: 'Registrar un nuevo dispositivo Zero-Trust' })
   @ApiCreatedResponse({ description: 'Dispositivo creado correctamente.' })
-  create(@Body() createDeviceDto: CreateDeviceDto) {
-    return this.devicesService.create(createDeviceDto);
+  create(@Body() createDeviceDto: CreateDeviceDto, @Req() request: AuthenticatedRequest) {
+    return this.devicesService.create(createDeviceDto, request.user?.sub);
   }
 
   @Get()
@@ -43,14 +43,14 @@ export class DevicesController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
-  update(@Param('id') id: string, @Body() updateDeviceDto: UpdateDeviceDto) {
-    return this.devicesService.update(id, updateDeviceDto);
+  update(@Param('id') id: string, @Body() updateDeviceDto: UpdateDeviceDto, @Req() request: AuthenticatedRequest) {
+    return this.devicesService.update(id, updateDeviceDto, request.user?.sub);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
-  remove(@Param('id') id: string) {
-    return this.devicesService.remove(id);
+  remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.devicesService.remove(id, request.user?.sub);
   }
 }

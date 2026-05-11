@@ -8,6 +8,8 @@ import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
+import { ActionType } from '../../blockchain/anchoring/action-types.enum';
 
 /**
  * Servicio de gestión de dispositivos IoT.
@@ -22,7 +24,10 @@ import { UpdateDeviceDto } from './dto/update-device.dto';
  */
 @Injectable()
 export class DevicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly anchoringService: ActionsAnchorService,
+  ) {}
 
   private readonly deviceSelect = {
     id: true,
@@ -61,7 +66,7 @@ export class DevicesService {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
   }
 
-  create(createDeviceDto: CreateDeviceDto) {
+  create(createDeviceDto: CreateDeviceDto, actorId?: string) {
     return this.prisma.device.create({
       data: {
         name: createDeviceDto.name,
@@ -72,6 +77,17 @@ export class DevicesService {
         vendor: createDeviceDto.vendor ?? null,
       },
       select: this.deviceSelect,
+    }).then(async (device) => {
+      if (actorId) {
+        await this.anchoringService.anchorAction({
+          actionType: ActionType.DEVICE_REGISTER,
+          actorId,
+          targetId: device.id,
+          readableDescription: `Device "${device.name}" registered in ecosystem ${device.ecosystemId}`,
+          metadata: { deviceId: device.id, ecosystemId: device.ecosystemId },
+        });
+      }
+      return device;
     });
   }
 
@@ -276,7 +292,7 @@ export class DevicesService {
     return deviceData;
   }
 
-  async update(id: string, updateDeviceDto: UpdateDeviceDto) {
+  async update(id: string, updateDeviceDto: UpdateDeviceDto, actorId?: string) {
     const normalizedMacAddress = updateDeviceDto.macAddress
       ? this.normalizeMacAddress(updateDeviceDto.macAddress)
       : undefined;
@@ -284,7 +300,7 @@ export class DevicesService {
     const { ecosystemId: _ignore, ...updateData } = updateDeviceDto;
 
     try {
-      return await this.prisma.device.update({
+      const device = await this.prisma.device.update({
         where: { id },
         data: {
           ...updateData,
@@ -293,6 +309,18 @@ export class DevicesService {
         },
         select: this.deviceSelect,
       });
+
+      if (actorId) {
+        await this.anchoringService.anchorAction({
+          actionType: ActionType.DEVICE_UPDATE,
+          actorId,
+          targetId: id,
+          readableDescription: `Device "${device.name}" updated`,
+          metadata: { deviceId: device.id, ecosystemId: device.ecosystemId },
+        });
+      }
+
+      return device;
     } catch (error) {
       if (this.isNotFoundError(error)) {
         throw new NotFoundException('Device not found');
@@ -302,12 +330,28 @@ export class DevicesService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, actorId?: string) {
     try {
-      return await this.prisma.device.delete({
+      const device = await this.prisma.device.findUnique({
         where: { id },
-        select: this.deviceSelect,
+        select: { ...this.deviceSelect },
       });
+
+      await this.prisma.device.delete({
+        where: { id },
+      });
+
+      if (actorId && device) {
+        await this.anchoringService.anchorAction({
+          actionType: ActionType.DEVICE_REMOVE,
+          actorId,
+          targetId: id,
+          readableDescription: `Device "${device.name}" removed`,
+          metadata: { deviceId: device.id, ecosystemId: device.ecosystemId },
+        });
+      }
+
+      return device;
     } catch (error) {
       if (this.isNotFoundError(error)) {
         throw new NotFoundException('Device not found');

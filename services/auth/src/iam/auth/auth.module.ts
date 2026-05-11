@@ -4,6 +4,7 @@ import { StringValue } from 'ms';
 import { generateKeyPairSync } from 'crypto';
 import { RedisModule } from '../redis/redis.module';
 import { UsersModule } from '../users/users.module';
+import { BlockchainModule } from '../../blockchain/blockchain.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -48,6 +49,7 @@ const decodeRsaKey = (rawValue: string | undefined, keyName: string): string => 
   imports: [
     forwardRef(() => UsersModule),
     RedisModule,
+    BlockchainModule,
     JwtModule.registerAsync({
       useFactory: async () => ({
         privateKey: decodeRsaKey(process.env.JWT_PRIVATE_KEY, 'JWT_PRIVATE_KEY'),

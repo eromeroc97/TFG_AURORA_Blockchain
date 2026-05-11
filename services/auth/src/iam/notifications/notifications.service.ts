@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../shared/mail/mail.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
+import { ActionType } from '../../blockchain/anchoring/action-types.enum';
 import {
   NotificationCategory,
   NotificationType,
@@ -16,6 +18,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly anchoringService: ActionsAnchorService,
   ) {}
 
   async create(createNotificationDto: CreateNotificationDto): Promise<Notification> {
@@ -110,6 +113,15 @@ export class NotificationsService {
         status: NotificationStatus.READ,
         readAt: new Date(),
       },
+    }).then(async (notification) => {
+      await this.anchoringService.anchorAction({
+          actionType: ActionType.NOTIFICATION_READ,
+        actorId: userId,
+        targetId: id,
+        readableDescription: `Notification "${notification.title}" marked as read`,
+        metadata: { notificationId: id },
+      });
+      return notification;
     });
   }
 
@@ -250,6 +262,14 @@ await this.prisma.notification.create({
     if (user?.email) {
       await this.mailService.sendNewNotificationEmail(user.email, title);
     }
+
+    await this.anchoringService.anchorAction({
+      actionType: ActionType.NOTIFICATION_SENT,
+      actorId,
+      targetId: userId,
+      readableDescription: `Notification sent: "${title}" to user ${userId}`,
+      metadata: { notificationId: notification.id, notificationType: 'ADMINISTRATOR_NOTIFICATION', recipientId: userId },
+    });
 
     return notification;
   }

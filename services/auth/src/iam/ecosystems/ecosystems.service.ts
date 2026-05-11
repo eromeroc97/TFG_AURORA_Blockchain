@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { AccessRole, EcosystemStatus, Prisma, Role, UserStatus } from '@prisma/client';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { FireflyService } from '../../blockchain/firefly.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
+import { ActionType } from '../../blockchain/anchoring/action-types.enum';
 import { CryptoService } from '../../crypto/crypto.service';
 import { MailService } from '../../shared/mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -32,7 +33,7 @@ import { CreateNotificationDto } from '../notifications/dto/create-notification.
 export class EcosystemsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fireflyService: FireflyService,
+    private readonly anchoringService: ActionsAnchorService,
     private readonly cryptoService: CryptoService,
     private readonly mailService: MailService,
     private readonly notificationsService: NotificationsService,
@@ -195,6 +196,13 @@ export class EcosystemsService {
           apiKeyAuthTag: encryptedApiKey.apiKeyAuthTag,
         },
         select: this.ecosystemSelect,
+      });
+
+      await this.anchoringService.anchorAction({
+        actionType: ActionType.ECOSYSTEM_CREATE,
+        actorId,
+        targetId: createdEcosystem.id,
+        readableDescription: `Ecosystem "${createdEcosystem.name}" created`,
       });
 
       return {
@@ -475,6 +483,7 @@ export class EcosystemsService {
       where: { id },
       select: {
         id: true,
+        name: true,
         ownerId: true,
         status: true,
       },
@@ -494,11 +503,20 @@ export class EcosystemsService {
       throw new ForbiddenException('No tienes permisos para modificar este ecosistema');
     }
 
-    return this.prisma.ecosystem.update({
+    const updated = await this.prisma.ecosystem.update({
       where: { id },
       data: updateEcosystemDto,
       select: this.ecosystemSelect,
     });
+
+    await this.anchoringService.anchorAction({
+        actionType: ActionType.ECOSYSTEM_UPDATE,
+      actorId: actorId!,
+      targetId: id,
+      readableDescription: `Ecosystem "${ecosystem.name}" updated`,
+    });
+
+    return updated;
   }
 
   async remove(id: string, actorId?: string) {
@@ -508,7 +526,7 @@ export class EcosystemsService {
       throw new ForbiddenException('No tienes permisos para dar de baja este ecosistema');
     }
 
-    return this.prisma.ecosystem.update({
+    const removed = await this.prisma.ecosystem.update({
       where: { id },
       data: {
         status: EcosystemStatus.REVOKED,
@@ -523,6 +541,15 @@ export class EcosystemsService {
       },
       select: this.ecosystemSelect,
     });
+
+    await this.anchoringService.anchorAction({
+        actionType: ActionType.ECOSYSTEM_REVOKE,
+      actorId: actorId!,
+      targetId: id,
+      readableDescription: `Ecosystem "${ecosystem.name}" revoked`,
+    });
+
+    return removed;
   }
 
   async updateHeartbeat(id: string) {
@@ -698,6 +725,17 @@ export class EcosystemsService {
         role: role ?? AccessRole.VIEWER,
       },
     });
+
+    await this.anchoringService.anchorAction({
+        actionType: ActionType.ECOSYSTEM_ACCESS_GRANT,
+      actorId,
+      targetId: ecosystemId,
+      readableDescription: `Ecosystem access granted: user ${targetUser.email} as ${role ?? AccessRole.VIEWER} on "${ecosystem.name}"`,
+      metadata: {
+        ecosystemId,
+        grantedUserId: targetUser.id,
+      },
+    });
   }
 
   async revokeAccess(ecosystemId: string, actorId: string, targetUserId: string): Promise<void> {
@@ -733,6 +771,17 @@ export class EcosystemsService {
     await this.prisma.ecosystemAccess.delete({
       where: { id: access.id },
     });
+
+    await this.anchoringService.anchorAction({
+        actionType: ActionType.ECOSYSTEM_ACCESS_REVOKE,
+      actorId,
+      targetId: ecosystemId,
+      readableDescription: `Ecosystem access revoked: user ${targetUserId} from ecosystem ${ecosystemId}`,
+      metadata: {
+        ecosystemId,
+        revokedUserId: targetUserId,
+      },
+    });
   }
 
   async updateAccessRole(ecosystemId: string, actorId: string, targetUserId: string, newRole: AccessRole): Promise<void> {
@@ -761,9 +810,24 @@ export class EcosystemsService {
       throw new NotFoundException('El usuario no tiene acceso a este ecosistema');
     }
 
+    const oldRole = access.role;
+
     await this.prisma.ecosystemAccess.update({
       where: { id: access.id },
       data: { role: newRole },
+    });
+
+    await this.anchoringService.anchorAction({
+        actionType: ActionType.ECOSYSTEM_ACCESS_UPDATE,
+      actorId,
+      targetId: ecosystemId,
+      readableDescription: `Ecosystem access role updated: user ${targetUserId} from ${oldRole} to ${newRole}`,
+      metadata: {
+        ecosystemId,
+        updatedUserId: targetUserId,
+        oldRole,
+        newRole,
+      },
     });
   }
 
@@ -958,6 +1022,14 @@ export class EcosystemsService {
 
     await this.prisma.ecosystemAccess.delete({
       where: { id: access.id },
+    });
+
+    await this.anchoringService.anchorAction({
+        actionType: ActionType.ECOSYSTEM_LEAVE,
+      actorId: userId,
+      targetId: ecosystemId,
+      readableDescription: `User left ecosystem: "${access.ecosystem.name}"`,
+      metadata: { ecosystemId },
     });
 
     await this.notificationsService.create({

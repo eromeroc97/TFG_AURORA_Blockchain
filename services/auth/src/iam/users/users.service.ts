@@ -14,21 +14,10 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../shared/mail/mail.service';
-import { FireflyService, AnchorPayload } from '../../blockchain/firefly.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
+import { ActionType } from '../../blockchain/anchoring/action-types.enum';
 import { CryptoService } from '../../crypto/crypto.service';
 import { RedisService } from '../redis/redis.service';
-
-/**
- * Acciones de auditoría para gestión de usuarios.
- */
-export enum AuditAction {
-  /** Aprobación de usuario */
-  USER_APPROVE = 'USER_APPROVE',
-  /** Revocación de usuario */
-  USER_REVOKE = 'USER_REVOKE',
-  /** Cambio de rol */
-  ROLE_CHANGE = 'ROLE_CHANGE',
-}
 
 /**
  * Servicio de gestión de usuarios.
@@ -46,7 +35,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
-    private readonly blockchainService: FireflyService,
+    private readonly anchoringService: ActionsAnchorService,
     private readonly cryptoService: CryptoService,
     private readonly redisService: RedisService,
   ) {}
@@ -130,101 +119,6 @@ export class UsersService {
   private assertCanRevoke(actorRole: Role | undefined, targetRole: Role) {
     if (actorRole === Role.ADMIN && (targetRole === Role.ADMIN || targetRole === Role.GLOBAL_ADMIN)) {
       throw new ForbiddenException('No puedes revocar cuentas de administradores');
-    }
-  }
-
-  private async resolveActorPublicKey(actorId: string): Promise<string> {
-    const actor = await this.prisma.user.findUnique({
-      where: { id: actorId },
-      select: {
-        identity: {
-          select: {
-            publicKey: true,
-          },
-        },
-      },
-    });
-
-    if (!actor) {
-      throw new NotFoundException('User not found');
-    }
-
-    if (!actor.identity?.publicKey) {
-      throw new BadRequestException('El usuario aprobador debe tener claves criptográficas');
-    }
-
-    return actor.identity.publicKey;
-  }
-
-  private async getActorPrivateKey(actorId: string): Promise<string> {
-    const actor = await this.prisma.user.findUnique({
-      where: { id: actorId },
-      select: {
-        identity: {
-          select: {
-            privateKeyCiphertext: true,
-            privateKeyIv: true,
-            privateKeyAuthTag: true,
-          },
-        },
-      },
-    });
-
-    if (!actor?.identity) {
-      throw new BadRequestException('El usuario aprobador no tiene identidad criptográfica');
-    }
-
-    const { privateKeyCiphertext, privateKeyIv, privateKeyAuthTag } = actor.identity;
-    if (!privateKeyCiphertext || !privateKeyIv || !privateKeyAuthTag) {
-      throw new BadRequestException('El usuario aprobador no tiene claves privadas');
-    }
-
-    const encryptedPayload = {
-      ciphertext: privateKeyCiphertext,
-      iv: privateKeyIv,
-      authTag: privateKeyAuthTag,
-    };
-    return this.cryptoService.decryptPrivateKey(encryptedPayload);
-  }
-
-  private async buildAnchorPayload(
-    action: AuditAction,
-    targetUserId: string,
-    actorId: string,
-    additionalData?: Record<string, unknown>,
-  ): Promise<AnchorPayload> {
-    const timestamp = new Date().toISOString();
-    const targetData = JSON.stringify({
-      action,
-      targetUserId,
-      timestamp,
-      ...additionalData,
-    });
-    const originalHash = this.cryptoService.hashSha256(targetData);
-    const publicKey = await this.resolveActorPublicKey(actorId);
-    const privateKey = await this.getActorPrivateKey(actorId);
-    const signature = this.cryptoService.sign(targetData, privateKey);
-
-    return {
-      actionId: action,
-      originalHash,
-      signature,
-      signerPublicKey: publicKey,
-      timestamp,
-    };
-  }
-
-  private async anchorAction(
-    action: AuditAction,
-    targetUserId: string,
-    actorId: string,
-    additionalData?: Record<string, unknown>,
-  ): Promise<void> {
-    try {
-      const payload = await this.buildAnchorPayload(action, targetUserId, actorId, additionalData);
-      await this.blockchainService.broadcastAnchor(payload);
-    } catch (error) {
-      console.error(`[UsersService] Anchoring failed for ${action}:`, error);
     }
   }
 
@@ -543,6 +437,15 @@ export class UsersService {
         },
       });
 
+      const emailDomain = createUserDto.email.split('@')[1] ?? '';
+      await this.anchoringService.anchorAction({
+        actionType: ActionType.ACCOUNT_INIT,
+        actorId: createdUser.id,
+        targetId: createdUser.id,
+        readableDescription: `User registered with email domain ${emailDomain}`,
+        metadata: { emailDomain },
+      });
+
       try {
         await this.mailService.sendWelcomeEmail(createUserDto.email);
       } catch (mailError) {
@@ -759,13 +662,12 @@ export class UsersService {
 
       await this.redisService.addToBlacklist(id, 300);
 
-      const targetUserPublicKey = user.identity?.publicKey;
-      await this.anchorAction(
-        AuditAction.USER_REVOKE,
-        id,
-        requesterId,
-        { targetUserPublicKey },
-      );
+      await this.anchoringService.anchorAction({
+        actionType: ActionType.ACCOUNT_REVOKE,
+        actorId: requesterId,
+        targetId: id,
+        readableDescription: `Account revoked: ${user.email} (${user.role}) by ${requesterRole}`,
+      });
 
       await this.mailService.sendAccountDeletedEmail(user.email, new Date().toISOString());
       return revokedUser;
@@ -816,12 +718,13 @@ export class UsersService {
         select: this.userSelect,
       });
 
-      await this.anchorAction(
-        AuditAction.ROLE_CHANGE,
-        targetUserId,
-        actorId!,
-        { oldRole: currentUser.role, newRole },
-      );
+      await this.anchoringService.anchorAction({
+        actionType: ActionType.ROLE_CHANGE,
+        actorId: actorId!,
+        targetId: targetUserId,
+        readableDescription: `Role changed: ${currentUser.email} from ${currentUser.role} to ${newRole}`,
+        metadata: { oldRole: currentUser.role, newRole },
+      });
 
       await this.mailService.sendRoleChangedEmail(
         currentUser.email,
@@ -896,7 +799,12 @@ export class UsersService {
       select: this.userSelect,
     });
 
-    await this.anchorAction(AuditAction.USER_APPROVE, id, actorId);
+    await this.anchoringService.anchorAction({
+        actionType: ActionType.ACCOUNT_APPROVE,
+      actorId: actorId,
+      targetId: id,
+      readableDescription: `Account approved: ${user.email} (${user.role}) by ${actorRole}`,
+    });
 
     const actionUrl = await this.issuePasswordResetActionUrl(user.id);
     await this.mailService.sendVerifyEmail(user.email, actionUrl);

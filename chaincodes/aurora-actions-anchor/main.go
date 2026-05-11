@@ -1,532 +1,343 @@
 package main
 
 import (
-	"crypto/ed25519"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/hyperledger/fabric-chaincode-go/shim"
-	"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
-const (
-	eventName        = "AuroraActionAnchored"
-	keyPrefixAction  = "action"
-	keyPrefixActor   = "actor"
-	keyPrefixParent  = "parent"
-	keyPrefixTarget  = "target"
-	keyPrefixType    = "type"
-	keyPrefixNonce   = "nonce"
-)
-
-// ActionType define los tipos de acciones soportadas por el chaincode.
 type ActionType string
 
 const (
-	ActionTypeShareRequest    ActionType = "SHARE_REQUEST"
-	ActionTypeShareAccept     ActionType = "SHARE_ACCEPT"
-	ActionTypeShareReject     ActionType = "SHARE_REJECT"
-	ActionTypeShareRevoke     ActionType = "SHARE_REVOKE"
-	ActionTypeRequestCancel   ActionType = "REQUEST_CANCEL"
-	ActionTypeRoleChange      ActionType = "ROLE_CHANGE"
-	ActionTypeAccountInit     ActionType = "ACCOUNT_INIT"
-	ActionTypeAccountApprove  ActionType = "ACCOUNT_APPROVE"
-	ActionTypeEcosystemCreate ActionType = "ECOSYSTEM_CREATE"
+	ActionTypeAccountInit        ActionType = "ACCOUNT_INIT"
+	ActionTypeAccountApprove    ActionType = "ACCOUNT_APPROVE"
+	ActionTypeRoleChange        ActionType = "ROLE_CHANGE"
+	ActionTypeAccountRevoke     ActionType = "ACCOUNT_REVOKE"
+	ActionTypeAccountPassblock  ActionType = "ACCOUNT_PASSBLOCK"
+
+	ActionTypeEcosystemCreate       ActionType = "ECOSYSTEM_CREATE"
+	ActionTypeEcosystemUpdate       ActionType = "ECOSYSTEM_UPDATE"
+	ActionTypeEcosystemRevoke       ActionType = "ECOSYSTEM_REVOKE"
+	ActionTypeEcosystemLeave        ActionType = "ECOSYSTEM_LEAVE"
+	ActionTypeEcosystemAccessGrant  ActionType = "ECOSYSTEM_ACCESS_GRANT"
+	ActionTypeEcosystemAccessAccept ActionType = "ECOSYSTEM_ACCESS_ACCEPT"
+	ActionTypeEcosystemAccessReject  ActionType = "ECOSYSTEM_ACCESS_REJECT"
+	ActionTypeEcosystemAccessRevoke  ActionType = "ECOSYSTEM_ACCESS_REVOKE"
+	ActionTypeEcosystemAccessUpdate  ActionType = "ECOSYSTEM_ACCESS_UPDATE"
+
+	ActionTypeDeviceRegister ActionType = "DEVICE_REGISTER"
+	ActionTypeDeviceUpdate   ActionType = "DEVICE_UPDATE"
+	ActionTypeDeviceRemove   ActionType = "DEVICE_REMOVE"
+
+	ActionTypeAuthLogin          ActionType = "AUTH_LOGIN"
+	ActionTypeAuthLogout         ActionType = "AUTH_LOGOUT"
+	ActionTypeAuthSessionRevoke  ActionType = "AUTH_SESSION_REVOKE"
+
+	ActionTypeNotificationSent ActionType = "NOTIFICATION_SENT"
+	ActionTypeNotificationRead ActionType = "NOTIFICATION_READ"
 )
 
-// AnchoredAction representa una acción anclada en el ledger inmutable de Fabric.
-type AnchoredAction struct {
+var ValidActionTypes = map[ActionType]bool{
+	ActionTypeAccountInit:        true,
+	ActionTypeAccountApprove:    true,
+	ActionTypeRoleChange:        true,
+	ActionTypeAccountRevoke:     true,
+	ActionTypeAccountPassblock:  true,
+	ActionTypeEcosystemCreate:       true,
+	ActionTypeEcosystemUpdate:       true,
+	ActionTypeEcosystemRevoke:       true,
+	ActionTypeEcosystemLeave:        true,
+	ActionTypeEcosystemAccessGrant:  true,
+	ActionTypeEcosystemAccessAccept: true,
+	ActionTypeEcosystemAccessReject: true,
+	ActionTypeEcosystemAccessRevoke: true,
+	ActionTypeEcosystemAccessUpdate: true,
+	ActionTypeDeviceRegister: true,
+	ActionTypeDeviceUpdate:   true,
+	ActionTypeDeviceRemove:   true,
+	ActionTypeAuthLogin:     true,
+	ActionTypeAuthLogout:    true,
+	ActionTypeAuthSessionRevoke: true,
+	ActionTypeNotificationSent: true,
+	ActionTypeNotificationRead: true,
+}
+
+func IsValidActionType(at ActionType) bool {
+	return ValidActionTypes[at]
+}
+
+type AuroraActionAnchor struct {
 	ActionID            string            `json:"action_id"`
-	ParentActionID      string            `json:"parent_action_id"`
 	ActorID             string            `json:"actor_id"`
 	TargetID            string            `json:"target_id"`
 	ActionType          string            `json:"action_type"`
+	ParentActionID      string            `json:"parent_action_id,omitempty"`
 	ReadableDescription string            `json:"readable_description"`
-	PayloadHash         string            `json:"payload_hash"`
 	Signature           string            `json:"signature"`
 	PublicKey           string            `json:"public_key"`
-	Timestamp           int64             `json:"timestamp"`
 	Nonce               string            `json:"nonce"`
 	Metadata            map[string]string `json:"metadata,omitempty"`
+	AnchorTxID          string            `json:"anchor_tx_id"`
+	AnchoredAt          string            `json:"anchored_at"`
 }
 
-// ActionPayload es el contenido canónico que se firma criptográficamente.
-type ActionPayload struct {
-	ActionID       string `json:"action_id"`
-	ActorID        string `json:"actor_id"`
-	TargetID       string `json:"target_id"`
-	ActionType     string `json:"action_type"`
-	ParentActionID string `json:"parent_action_id,omitempty"`
-	Nonce          string `json:"nonce"`
+type AuroraActionAnchorContract struct {
+	contractapi.Contract
 }
 
-// TransactionInput representa la estructura recibida en la invocación del chaincode.
-type TransactionInput struct {
-	ActionID            string `json:"action_id"`
-	ParentActionID      string `json:"parent_action_id,omitempty"`
-	ActorID             string `json:"actor_id"`
-	TargetID            string `json:"target_id"`
-	ActionType          string `json:"action_type"`
-	ReadableDescription string `json:"readable_description"`
-	Signature           string `json:"signature"`
-	PublicKey           string `json:"public_key"`
-	Nonce               string `json:"nonce"`
-}
-
-// ErrorCode define los códigos de error específicos del chaincode.
-type ErrorCode string
-
-const (
-	ErrMissingRequired        ErrorCode = "ERR_MISSING_REQUIRED"
-	ErrInvalidActionType      ErrorCode = "ERR_INVALID_ACTION_TYPE"
-	ErrInvalidSignature       ErrorCode = "ERR_INVALID_SIGNATURE"
-	ErrActionIDCollision     ErrorCode = "ERR_ACTION_ID_COLLISION"
-	ErrParentNotFound         ErrorCode = "ERR_PARENT_NOT_FOUND"
-	ErrSelfReferenceForbidden ErrorCode = "ERR_SELF_REFERENCE_FORBIDDEN"
-	ErrInvalidPublicKey       ErrorCode = "ERR_INVALID_PUBLIC_KEY"
-	ErrDuplicateNonce         ErrorCode = "ERR_DUPLICATE_NONCE"
-)
-
-var selfReferenceAllowed = map[ActionType]bool{
-	ActionTypeShareRevoke:   true,
-	ActionTypeRequestCancel: true,
-}
-
-var rootActionTypes = map[ActionType]bool{
-	ActionTypeShareRequest:    true,
-	ActionTypeAccountInit:     true,
-	ActionTypeEcosystemCreate: true,
-}
-
-type AuroraActionsAnchorChaincode struct{}
-
-func (a *AuroraActionsAnchorChaincode) Init(stub shim.ChaincodeStubInterface) peer.Response {
-	return shim.Success(nil)
-}
-
-func (a *AuroraActionsAnchorChaincode) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
-	function, args := stub.GetFunctionAndParameters()
-
-	switch function {
-	case "anchor":
-		return anchorAction(stub, args)
-	case "getAction":
-		return getActionByID(stub, args)
-	case "getActionsByActor":
-		return getActionsByActor(stub, args)
-	case "getActionChildren":
-		return getActionChildren(stub, args)
-	case "getActionsByTarget":
-		return getActionsByTarget(stub, args)
-	case "getActionsByType":
-		return getActionsByType(stub, args)
-	case "verifyActionSignature":
-		return verifyActionSignature(stub, args)
-	case "getActionHistory":
-		return getActionHistory(stub, args)
-	default:
-		return shim.Error(fmt.Sprintf("Función no soportada: %s", function))
+func (s *AuroraActionAnchorContract) AnchorAction(
+	ctx contractapi.TransactionContextInterface,
+	actionID string,
+	actorID string,
+	targetID string,
+	actionType string,
+	parentActionID string,
+	readableDescription string,
+	signature string,
+	publicKey string,
+	nonce string,
+	metadataJSON string,
+) error {
+	if strings.TrimSpace(actionID) == "" {
+		return fmt.Errorf("actionID es obligatorio")
 	}
-}
-
-func anchorAction(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera 1 JSON de TransactionInput")
+	if strings.TrimSpace(actorID) == "" {
+		return fmt.Errorf("actorID es obligatorio")
+	}
+	if strings.TrimSpace(targetID) == "" {
+		return fmt.Errorf("targetID es obligatorio")
+	}
+	if strings.TrimSpace(actionType) == "" {
+		return fmt.Errorf("actionType es obligatorio")
+	}
+	if strings.TrimSpace(readableDescription) == "" {
+		return fmt.Errorf("readableDescription es obligatorio")
+	}
+	if strings.TrimSpace(signature) == "" {
+		return fmt.Errorf("signature es obligatorio")
+	}
+	if strings.TrimSpace(publicKey) == "" {
+		return fmt.Errorf("publicKey es obligatorio")
+	}
+	if strings.TrimSpace(nonce) == "" {
+		return fmt.Errorf("nonce es obligatorio")
 	}
 
-	var input TransactionInput
-	if err := json.Unmarshal([]byte(args[0]), &input); err != nil {
-		return shim.Error(fmt.Sprintf("Error al deserializar JSON: %s", err))
+	if !IsValidActionType(ActionType(actionType)) {
+		return fmt.Errorf("actionType no valido: %s", actionType)
 	}
 
-	if errCode := validateInput(input); errCode != "" {
-		return shim.Error(string(errCode))
+	if len(readableDescription) > 2048 {
+		return fmt.Errorf("readableDescription excede 2048 caracteres")
 	}
 
-	if errCode := validateActionType(input.ActionType); errCode != "" {
-		return shim.Error(string(errCode))
+	if len(metadataJSON) > 4096 {
+		return fmt.Errorf("metadataJSON excede 4096 caracteres")
 	}
 
-	payload := ActionPayload{
-		ActionID:       input.ActionID,
-		ActorID:        input.ActorID,
-		TargetID:       input.TargetID,
-		ActionType:     input.ActionType,
-		ParentActionID: input.ParentActionID,
-		Nonce:          input.Nonce,
+	var metadata map[string]string
+	if strings.TrimSpace(metadataJSON) != "" && metadataJSON != "{}" {
+		if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
+			return fmt.Errorf("metadataJSON no es JSON valido: %v", err)
+		}
+	} else {
+		metadata = make(map[string]string)
 	}
 
-	payloadHash, err := computePayloadHash(payload)
+	existing, err := ctx.GetStub().GetState(actionID)
 	if err != nil {
-		return shim.Error(fmt.Sprintf("Error al calcular payload hash: %s", err))
+		return fmt.Errorf("error al verificar accion existente: %v", err)
+	}
+	if existing != nil {
+		return fmt.Errorf("accion duplicada: %s", actionID)
 	}
 
-	if !verifySignature(payloadHash, input.Signature, input.PublicKey) {
-		return shim.Error(string(ErrInvalidSignature))
-	}
-
-	if errCode := validateUniqueness(stub, input.ActionID, input.Nonce); errCode != "" {
-		return shim.Error(string(errCode))
-	}
-
-	if errCode := validateParentAction(stub, input.ParentActionID, input.ActionType, input.ActorID); errCode != "" {
-		return shim.Error(string(errCode))
-	}
-
-	txTimestamp, err := stub.GetTxTimestamp()
+	nonceKey, _ := ctx.GetStub().CreateCompositeKey("nonce", []string{nonce})
+	nonceExists, err := ctx.GetStub().GetState(nonceKey)
 	if err != nil {
-		return shim.Error("Error al obtener timestamp de transacción")
+		return fmt.Errorf("error al verificar nonce: %v", err)
 	}
-	timestamp := txTimestamp.Seconds*1000 + int64(txTimestamp.Nanos)/int64(time.Millisecond)
-
-	action := AnchoredAction{
-		ActionID:            input.ActionID,
-		ParentActionID:      input.ParentActionID,
-		ActorID:             input.ActorID,
-		TargetID:            input.TargetID,
-		ActionType:          input.ActionType,
-		ReadableDescription: input.ReadableDescription,
-		PayloadHash:         payloadHash,
-		Signature:           input.Signature,
-		PublicKey:           input.PublicKey,
-		Timestamp:           timestamp,
-		Nonce:               input.Nonce,
-	}
-
-	if err := storeAction(stub, action); err != nil {
-		return shim.Error(fmt.Sprintf("Error al almacenar acción: %s", err))
-	}
-
-	eventPayload := map[string]interface{}{
-		"action_id":              action.ActionID,
-		"action_type":            action.ActionType,
-		"actor_id":               action.ActorID,
-		"target_id":              action.TargetID,
-		"parent_action_id":       action.ParentActionID,
-		"timestamp":              action.Timestamp,
-		"readable_description":   action.ReadableDescription,
-		"payload_hash":           action.PayloadHash,
-		"signature":              action.Signature,
-		"tx_id":                  stub.GetTxID(),
-		"block_number":           0,
-		"nonce":                  action.Nonce,
-		"canonical_payload_json": canonicalJSON(payload),
-	}
-
-	eventBytes, _ := json.Marshal(eventPayload)
-	if err := stub.SetEvent(eventName, eventBytes); err != nil {
-		return shim.Error(fmt.Sprintf("Error al emitir evento: %s", err))
-	}
-
-	return shim.Success([]byte(action.ActionID))
-}
-
-func getActionByID(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera ActionID")
-	}
-
-	action, err := retrieveAction(stub, args[0])
-	if err != nil {
-		return shim.Error(fmt.Sprintf("Acción no encontrada: %s", args[0]))
-	}
-
-	actionBytes, _ := json.Marshal(action)
-	return shim.Success(actionBytes)
-}
-
-func getActionsByActor(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera ActorID")
-	}
-
-	actionIDs, err := retrieveActionsByIndex(stub, keyPrefixActor, args[0])
-	if err != nil {
-		return shim.Error(fmt.Sprintf("Error al consultar acciones: %s", err))
-	}
-
-	actionIDsBytes, _ := json.Marshal(actionIDs)
-	return shim.Success(actionIDsBytes)
-}
-
-func getActionChildren(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera ParentActionID")
-	}
-
-	actionIDs, err := retrieveActionsByIndex(stub, keyPrefixParent, args[0])
-	if err != nil {
-		return shim.Error(fmt.Sprintf("Error al consultar hijos: %s", err))
-	}
-
-	actionIDsBytes, _ := json.Marshal(actionIDs)
-	return shim.Success(actionIDsBytes)
-}
-
-func getActionsByTarget(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera TargetID")
-	}
-
-	actionIDs, err := retrieveActionsByIndex(stub, keyPrefixTarget, args[0])
-	if err != nil {
-		return shim.Error(fmt.Sprintf("Error al consultar acciones target: %s", err))
-	}
-
-	actionIDsBytes, _ := json.Marshal(actionIDs)
-	return shim.Success(actionIDsBytes)
-}
-
-func getActionsByType(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera ActionType")
-	}
-
-	if errCode := validateActionType(args[0]); errCode != "" {
-		return shim.Error(string(ErrInvalidActionType))
-	}
-
-	actionIDs, err := retrieveActionsByIndex(stub, keyPrefixType, args[0])
-	if err != nil {
-		return shim.Error(fmt.Sprintf("Error al consultar acciones por tipo: %s", err))
-	}
-
-	actionIDsBytes, _ := json.Marshal(actionIDs)
-	return shim.Success(actionIDsBytes)
-}
-
-func verifyActionSignature(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera ActionID")
-	}
-
-	action, err := retrieveAction(stub, args[0])
-	if err != nil {
-		return shim.Error(fmt.Sprintf("Acción no encontrada: %s", args[0]))
-	}
-
-	isValid := verifySignature(action.PayloadHash, action.Signature, action.PublicKey)
-	if !isValid {
-		return shim.Success([]byte(`{"valid":false}`))
-	}
-
-	return shim.Success([]byte(`{"valid":true}`))
-}
-
-func getActionHistory(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-	if len(args) != 1 {
-		return shim.Error("Argumento inválido: se espera ActionID")
-	}
-
-	return shim.Success([]byte(fmt.Sprintf(`{"action_id":"%s","history_not_implemented":true}`, args[0])))
-}
-
-func validateInput(input TransactionInput) ErrorCode {
-	if input.ActionID == "" ||
-		input.ActorID == "" ||
-		input.TargetID == "" ||
-		input.ActionType == "" ||
-		input.ReadableDescription == "" ||
-		input.Signature == "" ||
-		input.PublicKey == "" ||
-		input.Nonce == "" {
-		return ErrMissingRequired
-	}
-
-	if len(input.ReadableDescription) > 2048 {
-		return ErrMissingRequired
-	}
-
-	return ""
-}
-
-func validateActionType(actionType string) ErrorCode {
-	validTypes := map[ActionType]bool{
-		ActionTypeShareRequest:    true,
-		ActionTypeShareAccept:     true,
-		ActionTypeShareReject:     true,
-		ActionTypeShareRevoke:     true,
-		ActionTypeRequestCancel:   true,
-		ActionTypeRoleChange:      true,
-		ActionTypeAccountInit:     true,
-		ActionTypeAccountApprove:  true,
-		ActionTypeEcosystemCreate: true,
-	}
-
-	if !validTypes[ActionType(actionType)] {
-		return ErrInvalidActionType
-	}
-
-	return ""
-}
-
-func computePayloadHash(payload ActionPayload) (string, error) {
-	canonical := canonicalJSON(payload)
-	hash := sha256.Sum256([]byte(canonical))
-	return fmt.Sprintf("%x", hash), nil
-}
-
-func canonicalJSON(payload ActionPayload) string {
-	var builder strings.Builder
-	encoder := json.NewEncoder(&builder)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "")
-	_ = encoder.Encode(payload)
-	return strings.TrimSpace(builder.String())
-}
-
-func verifySignature(payloadHash, signatureB64, publicKeyPEM string) bool {
-	signature, err := base64.StdEncoding.DecodeString(signatureB64)
-	if err != nil {
-		return false
-	}
-
-	block, _ := pem.Decode([]byte(publicKeyPEM))
-	if block == nil {
-		return false
-	}
-
-	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return false
-	}
-
-	edPubKey, ok := pubKey.(ed25519.PublicKey)
-	if !ok {
-		return false
-	}
-
-	return ed25519.Verify(edPubKey, []byte(payloadHash), signature)
-}
-
-func validateUniqueness(stub shim.ChaincodeStubInterface, actionID, nonce string) ErrorCode {
-	exists, err := stub.GetState(compositeKey(stub, keyPrefixAction, actionID))
-	if err != nil {
-		return ErrActionIDCollision
-	}
-	if exists != nil {
-		return ErrActionIDCollision
-	}
-
-	nonceKey := compositeKey(stub, keyPrefixNonce, nonce)
-	nonceExists, _ := stub.GetState(nonceKey)
 	if nonceExists != nil {
-		return ErrDuplicateNonce
+		return fmt.Errorf("nonce duplicado: %s", nonce)
 	}
 
-	return ""
-}
-
-func validateParentAction(stub shim.ChaincodeStubInterface, parentActionID, actionType, actorID string) ErrorCode {
-	if parentActionID == "" {
-		if !rootActionTypes[ActionType(actionType)] {
-			return ErrParentNotFound
-		}
-		return ""
-	}
-
-	parentAction, err := retrieveAction(stub, parentActionID)
-	if err != nil {
-		return ErrParentNotFound
-	}
-
-	if parentAction.ActorID == actorID {
-		if !selfReferenceAllowed[ActionType(actionType)] {
-			return ErrSelfReferenceForbidden
-		}
-	}
-
-	return ""
-}
-
-func storeAction(stub shim.ChaincodeStubInterface, action AnchoredAction) error {
-	actionBytes, _ := json.Marshal(action)
-
-	err := stub.PutState(compositeKey(stub, keyPrefixAction, action.ActionID), actionBytes)
-	if err != nil {
-		return err
-	}
-
-	err = stub.PutState(compositeKey(stub, keyPrefixNonce, action.Nonce), []byte(action.ActionID))
-	if err != nil {
-		return err
-	}
-
-	ts := fmt.Sprintf("%d", action.Timestamp)
-
-	err = stub.PutState(compositeKey(stub, keyPrefixActor, action.ActorID, ts, action.ActionID), []byte(action.ActionID))
-	if err != nil {
-		return err
-	}
-
-	if action.ParentActionID != "" {
-		err = stub.PutState(compositeKey(stub, keyPrefixParent, action.ParentActionID, ts, action.ActionID), []byte(action.ActionID))
+	if parentActionID != "" {
+		parent, err := ctx.GetStub().GetState(parentActionID)
 		if err != nil {
-			return err
+			return fmt.Errorf("error al verificar accion padre: %v", err)
+		}
+		if parent == nil {
+			return fmt.Errorf("accion padre no encontrada: %s", parentActionID)
 		}
 	}
 
-	err = stub.PutState(compositeKey(stub, keyPrefixTarget, action.TargetID, ts, action.ActionID), []byte(action.ActionID))
-	if err != nil {
-		return err
+	txID := ctx.GetStub().GetTxID()
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	anchor := AuroraActionAnchor{
+		ActionID:            actionID,
+		ActorID:             actorID,
+		TargetID:            targetID,
+		ActionType:          actionType,
+		ParentActionID:      parentActionID,
+		ReadableDescription:  readableDescription,
+		Signature:           signature,
+		PublicKey:           publicKey,
+		Nonce:               nonce,
+		Metadata:            metadata,
+		AnchorTxID:          txID,
+		AnchoredAt:          now,
 	}
 
-	err = stub.PutState(compositeKey(stub, keyPrefixType, action.ActionType, ts, action.ActionID), []byte(action.ActionID))
+	anchorJSON, err := json.Marshal(anchor)
 	if err != nil {
-		return err
+		return fmt.Errorf("error al serializar accion: %v", err)
+	}
+
+	if err := ctx.GetStub().PutState(actionID, anchorJSON); err != nil {
+		return fmt.Errorf("error al guardar accion: %v", err)
+	}
+
+	nonceIndexKey, _ := ctx.GetStub().CreateCompositeKey("nonce", []string{nonce})
+	if err := ctx.GetStub().PutState(nonceIndexKey, []byte{0x00}); err != nil {
+		return fmt.Errorf("error al indexar nonce: %v", err)
+	}
+
+	actorIndexKey, _ := ctx.GetStub().CreateCompositeKey("actor", []string{actorID, now, actionID})
+	if err := ctx.GetStub().PutState(actorIndexKey, []byte{0x00}); err != nil {
+		return fmt.Errorf("error al indexar por actor: %v", err)
+	}
+
+	typeIndexKey, _ := ctx.GetStub().CreateCompositeKey("type", []string{actionType, now, actionID})
+	if err := ctx.GetStub().PutState(typeIndexKey, []byte{0x00}); err != nil {
+		return fmt.Errorf("error al indexar por tipo: %v", err)
+	}
+
+	targetIndexKey, _ := ctx.GetStub().CreateCompositeKey("target", []string{targetID, now, actionID})
+	if err := ctx.GetStub().PutState(targetIndexKey, []byte{0x00}); err != nil {
+		return fmt.Errorf("error al indexar por target: %v", err)
+	}
+
+	if parentActionID != "" {
+		parentIndexKey, _ := ctx.GetStub().CreateCompositeKey("parent", []string{parentActionID, now, actionID})
+		if err := ctx.GetStub().PutState(parentIndexKey, []byte{0x00}); err != nil {
+			return fmt.Errorf("error al indexar por padre: %v", err)
+		}
+	}
+
+	if err := ctx.GetStub().SetEvent("ActionAnchored", anchorJSON); err != nil {
+		return fmt.Errorf("error al emitir evento: %v", err)
 	}
 
 	return nil
 }
 
-func retrieveAction(stub shim.ChaincodeStubInterface, actionID string) (*AnchoredAction, error) {
-	actionBytes, err := stub.GetState(compositeKey(stub, keyPrefixAction, actionID))
-	if err != nil || actionBytes == nil {
-		return nil, fmt.Errorf("acción no encontrada")
+func (s *AuroraActionAnchorContract) GetAction(ctx contractapi.TransactionContextInterface, actionID string) (*AuroraActionAnchor, error) {
+	anchorJSON, err := ctx.GetStub().GetState(actionID)
+	if err != nil {
+		return nil, fmt.Errorf("error al leer del world state: %v", err)
+	}
+	if anchorJSON == nil {
+		return nil, fmt.Errorf("accion no encontrada: %s", actionID)
 	}
 
-	var action AnchoredAction
-	if err := json.Unmarshal(actionBytes, &action); err != nil {
-		return nil, err
+	var anchor AuroraActionAnchor
+	if err := json.Unmarshal(anchorJSON, &anchor); err != nil {
+		return nil, fmt.Errorf("error al deserializar accion: %v", err)
 	}
 
-	return &action, nil
+	return &anchor, nil
 }
 
-func retrieveActionsByIndex(stub shim.ChaincodeStubInterface, prefix, value string) ([]string, error) {
-	iterator, err := stub.GetStateByPartialCompositeKey(prefix, []string{value})
+func (s *AuroraActionAnchorContract) GetActionsByActor(ctx contractapi.TransactionContextInterface, actorID string) ([]*AuroraActionAnchor, error) {
+	return s.queryByIndex(ctx, "actor", []string{actorID})
+}
+
+func (s *AuroraActionAnchorContract) GetActionsByActorAndType(ctx contractapi.TransactionContextInterface, actorID string, actionType string) ([]*AuroraActionAnchor, error) {
+	allByActor, err := s.GetActionsByActor(ctx, actorID)
 	if err != nil {
 		return nil, err
+	}
+
+	var filtered []*AuroraActionAnchor
+	for _, a := range allByActor {
+		if a.ActionType == actionType {
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered, nil
+}
+
+func (s *AuroraActionAnchorContract) GetActionsByActorAndTypeAndTarget(ctx contractapi.TransactionContextInterface, actorID string, actionType string, targetID string) ([]*AuroraActionAnchor, error) {
+	allByActor, err := s.GetActionsByActor(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []*AuroraActionAnchor
+	for _, a := range allByActor {
+		if a.ActionType == actionType && a.TargetID == targetID {
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered, nil
+}
+
+func (s *AuroraActionAnchorContract) GetActionsByType(ctx contractapi.TransactionContextInterface, actionType string) ([]*AuroraActionAnchor, error) {
+	return s.queryByIndex(ctx, "type", []string{actionType})
+}
+
+func (s *AuroraActionAnchorContract) GetActionsByTarget(ctx contractapi.TransactionContextInterface, targetID string) ([]*AuroraActionAnchor, error) {
+	return s.queryByIndex(ctx, "target", []string{targetID})
+}
+
+func (s *AuroraActionAnchorContract) GetActionChildren(ctx contractapi.TransactionContextInterface, parentActionID string) ([]*AuroraActionAnchor, error) {
+	return s.queryByIndex(ctx, "parent", []string{parentActionID})
+}
+
+func (s *AuroraActionAnchorContract) queryByIndex(ctx contractapi.TransactionContextInterface, indexName string, indexValues []string) ([]*AuroraActionAnchor, error) {
+	iterator, err := ctx.GetStub().GetStateByPartialCompositeKey(indexName, indexValues)
+	if err != nil {
+		return nil, fmt.Errorf("error al obtener iterador de indice %s: %v", indexName, err)
 	}
 	defer iterator.Close()
 
-	var actionIDs []string
+	actionIDs := make(map[string]bool)
 	for iterator.HasNext() {
-		queryRes, err := iterator.Next()
+		response, err := iterator.Next()
 		if err != nil {
-			return nil, err
+			continue
 		}
-		actionIDs = append(actionIDs, string(queryRes.Value))
+		_, parts, err := ctx.GetStub().SplitCompositeKey(response.Key)
+		if err != nil {
+			continue
+		}
+		if len(parts) >= 3 {
+			actionIDs[parts[len(parts)-1]] = true
+		}
 	}
 
-	return actionIDs, nil
-}
-
-// compositeKey crea una clave compuesta nativa respetando la firma del stub de Fabric.
-func compositeKey(stub shim.ChaincodeStubInterface, prefix string, values ...string) string {
-	key, _ := stub.CreateCompositeKey(prefix, values)
-	return key
+	var anchors []*AuroraActionAnchor
+	for actionID := range actionIDs {
+		anchor, err := s.GetAction(ctx, actionID)
+		if err != nil {
+			continue
+		}
+		anchors = append(anchors, anchor)
+	}
+	return anchors, nil
 }
 
 func main() {
-	err := shim.Start(new(AuroraActionsAnchorChaincode))
+	chaincode, err := contractapi.NewChaincode(&AuroraActionAnchorContract{})
 	if err != nil {
-		fmt.Printf("Error al iniciar chaincode: %s\n", err)
+		panic(fmt.Sprintf("Error al crear el chaincode AuroraActionAnchor: %v", err))
+	}
+
+	if err := chaincode.Start(); err != nil {
+		panic(fmt.Sprintf("Error al iniciar el chaincode: %v", err))
 	}
 }
