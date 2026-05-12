@@ -8,6 +8,7 @@ import { UsersService } from './users.service';
 import { FireflyService } from '../../blockchain/firefly.service';
 import { CryptoService } from '../../crypto/crypto.service';
 import { RedisService } from '../redis/redis.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -55,6 +56,7 @@ describe('UsersService', () => {
         { provide: FireflyService, useValue: fireflyMock },
         { provide: CryptoService, useValue: cryptoMock },
         { provide: RedisService, useValue: redisMock },
+        { provide: ActionsAnchorService, useValue: { anchorAction: jest.fn() } },
       ],
     }).compile();
     service = module.get<UsersService>(UsersService);

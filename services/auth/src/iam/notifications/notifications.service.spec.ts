@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../shared/mail/mail.service';
 import { NotificationsService } from './notifications.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -42,6 +43,7 @@ describe('NotificationsService', () => {
         NotificationsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: MailService, useValue: mailMock },
+        { provide: ActionsAnchorService, useValue: { anchorAction: jest.fn() } },
       ],
     }).compile();
 

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { DevicesService } from './devices.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
 
 describe('DevicesService', () => {
   let service: DevicesService;
@@ -35,6 +36,7 @@ describe('DevicesService', () => {
           provide: PrismaService,
           useValue: prismaMock,
         },
+        { provide: ActionsAnchorService, useValue: { anchorAction: jest.fn() } },
       ],
     }).compile();
 

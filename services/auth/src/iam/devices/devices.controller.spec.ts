@@ -46,10 +46,11 @@ describe('DevicesController', () => {
       name: 'sensor-1',
       ecosystemId: '11111111-1111-4111-8111-111111111111',
     };
+    const mockRequest = { user: { sub: 'user-123' } };
 
-    await controller.create(dto);
+    await controller.create(dto, mockRequest);
 
-    expect(devicesService.create).toHaveBeenCalledWith(dto);
+    expect(devicesService.create).toHaveBeenCalledWith(dto, 'user-123');
   });
 
   it('findAll should call DevicesService.findAll', async () => {
@@ -65,16 +66,19 @@ describe('DevicesController', () => {
 
   it('update should call DevicesService.update', async () => {
     const dto: UpdateDeviceDto = { name: 'sensor-updated' };
-    await controller.update('33333333-3333-4333-8333-333333333333', dto);
+    const mockRequest = { user: { sub: 'user-123' } };
+    await controller.update('33333333-3333-4333-8333-333333333333', dto, mockRequest);
 
     expect(devicesService.update).toHaveBeenCalledWith(
       '33333333-3333-4333-8333-333333333333',
       dto,
+      'user-123',
     );
   });
 
   it('remove should call DevicesService.remove', async () => {
-    await controller.remove('44444444-4444-4444-8444-444444444444');
-    expect(devicesService.remove).toHaveBeenCalledWith('44444444-4444-4444-8444-444444444444');
+    const mockRequest = { user: { sub: 'user-123' } };
+    await controller.remove('44444444-4444-4444-8444-444444444444', mockRequest);
+    expect(devicesService.remove).toHaveBeenCalledWith('44444444-4444-4444-8444-444444444444', 'user-123');
   });
 });

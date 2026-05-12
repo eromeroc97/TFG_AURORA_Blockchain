@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 import { EcosystemsService } from './ecosystems.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
 
 describe('EcosystemsService', () => {
   let service: EcosystemsService;
@@ -45,6 +46,7 @@ describe('EcosystemsService', () => {
         { provide: CryptoService, useValue: cryptoMock },
         { provide: MailService, useValue: mailMock },
         { provide: NotificationsService, useValue: notificationsMock },
+        { provide: ActionsAnchorService, useValue: { anchorAction: jest.fn() } },
       ],
     }).compile();
     service = module.get<EcosystemsService>(EcosystemsService);

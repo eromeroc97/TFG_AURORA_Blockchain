@@ -10,6 +10,7 @@ jest.mock('./jwt-key.util', () => ({
 }));
 import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
+import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
 
 jest.mock('argon2');
 
@@ -59,6 +60,12 @@ describe('AuthService - Complete Authentication Flows', () => {
           useValue: {
             addToBlacklist: jest.fn(),
             isBlacklisted: jest.fn(),
+          },
+        },
+        {
+          provide: ActionsAnchorService,
+          useValue: {
+            anchorAction: jest.fn().mockResolvedValue({ id: 'mock-action-id' }),
           },
         },
       ],
