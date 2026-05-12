@@ -310,6 +310,19 @@ await this.prisma.notification.create({
           await this.mailService.sendNewNotificationEmail(user.email, title);
         }
       }
+
+      await this.anchoringService.anchorAction({
+        actionType: ActionType.NOTIFICATION_SENT,
+        actorId,
+        targetId: 'broadcast',
+        readableDescription: `Global notification sent to ${roles.join(', ')}: "${title}" for ${notifications.length} users`,
+        metadata: {
+          title,
+          roles: roles.join(','),
+          userCount: String(notifications.length),
+          notificationType: 'ADMINISTRATOR_NOTIFICATION',
+        },
+      });
     }
 
     return notifications.length;
