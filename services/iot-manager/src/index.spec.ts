@@ -1124,4 +1124,126 @@ describe('IoT manager smoke tests', () => {
 
     await app.close();
   });
+
+  it('/health (OPTIONS) should return CORS headers', async () => {
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore([]),
+    });
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/health',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['access-control-allow-origin']).toBe('*');
+    expect(response.headers['access-control-allow-methods']).toBe('GET,OPTIONS');
+    expect(response.headers['access-control-allow-headers']).toBe('Content-Type,Accept');
+
+    await app.close();
+  });
+
+  it('/health (GET) should return correct service status', async () => {
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore([]),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/health',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: 'UP',
+      service: 'iot-manager',
+    });
+
+    await app.close();
+  });
+
+  it('/v1/metrics (GET) should reject when ecosystem filter is empty string', async () => {
+    const configWithUserEcosystems = {
+      ...testConfig,
+      authUserEcosystemsUrl: 'http://auth-service:3001/internal/users',
+      authInternalToken: 'internal-token',
+    };
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ecosystems: [] }),
+    } as any);
+
+    const app = buildApp({
+      config: configWithUserEcosystems,
+      telemetryStore: createMockTelemetryStore([]),
+    });
+
+    const token = createJwtToken({
+      sub: 'user-empty-ecosystems',
+      role: 'USER',
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/metrics?ecosystemIds=',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(403);
+
+    await app.close();
+  });
+
+  it('/iot/devices/:deviceId/last-interaction (GET) should reject missing deviceId', async () => {
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore([]),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/iot/devices/%20/last-interaction',
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it('/iot/devices/last-interaction (GET) should reject empty macAddress', async () => {
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore([]),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/iot/devices/last-interaction?macAddress=%20&ecosystemId=eco-123',
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it('/iot/devices/last-interaction (GET) should reject empty ecosystemId', async () => {
+    const app = buildApp({
+      config: testConfig,
+      telemetryStore: createMockTelemetryStore([]),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/iot/devices/last-interaction?macAddress=AA:BB:CC:DD:EE:FF&ecosystemId=%20',
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
 });
