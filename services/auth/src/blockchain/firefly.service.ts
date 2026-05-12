@@ -83,9 +83,14 @@ export class FireflyService {
     this.initialized = true;
   }
 
+  private getFireFlyNamespaceUrl(): string {
+    return `${this.baseUrl}/namespaces/default`;
+  }
+
   private async fetchOrganizationKeys(): Promise<void> {
+    const nsUrl = this.getFireFlyNamespaceUrl();
     const statusRes = await firstValueFrom(
-      this.httpService.get<FireflyStatus>(`${this.baseUrl}/status`),
+      this.httpService.get<FireflyStatus>(`${nsUrl}/status`),
     );
 
     this.orgId = statusRes.data.org.id;
@@ -93,7 +98,7 @@ export class FireflyService {
     const verifier = statusRes.data.org.verifiers?.[0]?.value;
     if (!verifier) {
       const verifiersRes = await firstValueFrom(
-        this.httpService.get(`${this.baseUrl}/verifiers`),
+        this.httpService.get(`${nsUrl}/verifiers`),
       );
       this.verifierKey = verifiersRes.data?.[0]?.value;
     } else {
@@ -119,9 +124,10 @@ export class FireflyService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
+        const nsUrl = this.getFireFlyNamespaceUrl();
         const postRes = await firstValueFrom(
           this.httpService.post<{ id: string; did: string }>(
-            `${this.baseUrl}/identities?confirm=true`,
+            `${nsUrl}/identities?confirm=true`,
             {
               name: payload.name,
               type: 'custom',
@@ -174,9 +180,10 @@ export class FireflyService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
+        const nsUrl = this.getFireFlyNamespaceUrl();
         const postRes = await firstValueFrom(
           this.httpService.post<{ id: string; hash: string }>(
-            `${this.baseUrl}/messages/broadcast`,
+            `${nsUrl}/messages/broadcast`,
             {
               data: payload,
             },

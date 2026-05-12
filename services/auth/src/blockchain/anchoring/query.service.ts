@@ -18,15 +18,17 @@ export class ActionsQueryService {
         throw new Error('FIREFLY_API_URL is not defined');
       }
     }
-    return this.baseUrl;
+    return `${this.baseUrl}/namespaces/default/apis/aurora-actions-api`;
   }
 
   async getAction(actionId: string): Promise<AuroraActionAnchor | null> {
     try {
       const baseUrl = this.getFireFlyBaseUrl();
       const res = await firstValueFrom(
-        this.httpService.get(`${baseUrl}/apis/aurora-actions-anchor/GetAction`, {
-          params: { actionID: actionId },
+        this.httpService.post(`${baseUrl}/invoke/GetAction`, {
+          input: { actionID: actionId },
+        }, {
+          params: { confirm: 'true' },
         }),
       );
       return res.data as AuroraActionAnchor;
@@ -40,8 +42,10 @@ export class ActionsQueryService {
     try {
       const baseUrl = this.getFireFlyBaseUrl();
       const res = await firstValueFrom(
-        this.httpService.get(`${baseUrl}/apis/aurora-actions-anchor/GetActionsByActor`, {
-          params: { actorID: actorId },
+        this.httpService.post(`${baseUrl}/invoke/GetActionsByActor`, {
+          input: { actorID: actorId },
+        }, {
+          params: { confirm: 'true' },
         }),
       );
       return (res.data as AuroraActionAnchor[]) ?? [];
@@ -55,8 +59,10 @@ export class ActionsQueryService {
     try {
       const baseUrl = this.getFireFlyBaseUrl();
       const res = await firstValueFrom(
-        this.httpService.get(`${baseUrl}/apis/aurora-actions-anchor/GetActionsByActorAndType`, {
-          params: { actorID: actorId, actionType },
+        this.httpService.post(`${baseUrl}/invoke/GetActionsByActorAndType`, {
+          input: { actorID: actorId, actionType },
+        }, {
+          params: { confirm: 'true' },
         }),
       );
       return (res.data as AuroraActionAnchor[]) ?? [];
@@ -74,8 +80,10 @@ export class ActionsQueryService {
     try {
       const baseUrl = this.getFireFlyBaseUrl();
       const res = await firstValueFrom(
-        this.httpService.get(`${baseUrl}/apis/aurora-actions-anchor/GetActionsByActorAndTypeAndTarget`, {
-          params: { actorID: actorId, actionType, targetID: targetId },
+        this.httpService.post(`${baseUrl}/invoke/GetActionsByActorAndTypeAndTarget`, {
+          input: { actorID: actorId, actionType, targetID: targetId },
+        }, {
+          params: { confirm: 'true' },
         }),
       );
       return (res.data as AuroraActionAnchor[]) ?? [];
@@ -89,8 +97,10 @@ export class ActionsQueryService {
     try {
       const baseUrl = this.getFireFlyBaseUrl();
       const res = await firstValueFrom(
-        this.httpService.get(`${baseUrl}/apis/aurora-actions-anchor/GetActionsByType`, {
-          params: { actionType },
+        this.httpService.post(`${baseUrl}/invoke/GetActionsByType`, {
+          input: { actionType },
+        }, {
+          params: { confirm: 'true' },
         }),
       );
       return (res.data as AuroraActionAnchor[]) ?? [];
@@ -104,13 +114,32 @@ export class ActionsQueryService {
     try {
       const baseUrl = this.getFireFlyBaseUrl();
       const res = await firstValueFrom(
-        this.httpService.get(`${baseUrl}/apis/aurora-actions-anchor/GetActionChildren`, {
-          params: { parentActionID: parentActionId },
+        this.httpService.post(`${baseUrl}/invoke/GetActionChildren`, {
+          input: { parentActionID: parentActionId },
+        }, {
+          params: { confirm: 'true' },
         }),
       );
       return (res.data as AuroraActionAnchor[]) ?? [];
     } catch (error) {
-      this.logger.warn(`GetActionChildren failed: ${error instanceof Error ? error.message : 'Unknown'}`);
+      this.logger.warn(`GetActionChildren failed for ${parentActionId}: ${error instanceof Error ? error.message : 'Unknown'}`);
+      return [];
+    }
+  }
+
+  async getActionsByTarget(targetId: string): Promise<AuroraActionAnchor[]> {
+    try {
+      const baseUrl = this.getFireFlyBaseUrl();
+      const res = await firstValueFrom(
+        this.httpService.post(`${baseUrl}/invoke/GetActionsByTarget`, {
+          input: { targetID: targetId },
+        }, {
+          params: { confirm: 'true' },
+        }),
+      );
+      return (res.data as AuroraActionAnchor[]) ?? [];
+    } catch (error) {
+      this.logger.warn(`GetActionsByTarget failed for ${targetId}: ${error instanceof Error ? error.message : 'Unknown'}`);
       return [];
     }
   }

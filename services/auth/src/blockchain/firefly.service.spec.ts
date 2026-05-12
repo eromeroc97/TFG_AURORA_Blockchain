@@ -25,7 +25,7 @@ describe('FireflyService', () => {
 
     service = module.get<FireflyService>(FireflyService);
     jest.clearAllMocks();
-    process.env.FIREFLY_API_URL = 'http://firefly.local/api/v1/namespaces/default';
+    process.env.FIREFLY_API_URL = 'http://firefly.local';
   });
 
   it('should throw when FIREFLY_API_URL is missing', async () => {
@@ -59,7 +59,7 @@ describe('FireflyService', () => {
       const result = await service.broadcastAnchor(anchorPayload);
 
       expect(httpServiceMock.post).toHaveBeenCalledWith(
-        'http://firefly.local/api/v1/namespaces/default/messages/broadcast',
+        'http://firefly.local/namespaces/default/messages/broadcast',
         { data: anchorPayload },
       );
       expect(result.id).toBe('msg-001');

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, Role, UserStatus } from '@prisma/client';
@@ -32,6 +33,8 @@ import { RedisService } from '../redis/redis.service';
  */
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
@@ -718,7 +721,7 @@ export class UsersService {
         select: this.userSelect,
       });
 
-      await this.anchoringService.anchorAction({
+      const anchorResult = await this.anchoringService.anchorAction({
         actionType: ActionType.ROLE_CHANGE,
         actorId: actorId!,
         targetId: targetUserId,
@@ -726,17 +729,38 @@ export class UsersService {
         metadata: { oldRole: currentUser.role, newRole },
       });
 
-      await this.mailService.sendRoleChangedEmail(
-        currentUser.email,
-        newRole,
-        currentUser.role,
-      );
+      if (!anchorResult) {
+        this.logger.warn(
+          `Role change succeeded in DB but blockchain anchor returned null for user ${targetUserId} (actionType=${ActionType.ROLE_CHANGE})`,
+        );
+      } else {
+        this.logger.log(
+          `Role change anchored successfully: ${anchorResult.id} for user ${targetUserId}`,
+        );
+      }
+
+      try {
+        await this.mailService.sendRoleChangedEmail(
+          currentUser.email,
+          newRole,
+          currentUser.role,
+        );
+      } catch (emailError) {
+        this.logger.warn(
+          `Role change succeeded but failed to send email notification: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`,
+        );
+      }
 
       return updatedUser;
     } catch (error) {
       if (this.isNotFoundError(error)) {
         throw new NotFoundException('User not found');
       }
+
+      this.logger.error(
+        `Error in changeRole for user ${targetUserId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
 
       throw new InternalServerErrorException('Failed to change user role');
     }
