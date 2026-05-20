@@ -447,7 +447,7 @@ export default function EcosystemDevicesModal({
         rooms.add(device.room)
       }
     }
-    return Array.from(rooms).sort()
+    return Array.from(rooms).sort((a, b) => a.localeCompare(b, 'es-ES'))
   }, [devices])
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(devices[0]?.id ?? null)
