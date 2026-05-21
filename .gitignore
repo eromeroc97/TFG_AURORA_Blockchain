@@ -141,3 +141,4 @@ ignore/
 # Ignore .scannerwork folder created from SonarQube
 .scannerwork/
 /apps/webapp/.vite
+repomix-output.xml
