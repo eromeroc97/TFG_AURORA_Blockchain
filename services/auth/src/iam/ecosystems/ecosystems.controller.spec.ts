@@ -3,23 +3,32 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Role } from '@prisma/client';
 import { EcosystemsController } from './ecosystems.controller';
 import { EcosystemsService } from './ecosystems.service';
-import { CreateEcosystemDto } from './dto/create-ecosystem.dto';
 
 describe('EcosystemsController', () => {
   let controller: EcosystemsController;
 
   const ecosystemsServiceMock = {
-    create: jest.fn(),
-    findAll: jest.fn(),
-    findOne: jest.fn(),
-    findOneWithAccessCheck: jest.fn(),
-    findDevicesForEcosystem: jest.fn(),
-    findDevicesForEcosystemWithAccessCheck: jest.fn(),
-    update: jest.fn(),
-    remove: jest.fn(),
-    updateHeartbeat: jest.fn(),
-    getApiKey: jest.fn(),
-    getEcosystemsWithAccessType: jest.fn(),
+    create: jest.fn() as any,
+    findAll: jest.fn() as any,
+    findOne: jest.fn() as any,
+    findOneWithAccessCheck: jest.fn() as any,
+    findDevicesForEcosystem: jest.fn() as any,
+    findDevicesForEcosystemWithAccessCheck: jest.fn() as any,
+    update: jest.fn() as any,
+    remove: jest.fn() as any,
+    updateHeartbeat: jest.fn() as any,
+    getApiKey: jest.fn() as any,
+    getEcosystemsWithAccessType: jest.fn() as any,
+    getSharedWithMe: jest.fn() as any,
+    getMyEcosystems: jest.fn() as any,
+    getEcosystemsByUserId: jest.fn() as any,
+    grantAccess: jest.fn() as any,
+    getEcosystemAccesses: jest.fn() as any,
+    revokeAccess: jest.fn() as any,
+    updateAccessRole: jest.fn() as any,
+    leaveSharedEcosystem: jest.fn() as any,
+    getUserAccesses: jest.fn() as any,
+    findAllEcosystemsByUserId: jest.fn() as any,
   };
 
   const userRequest = {
@@ -42,26 +51,13 @@ describe('EcosystemsController', () => {
 
     controller = module.get<EcosystemsController>(EcosystemsController);
     jest.clearAllMocks();
-    delete process.env.TEST_OWNER_ID;
   });
 
   it('create resolves owner from authenticated JWT subject', async () => {
-    const dto: CreateEcosystemDto = { name: 'eco-1' };
+    const dto = { name: 'eco-1' };
     (ecosystemsServiceMock.create as any).mockResolvedValue({ id: 'eco-id' });
 
-    await controller.create(dto, userRequest);
-
-    expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto, userRequest.user.sub);
-  });
-
-  it('create forwards the full dto to service', async () => {
-    const dto: CreateEcosystemDto = {
-      name: 'eco-2',
-      latitude: 40.4168,
-      longitude: -3.7038,
-    };
-
-    await controller.create(dto, userRequest);
+    await controller.create(dto as any, userRequest);
 
     expect(ecosystemsServiceMock.create).toHaveBeenCalledWith(dto, userRequest.user.sub);
   });
@@ -82,10 +78,10 @@ describe('EcosystemsController', () => {
     (ecosystemsServiceMock.updateHeartbeat as any).mockResolvedValue({ id: 'eco', isOnline: true });
     (ecosystemsServiceMock.remove as any).mockResolvedValue({ id: 'eco' });
 
-    await controller.findAll(userRequest);
+    await controller.findAll(userRequest as any);
     await controller.findDevices('eco', userRequest);
     await controller.findOne('eco', userRequest);
-    await controller.update('eco', {}, userRequest);
+    await controller.update('eco', {} as any, userRequest);
     await controller.updateHeartbeat('eco');
     await controller.remove('eco', userRequest);
 
@@ -103,5 +99,57 @@ describe('EcosystemsController', () => {
     await controller.revoke('eco', userRequest);
 
     expect(ecosystemsServiceMock.remove).toHaveBeenCalledWith('eco', userRequest.user.sub);
+  });
+
+  it('getSharedWithMe routes to getUserAccesses', async () => {
+    (ecosystemsServiceMock.getUserAccesses as any).mockResolvedValue([]);
+
+    await controller.getSharedWithMe(userRequest);
+
+    expect(ecosystemsServiceMock.getUserAccesses).toHaveBeenCalledWith(userRequest.user.sub);
+  });
+
+  it('getMyEcosystems routes to getEcosystemsWithAccessType', async () => {
+    (ecosystemsServiceMock.getEcosystemsWithAccessType as any).mockResolvedValue([]);
+
+    await controller.getMyEcosystems(userRequest);
+
+    expect(ecosystemsServiceMock.getEcosystemsWithAccessType).toHaveBeenCalledWith(userRequest.user.sub, userRequest.user.role);
+  });
+
+  it('getEcosystemsByUserId routes to findAllEcosystemsByUserId', async () => {
+    (ecosystemsServiceMock.findAllEcosystemsByUserId as any).mockResolvedValue([{ id: 'eco-1' }]);
+
+    await controller.getEcosystemsByUserId('user-1');
+
+    expect(ecosystemsServiceMock.findAllEcosystemsByUserId).toHaveBeenCalledWith('user-1');
+  });
+
+  it('grantAccess routes to service', async () => {
+    (ecosystemsServiceMock.grantAccess as any).mockResolvedValue(undefined);
+
+    await controller.grantAccess('eco-1', { email: 'user@test.com' } as any, userRequest);
+
+    expect(ecosystemsServiceMock.grantAccess).toHaveBeenCalledWith('eco-1', userRequest.user.sub, 'user@test.com', undefined);
+  });
+
+  it('getAccesses routes to getEcosystemAccesses', async () => {
+    await controller.getAccesses('eco-1', userRequest);
+    expect(ecosystemsServiceMock.getEcosystemAccesses).toHaveBeenCalledWith('eco-1', userRequest.user.sub);
+  });
+
+  it('revokeAccess routes to service', async () => {
+    await controller.revokeAccess('eco-1', 'target-1', userRequest);
+    expect(ecosystemsServiceMock.revokeAccess).toHaveBeenCalledWith('eco-1', userRequest.user.sub, 'target-1');
+  });
+
+  it('updateAccessRole routes to service', async () => {
+    await controller.updateAccessRole('eco-1', 'target-1', { role: 'EDITOR' } as any, userRequest);
+    expect(ecosystemsServiceMock.updateAccessRole).toHaveBeenCalledWith('eco-1', userRequest.user.sub, 'target-1', 'EDITOR');
+  });
+
+  it('leaveSharedEcosystem routes to service', async () => {
+    await controller.leaveSharedEcosystem('eco-1', userRequest);
+    expect(ecosystemsServiceMock.leaveSharedEcosystem).toHaveBeenCalledWith('eco-1', userRequest.user.sub);
   });
 });

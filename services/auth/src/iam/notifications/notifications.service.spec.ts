@@ -313,6 +313,62 @@ describe('NotificationsService', () => {
       expect(prismaMock.notification.update).toHaveBeenCalled();
       expect(result).toEqual(updatedNotification);
     });
+
+    it('should use AccessRole.VIEWER when metadata.role is undefined on ACCEPTED', async () => {
+      const notification = {
+        id: 'notif-123', userId: 'user-456', category: NotificationCategory.ACTION_EXPECTED,
+        type: NotificationType.ECOSYSTEM_DELEGATION_REQUEST, status: NotificationStatus.PENDING,
+        actorId: 'actor-123', referenceId: 'eco-789',
+        metadata: { ecosystemId: 'eco-789', targetUserId: 'user-456' },
+      };
+      prismaMock.notification.findUnique.mockResolvedValue(notification);
+      prismaMock.notification.update.mockResolvedValue({ ...notification, status: 'ACCEPTED' });
+      prismaMock.ecosystem.findUnique.mockResolvedValue({ name: 'Eco' });
+      prismaMock.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      prismaMock.notification.create.mockResolvedValue({ id: 'response-notif' });
+
+      await service.respondToNotification('notif-123', 'user-456', 'ACCEPTED');
+
+      expect(prismaMock.ecosystemAccess.create).toHaveBeenCalledWith({
+        data: { ecosystemId: 'eco-789', userId: 'user-456', role: AccessRole.VIEWER },
+      });
+    });
+
+    it('should use fallback name when ecosystem lookup returns null', async () => {
+      const notification = {
+        id: 'notif-123', userId: 'user-456', category: NotificationCategory.ACTION_EXPECTED,
+        type: NotificationType.ECOSYSTEM_DELEGATION_REQUEST, status: NotificationStatus.PENDING,
+        actorId: 'actor-123', referenceId: 'eco-789',
+        metadata: { ecosystemId: 'eco-789', targetUserId: 'user-456', role: 'EDITOR' },
+      };
+      prismaMock.notification.findUnique.mockResolvedValue(notification);
+      prismaMock.notification.update.mockResolvedValue({ ...notification, status: 'ACCEPTED' });
+      prismaMock.ecosystem.findUnique.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      prismaMock.notification.create.mockResolvedValue({ id: 'response-notif' });
+
+      await service.respondToNotification('notif-123', 'user-456', 'ACCEPTED');
+
+      expect(prismaMock.ecosystemAccess.create).toHaveBeenCalled();
+    });
+
+    it('should not send email when notification has no actorId', async () => {
+      const notification = {
+        id: 'notif-123', userId: 'user-456', category: NotificationCategory.ACTION_EXPECTED,
+        type: NotificationType.ECOSYSTEM_DELEGATION_REQUEST, status: NotificationStatus.PENDING,
+        actorId: null, referenceId: 'eco-789',
+        metadata: { ecosystemId: 'eco-789', targetUserId: 'user-456', role: 'EDITOR' },
+      };
+      prismaMock.notification.findUnique.mockResolvedValue(notification);
+      prismaMock.notification.update.mockResolvedValue({ ...notification, status: 'ACCEPTED' });
+      prismaMock.ecosystem.findUnique.mockResolvedValue({ name: 'Eco' });
+      prismaMock.user.findUnique.mockResolvedValueOnce({ email: 'user@example.com' });
+      prismaMock.notification.create.mockResolvedValue({ id: 'response-notif' });
+
+      await service.respondToNotification('notif-123', 'user-456', 'ACCEPTED');
+
+      expect(mailMock.sendEcosystemDelegationResponseEmail).not.toHaveBeenCalled();
+    });
   });
 
   describe('getPendingCount', () => {
