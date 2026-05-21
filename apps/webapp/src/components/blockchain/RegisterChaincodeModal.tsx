@@ -1,7 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { FileCode, Loader2, X, Lock } from 'lucide-react'
 import { registerChaincode, type SmartContract } from '../../services/blockchain.service'
 import GoDragDropZone from './GoDragDropZone'
+
+function getButtonLabel(isLoading: boolean, isUpgrade: boolean): ReactNode {
+  if (isLoading) {
+    return (
+      <>
+        <Loader2 className="mr-2 size-4 animate-spin" />
+        {isUpgrade ? 'Actualizando...' : 'Registrando...'}
+      </>
+    )
+  }
+  return isUpgrade ? 'Actualizar' : 'Registrar'
+}
 
 interface RegisterChaincodeModalProps {
   isOpen: boolean
@@ -270,16 +282,7 @@ export default function RegisterChaincodeModal({
               disabled={!isFormValid || isLoading}
               className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:bg-emerald-600/60 disabled:hover:bg-emerald-600/60 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  {isUpgrade ? 'Actualizando...' : 'Registrando...'}
-                </>
-              ) : isUpgrade ? (
-                'Actualizar'
-              ) : (
-                'Registrar'
-              )}
+              {getButtonLabel(isLoading, isUpgrade)}
             </button>
           </div>
         </form>

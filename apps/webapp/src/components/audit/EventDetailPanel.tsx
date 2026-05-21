@@ -106,6 +106,26 @@ function SignatureInfoModal() {
   );
 }
 
+function getSignatureBadge(signatureValid: boolean | undefined) {
+  if (signatureValid === true) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+        <ShieldCheck className="w-3 h-3" />
+        Firma válida
+      </span>
+    )
+  }
+  if (signatureValid === false) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+        <ShieldX className="w-3 h-3" />
+        Firma inválida
+      </span>
+    )
+  }
+  return <span className="text-xs text-slate-400">Sin datos</span>
+}
+
 export default function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
   const isDiscrepancy = event.integrityStatus === 'DISCREPANCY';
   
@@ -153,19 +173,7 @@ export default function EventDetailPanel({ event, onClose }: EventDetailPanelPro
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-500">Verificación de Firma:</span>
               <SignatureInfoModal />
-              {signatureValid === true ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  <ShieldCheck className="w-3 h-3" />
-                  Firma válida
-                </span>
-              ) : signatureValid === false ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                  <ShieldX className="w-3 h-3" />
-                  Firma inválida
-                </span>
-              ) : (
-                <span className="text-xs text-slate-400">Sin datos</span>
-              )}
+              {getSignatureBadge(signatureValid)}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-500">Verificación de Integridad:</span>

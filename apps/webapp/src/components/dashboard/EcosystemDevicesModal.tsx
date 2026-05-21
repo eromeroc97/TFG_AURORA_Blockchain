@@ -409,6 +409,571 @@ function CompactCategorySelect({
   )
 }
 
+function ConfirmRevokeDialog({
+  ecosystemName,
+  isRevoking,
+  onConfirm,
+  onCancel,
+}: {
+  ecosystemName: string
+  isRevoking: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  if (!ecosystemName) return null
+  return (
+    <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
+      <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+        <div className="flex items-start gap-3">
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
+            <X className="size-5" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-primary">Confirmar baja de ecosistema</h3>
+            <p className="text-sm leading-6 text-muted">
+              ¿Estás seguro de que quieres dar de baja el ecosistema <strong>{ecosystemName}</strong>? Esta acción lo eliminará de tu lista.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isRevoking}
+            className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isRevoking ? 'Dando de baja...' : 'Confirmar baja'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmLeaveDialog({
+  ecosystemName,
+  isLeaving,
+  onConfirm,
+  onCancel,
+}: {
+  ecosystemName: string
+  isLeaving: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  if (!ecosystemName) return null
+  return (
+    <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
+      <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+        <div className="flex items-start gap-3">
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <UserMinus className="size-5" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-primary">Dejar de ver el ecosistema</h3>
+            <p className="text-sm leading-6 text-muted">
+              ¿Estás seguro de que quieres dejar de ver el ecosistema <strong>{ecosystemName}</strong>? El propietario será notificado de tu decisión.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isLeaving}
+            className="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLeaving ? 'Abandonando...' : 'Confirmar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CustomRoomDialog({
+  value,
+  onChange,
+  onConfirm,
+  onCancel,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
+      <div className="w-full max-w-md rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+        <div className="flex items-start gap-3">
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+            <Home className="size-5" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-primary">Nueva habitación</h3>
+            <p className="text-sm leading-6 text-muted">
+              Introduce el nombre de la nueva habitación o ubicación.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Ej: Terraza, Trastero, Garaje..."
+            className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onConfirm()
+            }}
+          />
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!value.trim()}
+            className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EcosystemHeader({
+  ecosystemName,
+  isEditing,
+  editedName,
+  onEditedNameChange,
+  isSaving,
+  onSave,
+  onCancelEdit,
+  onStartEdit,
+  canManage,
+  canRevoke,
+  isShared,
+  onRevoke,
+  onLeave,
+  error,
+  saveMessage,
+}: {
+  ecosystemName: string
+  isEditing: boolean
+  editedName: string
+  onEditedNameChange: (v: string) => void
+  isSaving: boolean
+  onSave: () => void
+  onCancelEdit: () => void
+  onStartEdit: () => void
+  canManage: boolean
+  canRevoke: boolean
+  isShared?: boolean
+  onRevoke: () => void
+  onLeave: () => void
+  error: string | null
+  saveMessage: string | null
+}) {
+  return (
+    <div className="min-w-0">
+      <h3 className="text-lg font-semibold text-primary">Dispositivos del ecosistema</h3>
+      {isEditing ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            aria-label="Nombre del ecosistema"
+            value={editedName}
+            onChange={(event) => onEditedNameChange(event.target.value)}
+            className="w-full max-w-md rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+          />
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving || editedName.trim().length === 0 || editedName.trim() === ecosystemName}
+            className="inline-flex items-center justify-center rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? 'Guardando...' : 'Guardar nombre ecosistema'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted">{ecosystemName}</p>
+          {canManage && (
+            <button
+              type="button"
+              onClick={onStartEdit}
+              className="inline-flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-surface/70"
+            >
+              <Pencil className="size-4" />
+              Editar ecosistema
+            </button>
+          )}
+          {canRevoke && (
+            <button
+              type="button"
+              onClick={onRevoke}
+              className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+            >
+              Dar de baja ecosistema
+            </button>
+          )}
+          {isShared && (
+            <button
+              type="button"
+              onClick={onLeave}
+              className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+            >
+              Quiero dejar de ver este ecosistema
+            </button>
+          )}
+        </div>
+      )}
+      {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
+      {saveMessage ? <p className="mt-2 text-sm text-emerald-700">{saveMessage}</p> : null}
+    </div>
+  )
+}
+
+function DeviceListPanel({
+  customRooms,
+  filterRoom,
+  onFilterRoomChange,
+  filterCategory,
+  onFilterCategoryChange,
+  filteredDevices,
+  selectedDeviceId,
+  onSelectDevice,
+  totalDevicesCount,
+}: {
+  customRooms: string[]
+  filterRoom: string
+  onFilterRoomChange: (v: string) => void
+  filterCategory: string
+  onFilterCategoryChange: (v: string) => void
+  filteredDevices: AccessMapDevice[]
+  selectedDeviceId: string | null
+  onSelectDevice: (device: AccessMapDevice) => void
+  totalDevicesCount: number
+}) {
+  return (
+    <div className="rounded-3xl border border-border bg-surface/60 p-4 overflow-hidden">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Lista de dispositivos</p>
+      <div className="mt-3 flex gap-2">
+        <div className="w-40 shrink-0">
+          <CompactLocationSelect value={filterRoom} onChange={onFilterRoomChange} customRooms={customRooms} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <CompactCategorySelect value={filterCategory} onChange={onFilterCategoryChange} />
+        </div>
+      </div>
+      <div className="mt-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2 space-y-2">
+        {filteredDevices.length > 0 ? (
+          filteredDevices.map((device) => (
+            <button
+              key={device.id}
+              type="button"
+              onClick={() => onSelectDevice(device)}
+              className={`w-full rounded-2xl px-4 py-3 text-left transition-all border-2 ${
+                device.id === selectedDeviceId ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-transparent bg-white text-primary/80 hover:bg-surface/80'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium">{device.name}</span>
+                <span className="text-[0.65rem] uppercase tracking-[0.2em] text-muted">ID</span>
+              </div>
+              <p className="mt-1 text-xs text-muted">{device.vendor ?? 'Sin vendor'}</p>
+            </button>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">
+            {totalDevicesCount === 0
+              ? 'No hay dispositivos registrados para este ecosistema.'
+              : 'No hay dispositivos que coincidan con los filtros seleccionados.'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DeviceDetailsPanel({
+  displayedDevice,
+  isDeviceLoading,
+  isUser,
+  editedDeviceName,
+  onEditedDeviceNameChange,
+  editedDeviceRoom,
+  onEditedDeviceRoomChange,
+  editedDeviceCategory,
+  onEditedDeviceCategoryChange,
+  isSavingDeviceName,
+  onSaveDevice,
+  onClose,
+  deviceStatusClassName,
+  deviceStatusLabel,
+  lastInteractionAt,
+  deviceStatusError,
+  modalError,
+  saveMessage,
+  ecosystemName,
+  customRooms,
+  onCustomRoomOpen,
+}: {
+  displayedDevice: AccessMapDevice | null
+  isDeviceLoading: boolean
+  isUser: boolean
+  editedDeviceName: string
+  onEditedDeviceNameChange: (v: string) => void
+  editedDeviceRoom: string
+  onEditedDeviceRoomChange: (v: string) => void
+  editedDeviceCategory: string
+  onEditedDeviceCategoryChange: (v: string) => void
+  isSavingDeviceName: boolean
+  onSaveDevice: () => void
+  onClose: () => void
+  deviceStatusClassName: string
+  deviceStatusLabel: string
+  lastInteractionAt: string | null
+  deviceStatusError: string | null
+  modalError: string | null
+  saveMessage: string | null
+  ecosystemName: string
+  customRooms: string[]
+  onCustomRoomOpen: () => void
+}) {
+  return (
+    <div className="rounded-3xl border border-border bg-surface/60 p-6 overflow-hidden">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Detalles del dispositivo</p>
+          <p className="mt-1 text-sm text-muted">Selecciona un dispositivo para ver la información completa.</p>
+        </div>
+        <div className={`rounded-full px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] ${deviceStatusClassName}`}>
+          {deviceStatusLabel}
+        </div>
+      </div>
+      {lastInteractionAt ? (
+        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
+          Última interacción: {new Date(lastInteractionAt).toLocaleString()}
+        </p>
+      ) : null}
+      {deviceStatusError ? <p className="mt-2 text-sm text-rose-600">{deviceStatusError}</p> : null}
+      {modalError ? <p className="mt-4 text-sm text-rose-600">{modalError}</p> : null}
+      {saveMessage ? <p className="mt-4 text-sm text-emerald-700">{saveMessage}</p> : null}
+
+      {(() => {
+        if (isDeviceLoading && !displayedDevice) {
+          return <div className="mt-6 rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">Cargando datos del dispositivo...</div>
+        }
+        if (displayedDevice) {
+          return (
+            <DeviceInfoFields
+              displayedDevice={displayedDevice}
+              isUser={isUser}
+              editedDeviceName={editedDeviceName}
+              onEditedDeviceNameChange={onEditedDeviceNameChange}
+              editedDeviceRoom={editedDeviceRoom}
+              onEditedDeviceRoomChange={onEditedDeviceRoomChange}
+              editedDeviceCategory={editedDeviceCategory}
+              onEditedDeviceCategoryChange={onEditedDeviceCategoryChange}
+              ecosystemName={ecosystemName}
+              customRooms={customRooms}
+              onCustomRoomOpen={onCustomRoomOpen}
+            />
+          )
+        }
+        return (
+          <div className="mt-6 rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">
+            Selecciona un dispositivo para ver su información.
+          </div>
+        )
+      })()}
+
+      {displayedDevice && (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
+          >
+            Cerrar
+          </button>
+          {isUser && (
+            <button
+              type="button"
+              disabled={isSavingDeviceName || (editedDeviceName.trim() === displayedDevice.name && !editedDeviceCategory && !editedDeviceRoom)}
+              onClick={onSaveDevice}
+              className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSavingDeviceName ? 'Guardando...' : 'Guardar'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DeviceInfoFields({
+  displayedDevice,
+  isUser,
+  editedDeviceName,
+  onEditedDeviceNameChange,
+  editedDeviceRoom,
+  onEditedDeviceRoomChange,
+  editedDeviceCategory,
+  onEditedDeviceCategoryChange,
+  ecosystemName,
+  customRooms,
+  onCustomRoomOpen,
+}: {
+  displayedDevice: AccessMapDevice
+  isUser: boolean
+  editedDeviceName: string
+  onEditedDeviceNameChange: (v: string) => void
+  editedDeviceRoom: string
+  onEditedDeviceRoomChange: (v: string) => void
+  editedDeviceCategory: string
+  onEditedDeviceCategoryChange: (v: string) => void
+  ecosystemName: string
+  customRooms: string[]
+  onCustomRoomOpen: () => void
+}) {
+  return (
+    <div className="mt-6 space-y-4 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-primary">Nombre del dispositivo</span>
+        {isUser ? (
+          <input
+            type="text"
+            value={editedDeviceName}
+            onChange={(event) => onEditedDeviceNameChange(event.target.value)}
+            className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+          />
+        ) : (
+          <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
+            {displayedDevice.name}
+          </div>
+        )}
+      </label>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-primary">Habitación</span>
+          {isUser ? (
+            <LocationSelect value={editedDeviceRoom} onChange={onEditedDeviceRoomChange} onSelectOther={onCustomRoomOpen} customRooms={customRooms} />
+          ) : (
+            <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
+              {displayedDevice.room && DEVICE_LOCATIONS[displayedDevice.room]
+                ? DEVICE_LOCATIONS[displayedDevice.room].label
+                : displayedDevice.room || 'No disponible'}
+            </div>
+          )}
+        </label>
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-primary">Categoría</span>
+          {isUser ? (
+            <CategorySelect value={editedDeviceCategory} onChange={onEditedDeviceCategoryChange} />
+          ) : (
+            <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
+              {displayedDevice.category && DEVICE_CATEGORIES[displayedDevice.category]
+                ? DEVICE_CATEGORIES[displayedDevice.category].label
+                : displayedDevice.category || 'No disponible'}
+            </div>
+          )}
+        </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted">Mac address</p>
+          <p className="mt-2 text-sm text-primary">{displayedDevice.macAddress ?? 'No disponible'}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted">Vendor</p>
+          <p className="mt-2 text-sm text-primary">{displayedDevice.vendor ?? 'No disponible'}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted">Ecosistema</p>
+          <p className="mt-2 text-sm text-primary">{ecosystemName}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted">Última actualización</p>
+          <p className="mt-2 text-sm text-primary">{displayedDevice.updatedAt ? new Date(displayedDevice.updatedAt).toLocaleString() : '-'}</p>
+        </div>
+      </div>
+
+      <PayloadSection payload={displayedDevice.payload} />
+    </div>
+  )
+}
+
+function formatPayloadValue(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No'
+  if (typeof value === 'number') return value.toString()
+  if (typeof value === 'string') return value
+  if (value === null || value === undefined) return '-'
+  return String(value)
+}
+
+function PayloadSection({ payload }: { payload: Record<string, unknown> | undefined }) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-3">Información adicional</p>
+      {payload && Object.keys(payload).length > 0 ? (
+        <div className="grid gap-2">
+          {Object.entries(payload).map(([key, value]) => (
+            <div key={key} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
+              <span className="text-xs text-slate-500 capitalize">{key.replace(/_/g, ' ')}</span>
+              <span className="text-sm font-medium text-primary">{formatPayloadValue(value)}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-400 italic">No hay información adicional disponible</p>
+      )}
+    </div>
+  )
+}
+
 export default function EcosystemDevicesModal({
   ecosystem,
   onClose,
@@ -435,17 +1000,15 @@ export default function EcosystemDevicesModal({
     'Exterior': 'EXTERIOR',
   }
 
-  const predefinedRoomKeys = ['SALON', 'COCINA', 'HABITACION', 'BAÑO', 'EXTERIOR', 'OTRO']
+  const predefinedSpanish = ['Salón', 'Dormitorio', 'Cocina', 'Baño', 'Exterior', 'Otro / Exterior']
+  const isCustomRoomName = (room: string) => {
+    const mapped = REVERSE_ROOM_MAPPING[room]
+    return mapped ? !['SALON', 'COCINA', 'HABITACION', 'BAÑO', 'EXTERIOR', 'OTRO'].includes(mapped) : !predefinedSpanish.includes(room)
+  }
   const customRooms = useMemo(() => {
     const rooms = new Set<string>()
     for (const device of devices) {
-      if (!device.room) continue
-      const roomKey = REVERSE_ROOM_MAPPING[device.room] || null
-      if (roomKey && !predefinedRoomKeys.includes(roomKey)) {
-        rooms.add(device.room)
-      } else if (!roomKey && device.room !== 'Salón' && device.room !== 'Dormitorio' && device.room !== 'Cocina' && device.room !== 'Baño' && device.room !== 'Exterior' && device.room !== 'Otro / Exterior') {
-        rooms.add(device.room)
-      }
+      if (device.room && isCustomRoomName(device.room)) rooms.add(device.room)
     }
     return Array.from(rooms).sort((a, b) => a.localeCompare(b, 'es-ES'))
   }, [devices])
@@ -626,14 +1189,8 @@ export default function EcosystemDevicesModal({
   }
 
   const handleSaveDeviceName = async () => {
-    if (!displayedDevice) {
-      return
-    }
-
     const trimmedName = editedDeviceName.trim()
-    if (trimmedName.length === 0 && !editedDeviceCategory && !editedDeviceRoom) {
-      return
-    }
+    if (!displayedDevice || (trimmedName.length === 0 && !editedDeviceCategory && !editedDeviceRoom)) return
 
     setIsSavingDeviceName(true)
     setModalError(null)
@@ -722,40 +1279,18 @@ export default function EcosystemDevicesModal({
     }
   }
 
-  const deviceStatusLabel = isDeviceStatusLoading
-    ? 'Verificando estado'
-    : isDeviceOnline === true
-      ? 'ONLINE'
-      : isDeviceOnline === false
-        ? 'OFFLINE'
-        : 'Desconocido'
-
-  const deviceStatusClassName = isDeviceStatusLoading
-    ? 'border border-accent/20 bg-accent/10 text-accent'
-    : isDeviceOnline === true
-      ? 'border border-emerald-200 bg-emerald-100 text-emerald-700'
-      : isDeviceOnline === false
-        ? 'border border-rose-200 bg-rose-50 text-rose-700'
-        : 'border border-slate-200 bg-slate-100 text-slate-700'
-
-  const formatPayloadKey = (key: string): string => {
-    return key.replace(/_/g, ' ')
+  const getDeviceStatusLabel = () => {
+    if (isDeviceStatusLoading) return 'Verificando estado'
+    if (isDeviceOnline === true) return 'ONLINE'
+    if (isDeviceOnline === false) return 'OFFLINE'
+    return 'Desconocido'
   }
 
-  const formatPayloadValue = (value: unknown): string => {
-    if (typeof value === 'boolean') {
-      return value ? 'Sí' : 'No'
-    }
-    if (typeof value === 'number') {
-      return value.toString()
-    }
-    if (typeof value === 'string') {
-      return value
-    }
-    if (value === null || value === undefined) {
-      return '-'
-    }
-    return String(value)
+  const getDeviceStatusClassName = () => {
+    if (isDeviceStatusLoading) return 'border border-accent/20 bg-accent/10 text-accent'
+    if (isDeviceOnline === true) return 'border border-emerald-200 bg-emerald-100 text-emerald-700'
+    if (isDeviceOnline === false) return 'border border-rose-200 bg-rose-50 text-rose-700'
+    return 'border border-slate-200 bg-slate-100 text-slate-700'
   }
 
   const handleConfirmCustomRoom = () => {
@@ -772,76 +1307,28 @@ export default function EcosystemDevicesModal({
     <div className="fixed inset-0 z-[90] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
       <div className="w-full max-w-6xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-primary">Dispositivos del ecosistema</h3>
-            {isEditingEcosystemName ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  aria-label="Nombre del ecosistema"
-                  value={editedEcosystemName}
-                  onChange={(event) => setEditedEcosystemName(event.target.value)}
-                  className="w-full max-w-md rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveEcosystemName}
-                  disabled={
-                    isSavingEcosystemName || editedEcosystemName.trim().length === 0 || editedEcosystemName.trim() === ecosystem.name
-                  }
-                  className="inline-flex items-center justify-center rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSavingEcosystemName ? 'Guardando...' : 'Guardar nombre ecosistema'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingEcosystemName(false)
-                    setEditedEcosystemName(ecosystem.name)
-                    setEcosystemError(null)
-                    setEcosystemSaveMessage(null)
-                  }}
-                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
-                >
-                  Cancelar
-                </button>
-              </div>
-            ) : (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="text-sm text-muted">{ecosystem.name}</p>
-                {canManageEcosystem && (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingEcosystemName(true)}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-surface/70"
-                  >
-                    <Pencil className="size-4" />
-                    Editar ecosistema
-                  </button>
-                )}
-                {canRevokeEcosystem && (
-                  <button
-                    type="button"
-                    onClick={() => setIsConfirmingRevoke(true)}
-                    className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-                  >
-                    Dar de baja ecosistema
-                  </button>
-                )}
-                {ecosystem.isShared && (
-                  <button
-                    type="button"
-                    onClick={() => setIsConfirmingLeave(true)}
-                    className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100"
-                  >
-                    Quiero dejar de ver este ecosistema
-                  </button>
-                )}
-              </div>
-            )}
-            {ecosystemError ? <p className="mt-2 text-sm text-rose-600">{ecosystemError}</p> : null}
-            {ecosystemSaveMessage ? <p className="mt-2 text-sm text-emerald-700">{ecosystemSaveMessage}</p> : null}
-          </div>
+          <EcosystemHeader
+            ecosystemName={ecosystem.name}
+            isEditing={isEditingEcosystemName}
+            editedName={editedEcosystemName}
+            onEditedNameChange={setEditedEcosystemName}
+            isSaving={isSavingEcosystemName}
+            onSave={handleSaveEcosystemName}
+            onCancelEdit={() => {
+              setIsEditingEcosystemName(false)
+              setEditedEcosystemName(ecosystem.name)
+              setEcosystemError(null)
+              setEcosystemSaveMessage(null)
+            }}
+            onStartEdit={() => setIsEditingEcosystemName(true)}
+            canManage={canManageEcosystem}
+            canRevoke={canRevokeEcosystem}
+            isShared={ecosystem.isShared}
+            onRevoke={() => setIsConfirmingRevoke(true)}
+            onLeave={() => setIsConfirmingLeave(true)}
+            error={ecosystemError}
+            saveMessage={ecosystemSaveMessage}
+          />
           <button
             type="button"
             onClick={onClose}
@@ -853,300 +1340,70 @@ export default function EcosystemDevicesModal({
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
-          <div className="rounded-3xl border border-border bg-surface/60 p-4 overflow-hidden">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Lista de dispositivos</p>
-            <div className="mt-3 flex gap-2">
-              <div className="w-40 shrink-0">
-                <CompactLocationSelect value={filterRoom} onChange={setFilterRoom} customRooms={customRooms} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <CompactCategorySelect value={filterCategory} onChange={setFilterCategory} />
-              </div>
-            </div>
-            <div className="mt-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2 space-y-2">
-              {filteredDevices.length > 0 ? (
-                filteredDevices.map((device) => (
-                  <button
-                    key={device.id}
-                    type="button"
-                    onClick={() => handleSelectDevice(device)}
-                    className={`w-full rounded-2xl px-4 py-3 text-left transition-all border-2 ${
-                      device.id === selectedDeviceId ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-transparent bg-white text-primary/80 hover:bg-surface/80'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-medium">{device.name}</span>
-                      <span className="text-[0.65rem] uppercase tracking-[0.2em] text-muted">ID</span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted">{device.vendor ?? 'Sin vendor'}</p>
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">
-                  {ecosystem.devices.length === 0
-                    ? 'No hay dispositivos registrados para este ecosistema.'
-                    : 'No hay dispositivos que coincidan con los filtros seleccionados.'}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-border bg-surface/60 p-6 overflow-hidden">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Detalles del dispositivo</p>
-                <p className="mt-1 text-sm text-muted">Selecciona un dispositivo para ver la información completa.</p>
-              </div>
-              <div className={`rounded-full px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] ${deviceStatusClassName}`}>
-                {deviceStatusLabel}
-              </div>
-            </div>
-            {lastInteractionAt ? (
-              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
-                Última interacción: {new Date(lastInteractionAt).toLocaleString()}
-              </p>
-            ) : null}
-            {deviceStatusError ? <p className="mt-2 text-sm text-rose-600">{deviceStatusError}</p> : null}
-            {modalError ? <p className="mt-4 text-sm text-rose-600">{modalError}</p> : null}
-            {saveMessage ? <p className="mt-4 text-sm text-emerald-700">{saveMessage}</p> : null}
-
-            {isDeviceLoading && !displayedDevice ? (
-              <div className="mt-6 rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">Cargando datos del dispositivo...</div>
-            ) : displayedDevice ? (
-              <div className="mt-6 space-y-4 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
-                <label className="block space-y-2">
-                  <span className="text-sm font-medium text-primary">Nombre del dispositivo</span>
-                  {isUser ? (
-                    <input
-                      type="text"
-                      value={editedDeviceName}
-                      onChange={(event) => setEditedDeviceName(event.target.value)}
-                      className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
-                    />
-                  ) : (
-                    <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
-                      {displayedDevice.name}
-                    </div>
-                  )}
-                </label>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium text-primary">Habitación</span>
-                    {isUser ? (
-                      <LocationSelect value={editedDeviceRoom} onChange={setEditedDeviceRoom} onSelectOther={() => setIsCustomRoomModalOpen(true)} customRooms={customRooms} />
-                    ) : (
-                      <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
-                        {displayedDevice.room && DEVICE_LOCATIONS[displayedDevice.room]
-                          ? DEVICE_LOCATIONS[displayedDevice.room].label
-                          : displayedDevice.room || 'No disponible'}
-                      </div>
-                    )}
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium text-primary">Categoría</span>
-                    {isUser ? (
-                      <CategorySelect value={editedDeviceCategory} onChange={setEditedDeviceCategory} />
-                    ) : (
-                      <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-primary">
-                        {displayedDevice.category && DEVICE_CATEGORIES[displayedDevice.category]
-                          ? DEVICE_CATEGORIES[displayedDevice.category].label
-                          : displayedDevice.category || 'No disponible'}
-                      </div>
-                    )}
-                  </label>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-border bg-white p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Mac address</p>
-                    <p className="mt-2 text-sm text-primary">{displayedDevice.macAddress ?? 'No disponible'}</p>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-white p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Vendor</p>
-                    <p className="mt-2 text-sm text-primary">{displayedDevice.vendor ?? 'No disponible'}</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-border bg-white p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Ecosistema</p>
-                    <p className="mt-2 text-sm text-primary">{ecosystem.name}</p>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-white p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Última actualización</p>
-                    <p className="mt-2 text-sm text-primary">{displayedDevice.updatedAt ? new Date(displayedDevice.updatedAt).toLocaleString() : '-'}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border bg-white p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent mb-3">Información adicional</p>
-                  {displayedDevice?.payload && Object.keys(displayedDevice.payload).length > 0 ? (
-                    <div className="grid gap-2">
-                      {Object.entries(displayedDevice.payload).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
-                          <span className="text-xs text-slate-500 capitalize">{formatPayloadKey(key)}</span>
-                          <span className="text-sm font-medium text-primary">{formatPayloadValue(value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic">No hay información adicional disponible</p>
-                  )}
-                </div>
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
-                  >
-                    Cerrar
-                  </button>
-                  {isUser && (
-                    <button
-                      type="button"
-                      disabled={isSavingDeviceName || (editedDeviceName.trim() === displayedDevice.name && !editedDeviceCategory && !editedDeviceRoom)}
-                      onClick={handleSaveDeviceName}
-                      className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isSavingDeviceName ? 'Guardando...' : 'Guardar'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="mt-6 rounded-2xl border border-border bg-white px-4 py-6 text-sm text-muted">
-                Selecciona un dispositivo para ver su información.
-              </div>
-            )}
-          </div>
+          <DeviceListPanel
+            customRooms={customRooms}
+            filterRoom={filterRoom}
+            onFilterRoomChange={setFilterRoom}
+            filterCategory={filterCategory}
+            onFilterCategoryChange={setFilterCategory}
+            filteredDevices={filteredDevices}
+            selectedDeviceId={selectedDeviceId}
+            onSelectDevice={handleSelectDevice}
+            totalDevicesCount={ecosystem.devices.length}
+          />
+          <DeviceDetailsPanel
+            displayedDevice={displayedDevice}
+            isDeviceLoading={isDeviceLoading}
+            isUser={isUser}
+            editedDeviceName={editedDeviceName}
+            onEditedDeviceNameChange={setEditedDeviceName}
+            editedDeviceRoom={editedDeviceRoom}
+            onEditedDeviceRoomChange={setEditedDeviceRoom}
+            editedDeviceCategory={editedDeviceCategory}
+            onEditedDeviceCategoryChange={setEditedDeviceCategory}
+            isSavingDeviceName={isSavingDeviceName}
+            onSaveDevice={handleSaveDeviceName}
+            onClose={onClose}
+            deviceStatusClassName={getDeviceStatusClassName()}
+            deviceStatusLabel={getDeviceStatusLabel()}
+            lastInteractionAt={lastInteractionAt}
+            deviceStatusError={deviceStatusError}
+            modalError={modalError}
+            saveMessage={saveMessage}
+            ecosystemName={ecosystem.name}
+            customRooms={customRooms}
+            onCustomRoomOpen={() => setIsCustomRoomModalOpen(true)}
+          />
         </div>
-        {isConfirmingRevoke ? (
-          <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
-            <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
-              <div className="flex items-start gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
-                  <X className="size-5" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-semibold text-primary">Confirmar baja de ecosistema</h3>
-                  <p className="text-sm leading-6 text-muted">
-                    ¿Estás seguro de que quieres dar de baja el ecosistema <strong>{ecosystem.name}</strong>? Esta acción lo eliminará de tu lista.
-                  </p>
-                </div>
-              </div>
 
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsConfirmingRevoke(false)}
-                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmRevoke}
-                  disabled={isRevoking}
-                  className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isRevoking ? 'Dando de baja...' : 'Confirmar baja'}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {isConfirmingRevoke && (
+          <ConfirmRevokeDialog
+            ecosystemName={ecosystem.name}
+            isRevoking={isRevoking}
+            onConfirm={handleConfirmRevoke}
+            onCancel={() => setIsConfirmingRevoke(false)}
+          />
+        )}
 
-        {isConfirmingLeave ? (
-          <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
-            <div className="w-full max-w-lg rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
-              <div className="flex items-start gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                  <UserMinus className="size-5" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-semibold text-primary">Dejar de ver el ecosistema</h3>
-                  <p className="text-sm leading-6 text-muted">
-                    ¿Estás seguro de que quieres dejar de ver el ecosistema <strong>{ecosystem.name}</strong>? El propietario será notificado de tu decisión.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsConfirmingLeave(false)}
-                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLeaveShared}
-                  disabled={isLeaving}
-                  className="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isLeaving ? 'Abandonando...' : 'Confirmar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {isConfirmingLeave && (
+          <ConfirmLeaveDialog
+            ecosystemName={ecosystem.name}
+            isLeaving={isLeaving}
+            onConfirm={handleLeaveShared}
+            onCancel={() => setIsConfirmingLeave(false)}
+          />
+        )}
 
         {isCustomRoomModalOpen && (
-          <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/20 px-4 py-6">
-            <div className="w-full max-w-md rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
-              <div className="flex items-start gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-                  <Home className="size-5" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-semibold text-primary">Nueva habitación</h3>
-                  <p className="text-sm leading-6 text-muted">
-                    Introduce el nombre de la nueva habitación o ubicación.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <input
-                  type="text"
-                  value={customRoomInput}
-                  onChange={(e) => setCustomRoomInput(e.target.value)}
-                  placeholder="Ej: Terraza, Trastero, Garaje..."
-                  className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleConfirmCustomRoom()
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCustomRoomModalOpen(false)
-                    setCustomRoomInput('')
-                  }}
-                  className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-surface/50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmCustomRoom}
-                  disabled={!customRoomInput.trim()}
-                  className="inline-flex items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Confirmar
-                </button>
-              </div>
-            </div>
-          </div>
+          <CustomRoomDialog
+            value={customRoomInput}
+            onChange={setCustomRoomInput}
+            onConfirm={handleConfirmCustomRoom}
+            onCancel={() => {
+              setIsCustomRoomModalOpen(false)
+              setCustomRoomInput('')
+            }}
+          />
         )}
       </div>
     </div>

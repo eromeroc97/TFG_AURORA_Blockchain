@@ -12,6 +12,990 @@ const PAGE_SIZES = [10, 25, 50] as const
 
 type ModalType = 'organizations' | 'namespaces' | 'ledger' | 'event' | null
 
+function getContractStatusClass(status: string): string {
+  if (status === 'active') return 'bg-emerald-100 text-emerald-700'
+  if (status === 'deploying') return 'bg-amber-100 text-amber-700'
+  return 'bg-rose-100 text-rose-700'
+}
+
+function getContractStatusLabel(status: string): string {
+  if (status === 'active') return 'Activo'
+  if (status === 'deploying') return 'Desplegando'
+  return 'Fallido'
+}
+
+function isEventInDateRange(event: BlockchainEvent, from: string, to: string): boolean {
+  if (!from && !to) return true
+  if (!event.timestamp) return false
+  const eventDate = new Date(event.timestamp)
+  if (from) {
+    const fromDate = new Date(from)
+    fromDate.setHours(0, 0, 0, 0)
+    if (eventDate < fromDate) return false
+  }
+  if (to) {
+    const toDate = new Date(to)
+    toDate.setHours(23, 59, 59, 999)
+    if (eventDate > toDate) return false
+  }
+  return true
+}
+
+function getStatusValue(isLoading: boolean, value: string, condition: boolean, trueText: string, falseText: string): string {
+  if (isLoading) return '...'
+  return condition ? trueText : falseText
+}
+
+function StatusCardsGrid({
+  isLoading,
+  managerStatus,
+  networkNodes,
+  organizations,
+  namespaces,
+  events,
+  openDetailModal,
+}: {
+  isLoading: boolean
+  managerStatus: string
+  networkNodes: NetworkNode[]
+  organizations: Organization[]
+  namespaces: ChannelNamespace[]
+  events: BlockchainEvent[]
+  openDetailModal: (type: ModalType) => void
+}) {
+  const cardClasses = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-teal-300"
+
+  const ordererValue = getStatusValue(isLoading, '', networkNodes.length > 0, 'Activo', '-')
+  const orgValue = getStatusValue(isLoading, '', organizations.length > 0, String(organizations.length), '-')
+  const nsValue = getStatusValue(isLoading, '', namespaces.length > 0, String(namespaces.length), '-')
+  const eventsValue = getStatusValue(isLoading, '', events.length > 0, events.length.toLocaleString(), '0')
+
+  return (
+    <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-amber-600" />
+          <p className="text-sm text-slate-500">Blockchain Manager</p>
+        </div>
+        <p className="mt-2 text-2xl font-semibold text-slate-900">
+          {isLoading ? '...' : managerStatus}
+        </p>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Server className="h-5 w-5 text-emerald-600" />
+          <p className="text-sm text-slate-500">Orderer</p>
+        </div>
+        <p className="mt-2 text-2xl font-semibold text-slate-900">{ordererValue}</p>
+      </div>
+
+      <div
+        className={cardClasses}
+        role="button"
+        tabIndex={0}
+        aria-label="Ver organizaciones"
+        onClick={() => openDetailModal('organizations')}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('organizations') } }}
+      >
+        <div className="flex items-center gap-2">
+          <Network className="h-5 w-5 text-sky-600" />
+          <p className="text-sm text-slate-500">Organizaciones</p>
+        </div>
+        <p className="mt-2 text-2xl font-semibold text-slate-900">{orgValue}</p>
+      </div>
+
+      <div
+        className={cardClasses}
+        role="button"
+        tabIndex={0}
+        aria-label="Ver namespaces"
+        onClick={() => openDetailModal('namespaces')}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('namespaces') } }}
+      >
+        <div className="flex items-center gap-2">
+          <Layers className="h-5 w-5 text-teal-600" />
+          <p className="text-sm text-slate-500">Namespaces</p>
+        </div>
+        <p className="mt-2 text-2xl font-semibold text-slate-900">{nsValue}</p>
+      </div>
+
+      <div
+        className={cardClasses}
+        role="button"
+        tabIndex={0}
+        aria-label="Ver eventos"
+        onClick={() => openDetailModal('ledger')}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('ledger') } }}
+      >
+        <div className="flex items-center gap-2">
+          <Cpu className="h-5 w-5 text-teal-600" />
+          <p className="text-sm text-slate-500">Eventos</p>
+        </div>
+        <p className="mt-2 text-2xl font-semibold text-slate-900">{eventsValue}</p>
+      </div>
+    </div>
+  )
+}
+
+function EventsSection({
+  isLoading,
+  eventsSearchTerm,
+  setEventsSearchTerm,
+  eventsPageSize,
+  handleEventsPageSizeChange,
+  showEventsFilters,
+  setShowEventsFilters,
+  eventsNamespaceFilter,
+  setEventsNamespaceFilter,
+  eventsSourceFilter,
+  setEventsSourceFilter,
+  eventsTxFilter,
+  setEventsTxFilter,
+  eventsDateFrom,
+  setEventsDateFrom,
+  eventsDateTo,
+  setEventsDateTo,
+  clearEventsFilters,
+  filteredEvents,
+  paginatedEvents,
+  eventsCurrentPage,
+  handleEventsPageChange,
+  totalEventsPages,
+  namespaces,
+  setEventsCurrentPage,
+  setSelectedEvent,
+  setDetailModal,
+}: {
+  isLoading: boolean
+  eventsSearchTerm: string
+  setEventsSearchTerm: (v: string) => void
+  eventsPageSize: number
+  handleEventsPageSizeChange: (v: number) => void
+  showEventsFilters: boolean
+  setShowEventsFilters: (v: boolean) => void
+  eventsNamespaceFilter: string
+  setEventsNamespaceFilter: (v: string) => void
+  eventsSourceFilter: string
+  setEventsSourceFilter: (v: string) => void
+  eventsTxFilter: string
+  setEventsTxFilter: (v: string) => void
+  eventsDateFrom: string
+  setEventsDateFrom: (v: string) => void
+  eventsDateTo: string
+  setEventsDateTo: (v: string) => void
+  clearEventsFilters: () => void
+  filteredEvents: BlockchainEvent[]
+  paginatedEvents: BlockchainEvent[]
+  eventsCurrentPage: number
+  handleEventsPageChange: (v: number) => void
+  totalEventsPages: number
+  namespaces: ChannelNamespace[]
+  setEventsCurrentPage: (v: number) => void
+  setSelectedEvent: (v: BlockchainEvent | null) => void
+  setDetailModal: (v: ModalType) => void
+}) {
+  return (
+    <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <h2 className="text-lg font-semibold text-slate-900">Eventos Recientes</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-2xl border border-border bg-slate-50 px-3 py-2">
+            <Search className="h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={eventsSearchTerm}
+              onChange={(e) => {
+                setEventsSearchTerm(e.target.value)
+                setEventsCurrentPage(1)
+              }}
+              placeholder="Buscar eventos..."
+              className="ml-2 w-40 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <Select
+            value={eventsPageSize}
+            onChange={(value) => handleEventsPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
+            options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
+          />
+          <button
+            type="button"
+            onClick={() => setShowEventsFilters(!showEventsFilters)}
+            className="inline-flex items-center gap-1 rounded-2xl border border-border px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            <Filter className="size-4" />
+            Filtros
+          </button>
+        </div>
+      </div>
+
+      {showEventsFilters && (
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="grid grid-cols-6 gap-4">
+            <div>
+              <label htmlFor="events-namespace" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                Namespace
+              </label>
+              <select
+                id="events-namespace"
+                value={eventsNamespaceFilter}
+                onChange={(e) => {
+                  setEventsNamespaceFilter(e.target.value)
+                  setEventsCurrentPage(1)
+                }}
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              >
+                <option value="">Todos</option>
+                {namespaces.map((ns) => (
+                  <option key={ns.name} value={ns.name}>{ns.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="events-source" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                Fuente
+              </label>
+              <select
+                id="events-source"
+                value={eventsSourceFilter}
+                onChange={(e) => {
+                  setEventsSourceFilter(e.target.value)
+                  setEventsCurrentPage(1)
+                }}
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              >
+                <option value="">Todas</option>
+                <option value="fabric">fabric</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="events-tx" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                TX
+              </label>
+              <input
+                id="events-tx"
+                type="text"
+                value={eventsTxFilter}
+                onChange={(e) => {
+                  setEventsTxFilter(e.target.value)
+                  setEventsCurrentPage(1)
+                }}
+                placeholder="Buscar TX..."
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            </div>
+            <div>
+              <label htmlFor="events-date-from" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                Desde
+              </label>
+              <input
+                id="events-date-from"
+                type="date"
+                value={eventsDateFrom}
+                onChange={(e) => {
+                  setEventsDateFrom(e.target.value)
+                  setEventsCurrentPage(1)
+                }}
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            </div>
+            <div>
+              <label htmlFor="events-date-to" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                Hasta
+              </label>
+              <input
+                id="events-date-to"
+                type="date"
+                value={eventsDateTo}
+                onChange={(e) => {
+                  setEventsDateTo(e.target.value)
+                  setEventsCurrentPage(1)
+                }}
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={clearEventsFilters}
+              className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+            >
+              <XCircle className="size-4" />
+              Limpiar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(() => {
+        if (isLoading) {
+          return (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-16 rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          )
+        }
+        if (filteredEvents.length === 0) {
+          return (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+              <Cpu className="mx-auto size-8 text-slate-400" />
+              <p className="mt-2 text-sm font-medium text-slate-700">
+                {eventsSearchTerm || eventsNamespaceFilter || eventsSourceFilter || eventsTxFilter || eventsDateFrom || eventsDateTo
+                  ? 'No hay eventos para los filtros seleccionados'
+                  : 'No hay eventos en el ledger'}
+              </p>
+            </div>
+          )
+        }
+        return (
+          <>
+          <EventPagination
+            currentPage={eventsCurrentPage}
+            totalPages={totalEventsPages}
+            onPageChange={handleEventsPageChange}
+            filteredLength={filteredEvents.length}
+            paginatedLength={paginatedEvents.length}
+            label="evento"
+          />
+          <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Evento</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Fuente</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">TX</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {paginatedEvents.map((event) => (
+                  <tr
+                    key={event.id}
+                    onClick={() => {
+                      setSelectedEvent(event)
+                      setDetailModal('event')
+                    }}
+                    className="cursor-pointer hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {event.name}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                      {event.namespace || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {event.source}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                      {event.tx?.blockchainId
+                        ? event.tx.blockchainId.substring(0, 12) + '...'
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {event.timestamp
+                        ? new Date(event.timestamp).toLocaleString('es-ES')
+                        : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <EventPagination
+            currentPage={eventsCurrentPage}
+            totalPages={totalEventsPages}
+            onPageChange={handleEventsPageChange}
+            filteredLength={filteredEvents.length}
+            paginatedLength={paginatedEvents.length}
+            label="evento"
+          />
+        </>
+      )})()}
+    </div>
+  )
+}
+
+function EventPagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+  filteredLength,
+  paginatedLength,
+  label,
+}: {
+  currentPage: number
+  totalPages: number
+  onPageChange: (v: number) => void
+  filteredLength: number
+  paginatedLength: number
+  label: string
+}) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <span>
+        Mostrando {paginatedLength} de {filteredLength} {label}
+        {filteredLength === 1 ? '' : 's'}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span>
+          Página {currentPage} de {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ContractsSection({
+  isLoading,
+  isGlobalAdmin,
+  isAdmin,
+  setIsRegisterModalOpen,
+  contractsSearchTerm,
+  setContractsSearchTerm,
+  contractsPageSize,
+  setContractsPageSize,
+  handleContractsPageSizeChange,
+  showContractFilters,
+  setShowContractFilters,
+  contractStatusFilter,
+  setContractStatusFilter,
+  contractChannelFilter,
+  setContractChannelFilter,
+  clearContractFilters,
+  filteredContracts,
+  paginatedContracts,
+  contractsCurrentPage,
+  setContractsCurrentPage,
+  handleContractsPageChange,
+  totalContractsPages,
+  namespaces,
+  contractVersions,
+  handleContractClick,
+}: {
+  isLoading: boolean
+  isGlobalAdmin: boolean
+  isAdmin: boolean
+  setIsRegisterModalOpen: (v: boolean) => void
+  contractsSearchTerm: string
+  setContractsSearchTerm: (v: string) => void
+  contractsPageSize: number
+  setContractsPageSize: (v: number) => void
+  handleContractsPageSizeChange: (v: number) => void
+  showContractFilters: boolean
+  setShowContractFilters: (v: boolean) => void
+  contractStatusFilter: string
+  setContractStatusFilter: (v: string) => void
+  contractChannelFilter: string
+  setContractChannelFilter: (v: string) => void
+  clearContractFilters: () => void
+  filteredContracts: SmartContract[]
+  paginatedContracts: SmartContract[]
+  contractsCurrentPage: number
+  setContractsCurrentPage: (v: number) => void
+  handleContractsPageChange: (v: number) => void
+  totalContractsPages: number
+  namespaces: ChannelNamespace[]
+  contractVersions: Record<string, string>
+  handleContractClick: (contract: SmartContract) => void
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <h2 className="text-lg font-semibold text-slate-900">
+          Smart Contracts
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          {(isGlobalAdmin || isAdmin) && (
+            <button
+              type="button"
+              onClick={() => !isAdmin && setIsRegisterModalOpen(true)}
+              disabled={isAdmin}
+              className={`inline-flex items-center gap-1 text-sm font-medium transition-colors ${isAdmin ? 'cursor-not-allowed text-slate-300' : 'text-accent hover:text-accent/80'}`}
+            >
+              <Layers className="size-4" />
+              Registrar Smart Contract
+            </button>
+          )}
+          <DeploymentHelpModal disabled={isAdmin} />
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-2xl border border-border bg-slate-50 px-3 py-2">
+            <Search className="h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={contractsSearchTerm}
+              onChange={(e) => {
+                setContractsSearchTerm(e.target.value)
+                setContractsCurrentPage(1)
+              }}
+              placeholder="Buscar por nombre o namespace..."
+              className="ml-2 w-40 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <Select
+            value={contractsPageSize}
+            onChange={(value) => handleContractsPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
+            options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
+          />
+          <button
+            type="button"
+            onClick={() => setShowContractFilters(!showContractFilters)}
+            className="inline-flex items-center gap-1 rounded-2xl border border-border px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            <Filter className="size-4" />
+            Filtros
+          </button>
+        </div>
+      </div>
+
+      {showContractFilters && (
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label htmlFor="contract-status" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                Estado
+              </label>
+              <select
+                id="contract-status"
+                value={contractStatusFilter}
+                onChange={(e) => {
+                  setContractStatusFilter(e.target.value)
+                  setContractsCurrentPage(1)
+                }}
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              >
+                <option value="">Todos</option>
+                <option value="active">Activo</option>
+                <option value="deploying">Desplegando</option>
+                <option value="failed">Fallido</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="contract-namespace" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                Namespace
+              </label>
+              <select
+                id="contract-namespace"
+                value={contractChannelFilter}
+                onChange={(e) => {
+                  setContractChannelFilter(e.target.value)
+                  setContractsCurrentPage(1)
+                }}
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
+              >
+                <option value="">Todos</option>
+                {namespaces.map((ns) => (
+                  <option key={ns.name} value={ns.name}>{ns.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={clearContractFilters}
+              className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+            >
+              <XCircle className="size-4" />
+              Limpiar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(() => {
+        if (isLoading) {
+          return (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          )
+        }
+        if (filteredContracts.length === 0) {
+          return (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+              <Server className="mx-auto size-8 text-slate-400" />
+              <p className="mt-2 text-sm font-medium text-slate-700">
+                No hay smart contracts para los filtros seleccionados
+              </p>
+            </div>
+          )
+        }
+        return (
+          <>
+          <EventPagination
+            currentPage={contractsCurrentPage}
+            totalPages={totalContractsPages}
+            onPageChange={handleContractsPageChange}
+            filteredLength={filteredContracts.length}
+            paginatedLength={paginatedContracts.length}
+            label="smart contract"
+          />
+          <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Nombre</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Versión</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Estado</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {paginatedContracts.map((contract) => (
+                  <tr
+                    key={contract.id}
+                    onClick={() => handleContractClick(contract)}
+                    className="cursor-pointer hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 font-medium text-slate-900">{contract.name}</td>
+                    <td className="px-4 py-3 text-slate-600">{contractVersions[contract.id] || contract.version}</td>
+                    <td className="px-4 py-3 text-slate-600">{contract.channel}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getContractStatusClass(contract.status)}`}>
+                        {getContractStatusLabel(contract.status)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {new Date(contract.createdAt).toLocaleDateString('es-ES')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <EventPagination
+            currentPage={contractsCurrentPage}
+            totalPages={totalContractsPages}
+            onPageChange={handleContractsPageChange}
+            filteredLength={filteredContracts.length}
+            paginatedLength={paginatedContracts.length}
+            label="smart contract"
+          />
+        </>
+      )})()}
+    </div>
+  )
+}
+function TopologySection({
+  isLoading,
+  error,
+  networkNodes,
+  organizations,
+}: {
+  isLoading: boolean
+  error: string
+  networkNodes: NetworkNode[]
+  organizations: Organization[]
+}) {
+  return (
+    <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 className="mb-4 text-lg font-semibold text-slate-900">Topología de Red</h2>
+      {(() => {
+        if (isLoading) return <div className="h-64 rounded-2xl bg-slate-100" />
+        if (error) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
+        return <BlockchainTopologyGraph networkNodes={networkNodes} organizations={organizations} />
+      })()}
+    </div>
+  )
+}
+
+function DetailModalView({
+  detailModal,
+  closeDetailModal,
+  organizations,
+  namespaces,
+  events,
+  lastHourEvents,
+}: {
+  detailModal: ModalType
+  closeDetailModal: () => void
+  organizations: Organization[]
+  namespaces: ChannelNamespace[]
+  events: BlockchainEvent[]
+  lastHourEvents: number
+}) {
+  return (
+    <>
+      {detailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={closeDetailModal} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeDetailModal() } }} />
+          <div className="relative z-10 w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <button
+              onClick={closeDetailModal}
+              className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X className="size-5" />
+            </button>
+
+            {detailModal === 'organizations' && (
+              <>
+                <h3 className="text-xl font-semibold text-slate-900">Organizaciones</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Total: {organizations.length} organizaciones
+                </p>
+                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                  {organizations.map((org) => (
+                    <div key={org.id} className="rounded-xl border border-slate-200 p-3">
+                      <p className="font-medium text-slate-900">{org.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {org.description ?? org.id}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {detailModal === 'namespaces' && (
+              <>
+                <h3 className="text-xl font-semibold text-slate-900">Namespaces</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Total: {namespaces.length} namespaces
+                </p>
+                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                  {namespaces.map((ns) => (
+                    <div key={ns.name} className="rounded-xl border border-slate-200 p-3">
+                      <p className="font-medium text-slate-900">{ns.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {ns.description ?? 'Sin descripción'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {detailModal === 'ledger' && (
+              <>
+                <h3 className="text-xl font-semibold text-slate-900">Eventos</h3>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-sm text-slate-500">Eventos totales</p>
+                    <p className="text-2xl font-semibold text-slate-900">
+                      {events.length > 0 ? events.length.toLocaleString() : '-'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-sm text-slate-500">Eventos última hora</p>
+                    <p className="text-2xl font-semibold text-slate-900">
+                      {lastHourEvents}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function ContractDetailModal({
+  selectedContract,
+  setSelectedContract,
+  setIsUpgradeModalOpen,
+  setConfirmDelete,
+  isGlobalAdmin,
+  contractDetailLoading,
+  contractInterfaceJson,
+  syntaxHighlightJson,
+}: {
+  selectedContract: SmartContract | null
+  setSelectedContract: (v: SmartContract | null) => void
+  setIsUpgradeModalOpen: (v: boolean) => void
+  setConfirmDelete: (v: { open: boolean; name: string }) => void
+  isGlobalAdmin: boolean
+  contractDetailLoading: boolean
+  contractInterfaceJson: string | null
+  syntaxHighlightJson: (json: string) => string
+}) {
+  return (
+    <>
+      {selectedContract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setSelectedContract(null)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedContract(null) } }} />
+          <div className="relative z-10 w-[80vw] max-h-[90vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl flex flex-col">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">Detalle de Smart Contract</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedContract.name}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {isGlobalAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUpgradeModalOpen(true)
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                    >
+                      <Pencil className="size-4" />
+                      Actualizar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDelete({ open: true, name: selectedContract.name })
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100"
+                    >
+                      <Trash2 className="size-4" />
+                      Eliminar
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedContract(null)}
+                  className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Versión</p>
+                  <p className="text-sm text-slate-900">{selectedContract.version}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Namespace</p>
+                  <p className="text-sm text-slate-900">{selectedContract.channel}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Estado</p>
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getContractStatusClass(selectedContract.status)}`}>
+                    {getContractStatusLabel(selectedContract.status)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Fecha</p>
+                  <p className="text-sm text-slate-900">
+                    {new Date(selectedContract.createdAt).toLocaleDateString('es-ES')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex-1 min-h-0 flex flex-col">
+              <p className="text-xs font-medium text-slate-500 mb-2">Interfaz (Swagger JSON)</p>
+              {(() => {
+                if (contractDetailLoading) {
+                  return (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="size-6 animate-spin text-slate-400" />
+                    </div>
+                  )
+                }
+                if (contractInterfaceJson) {
+                  return (
+                    <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <pre
+                        className="text-xs font-mono text-slate-700 whitespace-pre"
+                        dangerouslySetInnerHTML={{ __html: syntaxHighlightJson(contractInterfaceJson) }}
+                      />
+                    </div>
+                  )
+                }
+                return <p className="text-sm text-slate-500">No se pudo cargar la interfaz</p>
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function ConfirmDeleteModal({
+  confirmDelete,
+  setConfirmDelete,
+  setSelectedContract,
+  refreshNetworkData,
+}: {
+  confirmDelete: { open: boolean; name: string }
+  setConfirmDelete: (v: { open: boolean; name: string }) => void
+  setSelectedContract: (v: SmartContract | null) => void
+  refreshNetworkData: () => void
+}) {
+  return (
+    <>
+      {confirmDelete.open && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setConfirmDelete({ open: false, name: '' })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmDelete({ open: false, name: '' }) } }} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">Eliminar Smart Contract</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              ¿Estás seguro de que quieres eliminar <strong>{confirmDelete.name}</strong>? Esta acción eliminará la API y todos los listeners asociados en FireFly.
+            </p>
+            <p className="mt-2 text-xs text-rose-500">
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete({ open: false, name: '' })}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await deleteChaincode(confirmDelete.name)
+                    setConfirmDelete({ open: false, name: '' })
+                    setSelectedContract(null)
+                    refreshNetworkData()
+                  } catch {
+                    setConfirmDelete({ open: false, name: '' })
+                  }
+                }}
+                className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function BlockchainManagementPage() {
   const [detailModal, setDetailModal] = useState<ModalType>(null)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
@@ -62,8 +1046,6 @@ export default function BlockchainManagementPage() {
     setDetailModal(null)
   }
 
-  const cardClasses = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-teal-300"
-
   const filteredContracts = useMemo(() => {
     return smartContracts.filter((contract) => {
       const searchLower = contractsSearchTerm.toLowerCase()
@@ -86,36 +1068,19 @@ export default function BlockchainManagementPage() {
 
   const filteredEvents = useMemo(() => {
     return events.filter(event => {
-      if (eventsSearchTerm && !event.name.toLowerCase().includes(eventsSearchTerm.toLowerCase()) &&
-          !event.id.toLowerCase().includes(eventsSearchTerm.toLowerCase())) {
+      if (eventsSearchTerm
+        && !event.name.toLowerCase().includes(eventsSearchTerm.toLowerCase())
+        && !event.id.toLowerCase().includes(eventsSearchTerm.toLowerCase())
+      ) {
         return false
       }
-      if (eventsNamespaceFilter && event.namespace !== eventsNamespaceFilter) {
-        return false
-      }
-      if (eventsSourceFilter && event.source !== eventsSourceFilter) {
-        return false
-      }
+      if (eventsNamespaceFilter && event.namespace !== eventsNamespaceFilter) return false
+      if (eventsSourceFilter && event.source !== eventsSourceFilter) return false
       if (eventsTxFilter) {
         const txId = event.tx?.blockchainId || ''
-        if (!txId.toLowerCase().includes(eventsTxFilter.toLowerCase())) {
-          return false
-        }
+        if (!txId.toLowerCase().includes(eventsTxFilter.toLowerCase())) return false
       }
-      if (eventsDateFrom || eventsDateTo) {
-        if (!event.timestamp) return false
-        const eventDate = new Date(event.timestamp)
-        if (eventsDateFrom) {
-          const from = new Date(eventsDateFrom)
-          from.setHours(0, 0, 0, 0)
-          if (eventDate < from) return false
-        }
-        if (eventsDateTo) {
-          const to = new Date(eventsDateTo)
-          to.setHours(23, 59, 59, 999)
-          if (eventDate > to) return false
-        }
-      }
+      if (!isEventInDateRange(event, eventsDateFrom, eventsDateTo)) return false
       return true
     })
   }, [events, eventsSearchTerm, eventsNamespaceFilter, eventsSourceFilter, eventsTxFilter, eventsDateFrom, eventsDateTo])
@@ -200,22 +1165,20 @@ export default function BlockchainManagementPage() {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
-        let cls = 'text-amber-600'
-        if (/^"/.test(match)) {
-          if (/:$/.test(match)) {
-            cls = 'text-sky-600'
-            match = match.replace(/:$/, '')
-            return `<span class="${cls}">${match}</span>:`
-          } else {
-            cls = 'text-emerald-600'
+      .replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?/g, (match, str, colon) => {
+        if (str) {
+          if (colon) {
+            return `<span class="text-sky-600">${str}</span>:`
           }
-        } else if (/true|false/.test(match)) {
-          cls = 'text-purple-600'
-        } else if (/null/.test(match)) {
-          cls = 'text-rose-600'
+          return `<span class="text-emerald-600">${match}</span>`
         }
-        return `<span class="${cls}">${match}</span>`
+        if (match === 'true' || match === 'false') {
+          return `<span class="text-purple-600">${match}</span>`
+        }
+        if (match === 'null') {
+          return `<span class="text-rose-600">${match}</span>`
+        }
+        return `<span class="text-amber-600">${match}</span>`
       })
   }
 
@@ -234,649 +1197,90 @@ export default function BlockchainManagementPage() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-amber-600" />
-              <p className="text-sm text-slate-500">Blockchain Manager</p>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '...' : managerStatus}
-            </p>
-          </div>
+        <StatusCardsGrid
+          isLoading={isLoading}
+          managerStatus={managerStatus}
+          networkNodes={networkNodes}
+          organizations={organizations}
+          namespaces={namespaces}
+          events={events}
+          openDetailModal={openDetailModal}
+        />
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <Server className="h-5 w-5 text-emerald-600" />
-              <p className="text-sm text-slate-500">Orderer</p>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '...' : networkNodes.length > 0 ? 'Activo' : '-'}
-            </p>
-          </div>
+        <TopologySection
+          isLoading={isLoading}
+          error={error}
+          networkNodes={networkNodes}
+          organizations={organizations}
+        />
 
-          <div
-            className={cardClasses}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver organizaciones"
-            onClick={() => openDetailModal('organizations')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('organizations') } }}
-          >
-            <div className="flex items-center gap-2">
-              <Network className="h-5 w-5 text-sky-600" />
-              <p className="text-sm text-slate-500">Organizaciones</p>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '...' : organizations.length > 0 ? organizations.length : '-'}
-            </p>
-          </div>
+        <EventsSection
+          isLoading={isLoading}
+          eventsSearchTerm={eventsSearchTerm}
+          setEventsSearchTerm={setEventsSearchTerm}
+          eventsPageSize={eventsPageSize}
+          handleEventsPageSizeChange={handleEventsPageSizeChange}
+          showEventsFilters={showEventsFilters}
+          setShowEventsFilters={setShowEventsFilters}
+          eventsNamespaceFilter={eventsNamespaceFilter}
+          setEventsNamespaceFilter={setEventsNamespaceFilter}
+          eventsSourceFilter={eventsSourceFilter}
+          setEventsSourceFilter={setEventsSourceFilter}
+          eventsTxFilter={eventsTxFilter}
+          setEventsTxFilter={setEventsTxFilter}
+          eventsDateFrom={eventsDateFrom}
+          setEventsDateFrom={setEventsDateFrom}
+          eventsDateTo={eventsDateTo}
+          setEventsDateTo={setEventsDateTo}
+          clearEventsFilters={clearEventsFilters}
+          filteredEvents={filteredEvents}
+          paginatedEvents={paginatedEvents}
+          eventsCurrentPage={eventsCurrentPage}
+          handleEventsPageChange={handleEventsPageChange}
+          totalEventsPages={totalEventsPages}
+          namespaces={namespaces}
+          setEventsCurrentPage={setEventsCurrentPage}
+          setSelectedEvent={setSelectedEvent}
+          setDetailModal={setDetailModal}
+        />
 
-          <div
-            className={cardClasses}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver namespaces"
-            onClick={() => openDetailModal('namespaces')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('namespaces') } }}
-          >
-            <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-teal-600" />
-              <p className="text-sm text-slate-500">Namespaces</p>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '...' : namespaces.length > 0 ? namespaces.length : '-'}
-            </p>
-          </div>
-
-          <div
-            className={cardClasses}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver eventos"
-            onClick={() => openDetailModal('ledger')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('ledger') } }}
-          >
-            <div className="flex items-center gap-2">
-              <Cpu className="h-5 w-5 text-teal-600" />
-              <p className="text-sm text-slate-500">Eventos</p>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '...' : events.length > 0 ? events.length.toLocaleString() : '0'}
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Topología de Red</h2>
-          </div>
-          {isLoading ? (
-            <div className="flex h-96 items-center justify-center">
-              <RefreshCw className="size-8 animate-spin text-slate-400" />
-            </div>
-          ) : error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {error}
-            </div>
-          ) : (
-            <BlockchainTopologyGraph
-              nodes={networkNodes}
-              organizations={organizations}
-            />
-          )}
-        </div>
-
-        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Eventos Recientes</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center rounded-2xl border border-border bg-slate-50 px-3 py-2">
-                <Search className="h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={eventsSearchTerm}
-                  onChange={(e) => {
-                    setEventsSearchTerm(e.target.value)
-                    setEventsCurrentPage(1)
-                  }}
-                  placeholder="Buscar eventos..."
-                  className="ml-2 w-40 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                />
-              </div>
-              <Select
-                value={eventsPageSize}
-                onChange={(value) => handleEventsPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
-                options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
-              />
-              <button
-                type="button"
-                onClick={() => setShowEventsFilters(!showEventsFilters)}
-                className="inline-flex items-center gap-1 rounded-2xl border border-border px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
-              >
-                <Filter className="size-4" />
-                Filtros
-              </button>
-            </div>
-          </div>
-
-          {showEventsFilters && (
-            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="grid grid-cols-6 gap-4">
-                <div>
-                  <label htmlFor="events-namespace" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
-                    Namespace
-                  </label>
-                  <select
-                    id="events-namespace"
-                    value={eventsNamespaceFilter}
-                    onChange={(e) => {
-                      setEventsNamespaceFilter(e.target.value)
-                      setEventsCurrentPage(1)
-                    }}
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
-                  >
-                    <option value="">Todos</option>
-                    {namespaces.map((ns) => (
-                      <option key={ns.name} value={ns.name}>{ns.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="events-source" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
-                    Fuente
-                  </label>
-                  <select
-                    id="events-source"
-                    value={eventsSourceFilter}
-                    onChange={(e) => {
-                      setEventsSourceFilter(e.target.value)
-                      setEventsCurrentPage(1)
-                    }}
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
-                  >
-                    <option value="">Todas</option>
-                    <option value="fabric">fabric</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="events-tx" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
-                    TX
-                  </label>
-                  <input
-                    id="events-tx"
-                    type="text"
-                    value={eventsTxFilter}
-                    onChange={(e) => {
-                      setEventsTxFilter(e.target.value)
-                      setEventsCurrentPage(1)
-                    }}
-                    placeholder="Buscar TX..."
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="events-date-from" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
-                    Desde
-                  </label>
-                  <input
-                    id="events-date-from"
-                    type="date"
-                    value={eventsDateFrom}
-                    onChange={(e) => {
-                      setEventsDateFrom(e.target.value)
-                      setEventsCurrentPage(1)
-                    }}
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="events-date-to" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
-                   Hasta
-                  </label>
-                  <input
-                    id="events-date-to"
-                    type="date"
-                    value={eventsDateTo}
-                    onChange={(e) => {
-                      setEventsDateTo(e.target.value)
-                      setEventsCurrentPage(1)
-                    }}
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={clearEventsFilters}
-                  className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
-                >
-                  <XCircle className="size-4" />
-                  Limpiar
-                </button>
-              </div>
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-16 rounded-2xl bg-slate-100" />
-              ))}
-            </div>
-          ) : filteredEvents.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-              <Cpu className="mx-auto size-8 text-slate-400" />
-              <p className="mt-2 text-sm font-medium text-slate-700">
-                {eventsSearchTerm || eventsNamespaceFilter || eventsSourceFilter || eventsTxFilter || eventsDateFrom || eventsDateTo
-                  ? 'No hay eventos para los filtros seleccionados'
-                  : 'No hay eventos en el ledger'}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <span>
-                  Mostrando {paginatedEvents.length} de {filteredEvents.length} evento
-                  {filteredEvents.length === 1 ? '' : 's'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleEventsPageChange(eventsCurrentPage - 1)}
-                    disabled={eventsCurrentPage === 1}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span>
-                    Página {eventsCurrentPage} de {totalEventsPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleEventsPageChange(eventsCurrentPage + 1)}
-                    disabled={eventsCurrentPage === totalEventsPages}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-<thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Evento</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fuente</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">TX</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {paginatedEvents.map((event) => (
-                      <tr
-                        key={event.id}
-                        onClick={() => {
-                          setSelectedEvent(event)
-                          setDetailModal('event')
-                        }}
-                        className="cursor-pointer hover:bg-slate-50"
-                      >
-                        <td className="px-4 py-3 font-medium text-slate-900">
-                          {event.name}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                          {event.namespace || '-'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {event.source}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                          {event.tx?.blockchainId
-                            ? event.tx.blockchainId.substring(0, 12) + '...'
-                            : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                        {event.timestamp
-                          ? new Date(event.timestamp).toLocaleString('es-ES')
-: '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <span>
-                  Mostrando {paginatedEvents.length} de {filteredEvents.length} evento
-                  {filteredEvents.length === 1 ? '' : 's'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleEventsPageChange(eventsCurrentPage - 1)}
-                    disabled={eventsCurrentPage === 1}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span>
-                    Página {eventsCurrentPage} de {totalEventsPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleEventsPageChange(eventsCurrentPage + 1)}
-                    disabled={eventsCurrentPage === totalEventsPages}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Smart Contracts
-            </h2>
-            <div className="flex flex-wrap items-center gap-3">
-              {(isGlobalAdmin || isAdmin) && (
-                <button
-                  type="button"
-                  onClick={() => !isAdmin && setIsRegisterModalOpen(true)}
-                  disabled={isAdmin}
-                  className={`inline-flex items-center gap-1 text-sm font-medium transition-colors ${isAdmin ? 'cursor-not-allowed text-slate-300' : 'text-accent hover:text-accent/80'}`}
-                >
-                  <Layers className="size-4" />
-                  Registrar Smart Contract
-                </button>
-              )}
-              <DeploymentHelpModal disabled={isAdmin} />
-            </div>
-          </div>
-
-          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div />
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center rounded-2xl border border-border bg-slate-50 px-3 py-2">
-                <Search className="h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={contractsSearchTerm}
-                  onChange={(e) => {
-                    setContractsSearchTerm(e.target.value)
-                    setContractsCurrentPage(1)
-                  }}
-                  placeholder="Buscar por nombre o namespace..."
-                  className="ml-2 w-40 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                />
-              </div>
-              <Select
-                value={contractsPageSize}
-                onChange={(value) => handleContractsPageSizeChange(Number(value) as typeof PAGE_SIZES[number])}
-                options={PAGE_SIZES.map((size) => ({ value: size, label: size.toString() }))}
-              />
-              <button
-                type="button"
-                onClick={() => setShowContractFilters(!showContractFilters)}
-                className="inline-flex items-center gap-1 rounded-2xl border border-border px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
-              >
-                <Filter className="size-4" />
-                Filtros
-              </button>
-            </div>
-          </div>
-
-          {showContractFilters && (
-            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <label htmlFor="contract-status" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
-                    Estado
-                  </label>
-                  <select
-                    id="contract-status"
-                    value={contractStatusFilter}
-                    onChange={(e) => {
-                      setContractStatusFilter(e.target.value)
-                      setContractsCurrentPage(1)
-                    }}
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
-                  >
-                    <option value="">Todos</option>
-                    <option value="active">Activo</option>
-                    <option value="deploying">Desplegando</option>
-                    <option value="failed">Fallido</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="contract-namespace" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
-                    Namespace
-                  </label>
-                  <select
-                    id="contract-namespace"
-                    value={contractChannelFilter}
-                    onChange={(e) => {
-                      setContractChannelFilter(e.target.value)
-                      setContractsCurrentPage(1)
-                    }}
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent"
-                  >
-                    <option value="">Todos</option>
-                    {namespaces.map((ns) => (
-                      <option key={ns.name} value={ns.name}>{ns.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={clearContractFilters}
-                  className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
-                >
-                  <XCircle className="size-4" />
-                  Limpiar
-                </button>
-              </div>
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 rounded-2xl bg-slate-100" />
-              ))}
-            </div>
-          ) : filteredContracts.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-              <Server className="mx-auto size-8 text-slate-400" />
-              <p className="mt-2 text-sm font-medium text-slate-700">
-                No hay smart contracts para los filtros seleccionados
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <span>
-                  Mostrando {paginatedContracts.length} de {filteredContracts.length} smart contract
-                  {filteredContracts.length === 1 ? '' : 's'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleContractsPageChange(contractsCurrentPage - 1)}
-                    disabled={contractsCurrentPage === 1}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span>
-                    Página {contractsCurrentPage} de {totalContractsPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleContractsPageChange(contractsCurrentPage + 1)}
-                    disabled={contractsCurrentPage === totalContractsPages}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Nombre</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Versión</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Namespace</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Estado</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {paginatedContracts.map((contract) => (
-                      <tr
-                        key={contract.id}
-                        onClick={() => handleContractClick(contract)}
-                        className="cursor-pointer hover:bg-slate-50"
-                      >
-                        <td className="px-4 py-3 font-medium text-slate-900">{contract.name}</td>
-                        <td className="px-4 py-3 text-slate-600">{contractVersions[contract.id] || contract.version}</td>
-                        <td className="px-4 py-3 text-slate-600">{contract.channel}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${contract.status === 'active'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : contract.status === 'deploying'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-rose-100 text-rose-700'
-                              }`}
-                          >
-                            {contract.status === 'active'
-                              ? 'Activo'
-                              : contract.status === 'deploying'
-                                ? 'Desplegando'
-                                : 'Fallido'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {new Date(contract.createdAt).toLocaleDateString('es-ES')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <span>
-                  Mostrando {paginatedContracts.length} de {filteredContracts.length} smart contract
-                  {filteredContracts.length === 1 ? '' : 's'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleContractsPageChange(contractsCurrentPage - 1)}
-                    disabled={contractsCurrentPage === 1}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span>
-                    Página {contractsCurrentPage} de {totalContractsPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleContractsPageChange(contractsCurrentPage + 1)}
-                    disabled={contractsCurrentPage === totalContractsPages}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        <ContractsSection
+          isLoading={isLoading}
+          isGlobalAdmin={isGlobalAdmin}
+          isAdmin={isAdmin}
+          setIsRegisterModalOpen={setIsRegisterModalOpen}
+          contractsSearchTerm={contractsSearchTerm}
+          setContractsSearchTerm={setContractsSearchTerm}
+          contractsPageSize={contractsPageSize}
+          setContractsPageSize={setContractsPageSize}
+          handleContractsPageSizeChange={handleContractsPageSizeChange}
+          showContractFilters={showContractFilters}
+          setShowContractFilters={setShowContractFilters}
+          contractStatusFilter={contractStatusFilter}
+          setContractStatusFilter={setContractStatusFilter}
+          contractChannelFilter={contractChannelFilter}
+          setContractChannelFilter={setContractChannelFilter}
+          clearContractFilters={clearContractFilters}
+          filteredContracts={filteredContracts}
+          paginatedContracts={paginatedContracts}
+          contractsCurrentPage={contractsCurrentPage}
+          setContractsCurrentPage={setContractsCurrentPage}
+          handleContractsPageChange={handleContractsPageChange}
+          totalContractsPages={totalContractsPages}
+          namespaces={namespaces}
+          contractVersions={contractVersions}
+          handleContractClick={handleContractClick}
+        />
       </div>
 
-      {detailModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={closeDetailModal} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeDetailModal() } }} />
-          <div className="relative z-10 w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-            <button
-              onClick={closeDetailModal}
-              className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            >
-              <X className="size-5" />
-            </button>
-
-            {detailModal === 'organizations' && (
-              <>
-                <h3 className="text-xl font-semibold text-slate-900">Organizaciones</h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  Total: {organizations.length} organizaciones
-                </p>
-                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
-                  {organizations.map((org) => (
-                    <div key={org.id} className="rounded-xl border border-slate-200 p-3">
-                      <p className="font-medium text-slate-900">{org.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {org.description ?? org.id}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {detailModal === 'namespaces' && (
-              <>
-                <h3 className="text-xl font-semibold text-slate-900">Namespaces</h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  Total: {namespaces.length} namespaces
-                </p>
-                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
-                  {namespaces.map((ns) => (
-                    <div key={ns.name} className="rounded-xl border border-slate-200 p-3">
-                      <p className="font-medium text-slate-900">{ns.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {ns.description ?? 'Sin descripción'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {detailModal === 'ledger' && (
-              <>
-                <h3 className="text-xl font-semibold text-slate-900">Eventos</h3>
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-xl border border-slate-200 p-4">
-                    <p className="text-sm text-slate-500">Eventos totales</p>
-                    <p className="text-2xl font-semibold text-slate-900">
-                      {events.length > 0 ? events.length.toLocaleString() : '-'}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 p-4">
-                    <p className="text-sm text-slate-500">Eventos última hora</p>
-                    <p className="text-2xl font-semibold text-slate-900">
-                      {lastHourEvents}
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-</div>
-        )}
+      <DetailModalView
+        detailModal={detailModal}
+        closeDetailModal={closeDetailModal}
+        organizations={organizations}
+        namespaces={namespaces}
+        events={events}
+        lastHourEvents={lastHourEvents}
+      />
 
       <RegisterChaincodeModal
         isOpen={isRegisterModalOpen}
@@ -965,147 +1369,23 @@ export default function BlockchainManagementPage() {
         </div>
       )}
 
-      {selectedContract && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setSelectedContract(null)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedContract(null) } }} />
-          <div className="relative z-10 w-[80vw] max-h-[90vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl flex flex-col">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-xl font-semibold text-slate-900">Detalle de Smart Contract</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedContract.name}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {isGlobalAdmin && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsUpgradeModalOpen(true)
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
-                    >
-                      <Pencil className="size-4" />
-                      Actualizar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmDelete({ open: true, name: selectedContract.name })
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100"
-                    >
-                      <Trash2 className="size-4" />
-                      Eliminar
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => setSelectedContract(null)}
-                  className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                >
-                  <X className="size-5" />
-                </button>
-              </div>
-            </div>
+      <ContractDetailModal
+        selectedContract={selectedContract}
+        setSelectedContract={setSelectedContract}
+        setIsUpgradeModalOpen={setIsUpgradeModalOpen}
+        setConfirmDelete={setConfirmDelete}
+        isGlobalAdmin={isGlobalAdmin}
+        contractDetailLoading={contractDetailLoading}
+        contractInterfaceJson={contractInterfaceJson}
+        syntaxHighlightJson={syntaxHighlightJson}
+      />
 
-            <div className="mt-4 space-y-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-medium text-slate-500">Versión</p>
-                  <p className="text-sm text-slate-900">{selectedContract.version}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500">Namespace</p>
-                  <p className="text-sm text-slate-900">{selectedContract.channel}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500">Estado</p>
-                  <span
-                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${selectedContract.status === 'active'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : selectedContract.status === 'deploying'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-rose-100 text-rose-700'
-                      }`}
-                  >
-                    {selectedContract.status === 'active'
-                      ? 'Activo'
-                      : selectedContract.status === 'deploying'
-                        ? 'Desplegando'
-                        : 'Fallido'}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500">Fecha</p>
-                  <p className="text-sm text-slate-900">
-                    {new Date(selectedContract.createdAt).toLocaleDateString('es-ES')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex-1 min-h-0 flex flex-col">
-              <p className="text-xs font-medium text-slate-500 mb-2">Interfaz (Swagger JSON)</p>
-              {contractDetailLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="size-6 animate-spin text-slate-400" />
-                </div>
-              ) : contractInterfaceJson ? (
-                <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <pre
-                    className="text-xs font-mono text-slate-700 whitespace-pre"
-                    dangerouslySetInnerHTML={{ __html: syntaxHighlightJson(contractInterfaceJson) }}
-                  />
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">No se pudo cargar la interfaz</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {confirmDelete.open && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setConfirmDelete({ open: false, name: '' })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmDelete({ open: false, name: '' }) } }} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-slate-900">Eliminar Smart Contract</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              ¿Estás seguro de que quieres eliminar <strong>{confirmDelete.name}</strong>? Esta acción eliminará la API y todos los listeners asociados en FireFly.
-            </p>
-            <p className="mt-2 text-xs text-rose-500">
-              Esta acción no se puede deshacer.
-            </p>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setConfirmDelete({ open: false, name: '' })}
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await deleteChaincode(confirmDelete.name)
-                    setConfirmDelete({ open: false, name: '' })
-                    setSelectedContract(null)
-                    refreshNetworkData()
-                  } catch {
-                    setConfirmDelete({ open: false, name: '' })
-                  }
-                }}
-                className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteModal
+        confirmDelete={confirmDelete}
+        setConfirmDelete={setConfirmDelete}
+        setSelectedContract={setSelectedContract}
+        refreshNetworkData={refreshNetworkData}
+      />
 
       <RegisterChaincodeModal
         isOpen={isRegisterModalOpen}

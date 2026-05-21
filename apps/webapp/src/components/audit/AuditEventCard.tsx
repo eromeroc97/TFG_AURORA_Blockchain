@@ -36,20 +36,20 @@ export default function AuditEventCard({ event, isExpanded, onToggle }: AuditEve
     return 'Telemetría';
   };
 
+  const cardBackgroundColor = isExpanded
+    ? isDiscrepancy ? 'rgb(255 237 213 / 0.3)' : 'rgb(241 245 249 / 0.5)'
+    : 'transparent';
+
+  const cardBorderClass = isExpanded
+    ? isDiscrepancy ? 'border-orange-300' : 'border-slate-300'
+    : 'border-transparent hover:border-slate-200';
+
   return (
     <div className="relative">
       <motion.div
         initial={false}
-        animate={{
-          backgroundColor: isExpanded 
-            ? (isDiscrepancy ? 'rgb(255 237 213 / 0.3)' : 'rgb(241 245 249 / 0.5)')
-            : 'transparent'
-        }}
-        className={`group relative cursor-pointer rounded-2xl border transition-all duration-200 hover:bg-slate-50 hover:shadow-md ${
-          isExpanded 
-            ? (isDiscrepancy ? 'border-orange-300' : 'border-slate-300')
-            : 'border-transparent hover:border-slate-200'
-        }`}
+        animate={{ backgroundColor: cardBackgroundColor }}
+        className={`group relative cursor-pointer rounded-2xl border transition-all duration-200 hover:bg-slate-50 hover:shadow-md ${cardBorderClass}`}
         onClick={onToggle}
       >
         <div className="flex items-start gap-4 p-4">

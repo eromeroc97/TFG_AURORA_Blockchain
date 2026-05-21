@@ -5,6 +5,24 @@ import { getAuditTimeline, type AuditFilters, type AuditAnchor } from '../../ser
 import AuditEventCard from './AuditEventCard'
 import type { AuditEvent } from './types'
 
+function AuditTimelineItem({
+  event,
+  isExpanded,
+  onToggle,
+}: {
+  event: AuditEvent
+  isExpanded: boolean
+  onToggle: (id: string) => void
+}) {
+  return (
+    <AuditEventCard
+      event={event}
+      isExpanded={isExpanded}
+      onToggle={() => onToggle(event.eventId)}
+    />
+  )
+}
+
 const transformToAuditEvent = (item: AuditAnchor): AuditEvent => ({
   eventId: item.eventId,
   timestamp: item.timestamp,
@@ -208,41 +226,51 @@ export default function AuditTimeline() {
       )}
 
       <div className="p-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-          </div>
-        ) : error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
-            <p className="text-sm text-red-700">{error}</p>
-            <button
-              onClick={fetchEvents}
-              className="mt-2 text-sm font-medium text-red-600 hover:text-red-700"
-            >
-              Reintentar
-            </button>
-          </div>
-        ) : events.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-sm text-slate-500">No hay eventos para los filtros seleccionados</p>
-          </div>
-        ) : (
-          <Virtuoso
-            style={{ height: '600px' }}
-            totalCount={events.length}
-            itemContent={(index) => {
-              const event = events[index]
-              return (
-                <AuditEventCard
-                  key={event.eventId}
-                  event={event}
-                  isExpanded={expandedEventId === event.eventId}
-                  onToggle={() => handleToggle(event.eventId)}
-                />
-              )
-            }}
-          />
-        )}
+        {(() => {
+          if (isLoading) {
+            return (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+              </div>
+            )
+          }
+          if (error) {
+            return (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+                <p className="text-sm text-red-700">{error}</p>
+                <button
+                  onClick={fetchEvents}
+                  className="mt-2 text-sm font-medium text-red-600 hover:text-red-700"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )
+          }
+          if (events.length === 0) {
+            return (
+              <div className="text-center py-12">
+                <p className="text-sm text-slate-500">No hay eventos para los filtros seleccionados</p>
+              </div>
+            )
+          }
+          return (
+            <Virtuoso
+              style={{ height: '600px' }}
+              totalCount={events.length}
+              itemContent={(index) => {
+                const event = events[index]
+                return (
+                  <AuditTimelineItem
+                    event={event}
+                    isExpanded={expandedEventId === event.eventId}
+                    onToggle={handleToggle}
+                  />
+                )
+              }}
+            />
+          )
+        })()}
       </div>
     </div>
   )

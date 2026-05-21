@@ -125,6 +125,88 @@ export class NotificationsService {
     });
   }
 
+  private async handleDelegationAcceptance(
+    response: 'ACCEPTED' | 'REJECTED',
+    notification: Notification,
+  ): Promise<void> {
+    if (response !== 'ACCEPTED' || notification.type !== NotificationType.ECOSYSTEM_DELEGATION_REQUEST) return;
+
+    const metadata = notification.metadata as { ecosystemId: string; targetUserId: string; role: AccessRole } | null;
+    if (!metadata?.ecosystemId || !metadata?.targetUserId) return;
+
+    await this.prisma.ecosystemAccess.create({
+      data: {
+        ecosystemId: metadata.ecosystemId,
+        userId: metadata.targetUserId,
+        role: metadata.role ?? AccessRole.VIEWER,
+      },
+    });
+  }
+
+  private async sendDelegationResponseNotification(
+    id: string,
+    userId: string,
+    response: 'ACCEPTED' | 'REJECTED',
+    notification: Notification,
+  ): Promise<void> {
+    if (notification.type !== NotificationType.ECOSYSTEM_DELEGATION_REQUEST || !notification.actorId) return;
+
+    const ecosystem = await this.prisma.ecosystem.findUnique({
+      where: { id: notification.referenceId ?? '' },
+      select: { name: true },
+    });
+
+    const responder = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    const responseTitle = response === 'ACCEPTED'
+      ? 'Solicitud aceptada'
+      : 'Solicitud rechazada';
+
+    const responseMessage = response === 'ACCEPTED'
+      ? `${responder?.email ?? 'Un usuario'} ha aceptado tu invitación para acceder a '${ecosystem?.name ?? 'un ecosistema'}'`
+      : `${responder?.email ?? 'Un usuario'} ha rechazado tu invitación para acceder a '${ecosystem?.name ?? 'un ecosistema'}'`;
+
+    await this.prisma.notification.create({
+      data: {
+        category: NotificationCategory.READ_ONLY,
+        type: NotificationType.ECOSYSTEM_DELEGATION_RESPONSE,
+        targetType: 'INDIVIDUAL',
+        actorType: 'USER',
+        actorId: userId,
+        userId: notification.actorId,
+        referenceId: notification.referenceId,
+        referenceType: notification.referenceType,
+        title: responseTitle,
+        message: responseMessage,
+        status: NotificationStatus.PENDING,
+        metadata: {
+          originalNotificationId: id,
+          ecosystemId: notification.referenceId,
+          ecosystemName: ecosystem?.name,
+          responderId: userId,
+          responderEmail: responder?.email,
+          result: response,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    const actorUser = notification.actorId
+      ? await this.prisma.user.findUnique({ where: { id: notification.actorId }, select: { email: true } })
+      : null;
+
+    if (responder?.email && actorUser?.email) {
+      await this.mailService.sendEcosystemDelegationResponseEmail(
+        actorUser.email,
+        ecosystem?.name ?? 'un ecosistema',
+        responder.email,
+        response === 'ACCEPTED' ? 'aceptada' : 'rechazada',
+      );
+    }
+  }
+
   async respondToNotification(
     id: string,
     userId: string,
@@ -152,75 +234,9 @@ export class NotificationsService {
       },
     });
 
-    if (response === 'ACCEPTED' && notification.type === NotificationType.ECOSYSTEM_DELEGATION_REQUEST) {
-      const metadata = notification.metadata as { ecosystemId: string; targetUserId: string; role: AccessRole } | null;
-      if (metadata?.ecosystemId && metadata?.targetUserId) {
-        await this.prisma.ecosystemAccess.create({
-          data: {
-            ecosystemId: metadata.ecosystemId,
-            userId: metadata.targetUserId,
-            role: metadata.role ?? AccessRole.VIEWER,
-          },
-        });
-      }
-    }
+    await this.handleDelegationAcceptance(response, notification);
 
-    if (notification.type === NotificationType.ECOSYSTEM_DELEGATION_REQUEST && notification.actorId) {
-      const ecosystem = await this.prisma.ecosystem.findUnique({
-        where: { id: notification.referenceId ?? '' },
-        select: { name: true },
-      });
-
-      const responder = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true },
-      });
-
-      const responseTitle = response === 'ACCEPTED'
-        ? 'Solicitud aceptada'
-        : 'Solicitud rechazada'
-
-      const responseMessage = response === 'ACCEPTED'
-        ? `${responder?.email ?? 'Un usuario'} ha aceptado tu invitación para acceder a '${ecosystem?.name ?? 'un ecosistema'}'`
-        : `${responder?.email ?? 'Un usuario'} ha rechazado tu invitación para acceder a '${ecosystem?.name ?? 'un ecosistema'}'`
-
-await this.prisma.notification.create({
-          data: {
-            category: NotificationCategory.READ_ONLY,
-            type: NotificationType.ECOSYSTEM_DELEGATION_RESPONSE,
-            targetType: 'INDIVIDUAL',
-            actorType: 'USER',
-            actorId: userId,
-            userId: notification.actorId,
-            referenceId: notification.referenceId,
-            referenceType: notification.referenceType,
-            title: responseTitle,
-            message: responseMessage,
-            status: NotificationStatus.PENDING,
-            metadata: {
-              originalNotificationId: id,
-              ecosystemId: notification.referenceId,
-              ecosystemName: ecosystem?.name,
-              responderId: userId,
-              responderEmail: responder?.email,
-              result: response,
-            } as Prisma.InputJsonValue,
-          },
-        })
-
-      const actorUser = notification.actorId 
-        ? await this.prisma.user.findUnique({ where: { id: notification.actorId }, select: { email: true } })
-        : null
-
-      if (responder?.email && actorUser?.email) {
-        await this.mailService.sendEcosystemDelegationResponseEmail(
-          actorUser.email,
-          ecosystem?.name ?? 'un ecosistema',
-          responder.email,
-          response === 'ACCEPTED' ? 'aceptada' : 'rechazada',
-        )
-      }
-    }
+    await this.sendDelegationResponseNotification(id, userId, response, notification);
 
     return updatedNotification;
   }

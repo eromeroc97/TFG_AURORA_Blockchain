@@ -44,7 +44,7 @@ export default function JsonViewer({ data, title }: JsonViewerProps) {
       formattedLine = formattedLine.replace(/: (null)/g, ': <span class="text-slate-400 italic">null</span>');
       
       return (
-        <div key={index} className="whitespace-pre">
+        <div key={`${index}-${line}`} className="whitespace-pre">
           <code dangerouslySetInnerHTML={{ __html: formattedLine }} />
         </div>
       );

@@ -52,6 +52,19 @@ const getStatusStyle = (status: string): string => {
   }
 }
 
+const getStatusClass = (status: string): string => {
+  switch (status) {
+    case 'PENDING':
+      return 'bg-amber-100 text-amber-800'
+    case 'READ':
+      return 'bg-slate-100 text-slate-600'
+    case 'ACCEPTED':
+      return 'bg-emerald-100 text-emerald-800'
+    default:
+      return 'bg-rose-100 text-rose-800'
+  }
+}
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -68,7 +81,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
   const loadNotifications = async () => {
     setIsLoading(true)
     const data = await getNotifications(true)
-    setNotifications(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+    setNotifications(data.toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
     setIsLoading(false)
   }
 
@@ -267,15 +280,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            notification.status === 'PENDING'
-                              ? 'bg-amber-100 text-amber-800'
-                              : notification.status === 'READ'
-                                ? 'bg-slate-100 text-slate-600'
-                                : notification.status === 'ACCEPTED'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-rose-100 text-rose-800'
-                          }`}
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusClass(notification.status)}`}
                         >
                           {getStatusLabel(notification.status)}
                         </span>
@@ -351,15 +356,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
                   <h3 className="mt-2 text-lg font-semibold text-slate-900">{selectedNotification.title}</h3>
                 </div>
                 <span
-                  className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium ${
-                    selectedNotification.status === 'PENDING'
-                      ? 'bg-amber-100 text-amber-800'
-                      : selectedNotification.status === 'READ'
-                        ? 'bg-slate-100 text-slate-600'
-                        : selectedNotification.status === 'ACCEPTED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-rose-100 text-rose-800'
-                  }`}
+                  className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium ${getStatusClass(selectedNotification.status)}`}
                 >
                   {getStatusLabel(selectedNotification.status)}
                 </span>

@@ -110,6 +110,112 @@ function parseParameterBlock(paramStr: string): FireFlyParam[] {
  * Escáner de código que implementa una máquina de estados para evadir el uso de regex.
  * Busca firmas de métodos públicos asociados a un receptor (Contract API).
  */
+function skipSpaces(code: string, cursor: number, len: number): number {
+  while (cursor < len) {
+    const char = code[cursor]
+    if (char !== ' ' && char !== '\t' && char !== '\n' && char !== '\r') break
+    cursor++
+  }
+  return cursor
+}
+
+function skipLineComment(code: string, cursor: number, len: number): number {
+  cursor += 2
+  while (cursor < len && code[cursor] !== '\n') cursor++
+  return cursor
+}
+
+function skipBlockComment(code: string, cursor: number, len: number): number {
+  cursor += 2
+  while (cursor < len && !(code[cursor] === '*' && code[cursor + 1] === '/')) cursor++
+  return cursor + 2
+}
+
+function skipWhitespaceAndComments(code: string, cursor: number, len: number): number {
+  let pos = cursor
+  while (pos < len) {
+    const char = code[pos]
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+      pos++
+      continue
+    }
+    if (char === '/' && code[pos + 1] === '/') {
+      pos = skipLineComment(code, pos, len)
+      continue
+    }
+    if (char === '/' && code[pos + 1] === '*') {
+      pos = skipBlockComment(code, pos, len)
+      continue
+    }
+    break
+  }
+  return pos
+}
+
+function matchKeyword(code: string, cursor: number, len: number, kw: string): { matched: boolean; cursor: number } {
+  const pos = skipWhitespaceAndComments(code, cursor, len)
+  if (code.startsWith(kw, pos)) {
+    const nextChar = code[pos + kw.length]
+    if (!nextChar || /[\s([{]/.test(nextChar)) {
+      return { matched: true, cursor: pos + kw.length }
+    }
+  }
+  return { matched: false, cursor: pos }
+}
+
+function readUntil(code: string, cursor: number, len: number, target: string): { value: string; cursor: number } {
+  const start = cursor
+  let depth = 0
+  let pos = cursor
+  const isParen = target === ')'
+
+  while (pos < len) {
+    if (isParen && code[pos] === '(') {
+      depth++
+    } else if (code[pos] === target) {
+      if (depth === 0) {
+        return { value: code.substring(start, pos), cursor: pos + 1 }
+      }
+      depth--
+    }
+    pos++
+  }
+  return { value: '', cursor: pos }
+}
+
+function readIdentifier(code: string, cursor: number, len: number): { value: string; cursor: number } {
+  const pos = skipWhitespaceAndComments(code, cursor, len)
+  const start = pos
+  let p = pos
+  while (p < len && /[a-zA-Z0-9_]/.test(code[p])) p++
+  return { value: code.substring(start, p), cursor: p }
+}
+
+function tryParseMethod(code: string, cursor: number, len: number): { method: FireFlyMethod | null; cursor: number } {
+  const kw = matchKeyword(code, cursor, len, 'func')
+  if (!kw.matched) return { method: null, cursor: cursor + 1 }
+
+  let pos = skipWhitespaceAndComments(code, kw.cursor, len)
+  if (code[pos] !== '(') return { method: null, cursor: pos }
+
+  pos++
+  const receiver = readUntil(code, pos, len, ')')
+  if (!receiver.value.includes('*')) return { method: null, cursor: receiver.cursor }
+
+  pos = receiver.cursor
+  const ident = readIdentifier(code, pos, len)
+  if (!ident.value || ident.value[0] !== ident.value[0].toUpperCase()) return { method: null, cursor: ident.cursor }
+
+  pos = skipWhitespaceAndComments(code, ident.cursor, len)
+  if (code[pos] !== '(') return { method: null, cursor: pos }
+
+  pos++
+  const paramsBlock = readUntil(code, pos, len, ')')
+  const params = parseParameterBlock(paramsBlock.value)
+
+  return { method: { name: ident.value, params }, cursor: paramsBlock.cursor }
+}
+
 export function parseGoCodeToFFI(code: string): FireFlyFFI {
   if (!detectContractAPI(code)) {
     throw new ContractAPIError(
@@ -118,107 +224,15 @@ export function parseGoCodeToFFI(code: string): FireFlyFFI {
   }
 
   const methods: FireFlyMethod[] = []
-  
   let cursor = 0
   const len = code.length
 
-  function skipWhitespaceAndComments() {
-    while (cursor < len) {
-      const char = code[cursor]
-      if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
-        cursor++
-      } else if (char === '/' && code[cursor + 1] === '/') {
-        // Comentario de línea
-        cursor += 2
-        while (cursor < len && code[cursor] !== '\n') cursor++
-      } else if (char === '/' && code[cursor + 1] === '*') {
-        // Comentario de bloque
-        cursor += 2
-        while (cursor < len && !(code[cursor] === '*' && code[cursor + 1] === '/')) {
-          cursor++
-        }
-        cursor += 2
-      } else {
-        break
-      }
-    }
-  }
-
-  function matchKeyword(kw: string): boolean {
-    skipWhitespaceAndComments()
-    if (code.startsWith(kw, cursor)) {
-      // Asegurar que es una palabra completa (el siguiente carácter debe ser espacio o delimitador)
-      const nextChar = code[cursor + kw.length]
-      if (!nextChar || /[\s([{]/.test(nextChar)) {
-        cursor += kw.length
-        return true
-      }
-    }
-    return false
-  }
-
-  function readUntil(target: string): string {
-    const start = cursor
-    let depth = 0 // Manejar anidamientos si buscamos cierres de paréntesis
-    const isParen = target === ')'
-
-    while (cursor < len) {
-      if (isParen && code[cursor] === '(') {
-        depth++
-      } else if (code[cursor] === target) {
-        if (depth === 0) {
-          const result = code.substring(start, cursor)
-          cursor++ // Consumir el carácter objetivo
-          return result
-        } else {
-          depth--
-        }
-      }
-      cursor++
-    }
-    return ''
-  }
-
-  function readIdentifier(): string {
-    skipWhitespaceAndComments()
-    const start = cursor
-    while (cursor < len && /[a-zA-Z0-9_]/.test(code[cursor])) {
-      cursor++
-    }
-    return code.substring(start, cursor)
-  }
-
-  // Bucle principal de escaneo
   while (cursor < len) {
-    if (matchKeyword('func')) {
-      skipWhitespaceAndComments()
-      
-      // Comprobar si es un método receptor: debe abrir paréntesis inmediatamente
-      if (code[cursor] === '(') {
-        cursor++ // Consumir '('
-        const receiverBlock = readUntil(')')
-        
-        // Validar que el receptor sea un puntero a estructura (ej. "s *TelemetryAnchorSmartContract")
-        if (receiverBlock.includes('*')) {
-          const methodName = readIdentifier()
-          
-          // Asegurar que el método empieza por mayúscula (es público/exportado en Go)
-          if (methodName && methodName[0] === methodName[0].toUpperCase()) {
-            skipWhitespaceAndComments()
-            
-            if (code[cursor] === '(') {
-              cursor++ // Consumir '(' de los argumentos
-              const paramsBlock = readUntil(')')
-              
-              const params = parseParameterBlock(paramsBlock)
-              methods.push({ name: methodName, params })
-            }
-          }
-        }
-      }
-    } else {
-      cursor++
+    const result = tryParseMethod(code, cursor, len)
+    if (result.method) {
+      methods.push(result.method)
     }
+    cursor = result.cursor
   }
 
   return {

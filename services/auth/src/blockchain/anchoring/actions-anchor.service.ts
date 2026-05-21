@@ -103,6 +103,75 @@ export class ActionsAnchorService {
     return this.cryptoService.sign(sha256Hash, privateKeyPem);
   }
 
+  private async executeAnchorHttpCall(
+    actionId: string,
+    endpoint: string,
+    body: Record<string, unknown>,
+  ): Promise<void> {
+    await firstValueFrom(
+      this.httpService.post(endpoint, body, {
+        params: { confirm: String(this.isBlocking) },
+      }).pipe(
+        retry({ count: this.maxRetries, delay: this.retryDelayMs }),
+      ),
+    );
+  }
+
+  private async sendAnchorRequest(
+    actionId: string,
+    params: {
+      actionType: ActionType;
+      actorId: string;
+      targetId: string;
+      parentActionId?: string;
+      readableDescription: string;
+      metadata?: Record<string, string>;
+    },
+    signature: string,
+    publicKey: string,
+    nonce: string,
+    anchoredAt: string,
+  ): Promise<{ id: string } | null> {
+    const baseUrl = this.getFireFlyBaseUrl();
+    const endpoint = `${baseUrl}/invoke/AnchorAction`;
+
+    try {
+      await this.executeAnchorHttpCall(actionId, endpoint, {
+        input: {
+          actionID: actionId,
+          actorID: params.actorId,
+          targetID: params.targetId,
+          actionType: params.actionType,
+          parentActionID: params.parentActionId ?? '',
+          readableDescription: params.readableDescription,
+          signature,
+          publicKey,
+          nonce,
+          anchoredAt,
+          metadataJSON: serializeMetadata(params.actionType, (params.metadata ?? {}) as never),
+        },
+      });
+
+      this.logger.log(`Anchor succeeded: ${actionId}`);
+      return { id: actionId };
+    } catch (httpError) {
+      const axiosError = httpError as { message?: string; response?: { data?: unknown } };
+      const errorMessage = axiosError.message ?? 'Unknown error';
+      const errorDetails = axiosError.response?.data ? JSON.stringify(axiosError.response.data) : undefined;
+
+      this.logger.error(
+        `Anchor failed for actionId=${actionId}: ${errorMessage}`,
+        errorDetails,
+      );
+
+      if (this.isBlocking) {
+        throw new Error(`Blockchain anchor failed for actionId=${actionId}: ${errorMessage}`);
+      }
+
+      return null;
+    }
+  }
+
   async anchorAction<T extends ActionType>(params: {
     actionId?: string;
     actionType: T;
@@ -117,7 +186,6 @@ export class ActionsAnchorService {
     try {
       const nonce = randomBytes(16).toString('hex');
       const anchoredAt = new Date().toISOString();
-
       const { publicKey, privateKey } = await this.resolveActorKeys(params.actorId);
 
       const canonicalJson = this.buildCanonicalPayload({
@@ -130,55 +198,10 @@ export class ActionsAnchorService {
       });
 
       const signature = this.computeCanonicalSignature(canonicalJson, privateKey);
-      const metadataJSON = serializeMetadata(params.actionType, (params.metadata ?? {}) as never);
 
-      const baseUrl = this.getFireFlyBaseUrl();
-      const endpoint = `${baseUrl}/invoke/AnchorAction`;
-
-      try {
-        const postRes = await firstValueFrom(
-          this.httpService.post(endpoint, {
-            input: {
-              actionID: actionId,
-              actorID: params.actorId,
-              targetID: params.targetId,
-              actionType: params.actionType,
-              parentActionID: params.parentActionId ?? '',
-              readableDescription: params.readableDescription,
-              signature,
-              publicKey,
-              nonce,
-              anchoredAt,
-              metadataJSON,
-            },
-          }, {
-            params: { confirm: String(this.isBlocking) },
-          }).pipe(
-            retry({ count: this.maxRetries, delay: this.retryDelayMs }),
-          ),
-        );
-
-        this.logger.log(`Anchor succeeded: ${actionId}`);
-        return { id: actionId };
-      } catch (httpError) {
-        const axiosError = httpError as { message?: string; response?: { data?: unknown } };
-        const errorMessage = axiosError.message ?? 'Unknown error';
-        const errorDetails = axiosError.response?.data ? JSON.stringify(axiosError.response.data) : undefined;
-        
-        this.logger.error(
-          `Anchor failed for actionId=${actionId}: ${errorMessage}`,
-          errorDetails,
-        );
-
-        if (this.isBlocking) {
-          throw new Error(`Blockchain anchor failed for actionId=${actionId}: ${errorMessage}`);
-        }
-        
-        return null;
-      }
+      return await this.sendAnchorRequest(actionId, params, signature, publicKey, nonce, anchoredAt);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
       this.logger.error(
         `Anchor failed for actionId=${actionId}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
@@ -187,7 +210,7 @@ export class ActionsAnchorService {
       if (this.isBlocking) {
         throw new Error(`Blockchain anchor failed for actionId=${actionId}: ${errorMessage}`);
       }
-      
+
       return null;
     }
   }

@@ -116,6 +116,33 @@ export class FireflyService {
     return this.createChildIdentity({ name: payload.name });
   }
 
+  private async createIdentityOnce(payload: { name: string }): Promise<string> {
+    const nsUrl = this.getFireFlyNamespaceUrl();
+    const postRes = await firstValueFrom(
+      this.httpService.post<{ id: string; did: string }>(
+        `${nsUrl}/identities?confirm=true`,
+        {
+          name: payload.name,
+          type: 'custom',
+          parent: this.orgId,
+          key: this.verifierKey,
+        },
+      ),
+    );
+
+    const identity = postRes.data;
+    if (!identity.id) {
+      throw new Error('FireFly POST did not return identity ID');
+    }
+
+    if (!identity.did) {
+      throw new Error('FireFly POST with confirm=true did not return confirmed DID');
+    }
+
+    this.logger.log(`Identity confirmed: ${identity.did}`);
+    return identity.did;
+  }
+
   async createChildIdentity(payload: { name: string }): Promise<string> {
     await this.ensureInitialized();
 
@@ -124,30 +151,7 @@ export class FireflyService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const nsUrl = this.getFireFlyNamespaceUrl();
-        const postRes = await firstValueFrom(
-          this.httpService.post<{ id: string; did: string }>(
-            `${nsUrl}/identities?confirm=true`,
-            {
-              name: payload.name,
-              type: 'custom',
-              parent: this.orgId,
-              key: this.verifierKey,
-            },
-          ),
-        );
-
-        const identity = postRes.data;
-        if (!identity.id) {
-          throw new Error('FireFly POST did not return identity ID');
-        }
-
-        if (!identity.did) {
-          throw new Error('FireFly POST with confirm=true did not return confirmed DID');
-        }
-
-        this.logger.log(`Identity confirmed: ${identity.did}`);
-        return identity.did;
+        return await this.createIdentityOnce(payload);
       } catch (error) {
         const isLastAttempt = attempt === maxAttempts;
         this.logger.warn(

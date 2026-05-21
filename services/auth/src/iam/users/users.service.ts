@@ -683,6 +683,51 @@ export class UsersService {
     }
   }
 
+  private async executeRoleChange(
+    targetUserId: string,
+    newRole: Role,
+    actorId: string,
+    currentUser: { email: string; role: Role },
+  ) {
+    const updatedUser = await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { role: newRole },
+      select: this.userSelect,
+    });
+
+    const anchorResult = await this.anchoringService.anchorAction({
+      actionType: ActionType.ROLE_CHANGE,
+      actorId,
+      targetId: targetUserId,
+      readableDescription: `Role changed: ${currentUser.email} from ${currentUser.role} to ${newRole}`,
+      metadata: { oldRole: currentUser.role, newRole },
+    });
+
+    if (!anchorResult) {
+      this.logger.warn(
+        `Role change succeeded in DB but blockchain anchor returned null for user ${targetUserId} (actionType=${ActionType.ROLE_CHANGE})`,
+      );
+    } else {
+      this.logger.log(
+        `Role change anchored successfully: ${anchorResult.id} for user ${targetUserId}`,
+      );
+    }
+
+    try {
+      await this.mailService.sendRoleChangedEmail(
+        currentUser.email,
+        newRole,
+        currentUser.role,
+      );
+    } catch (emailError) {
+      this.logger.warn(
+        `Role change succeeded but failed to send email notification: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`,
+      );
+    }
+
+    return updatedUser;
+  }
+
   async changeRole(targetUserId: string, newRole: Role, actorId?: string, actorRole?: Role) {
     this.assertPrivilegedRole(actorRole);
 
@@ -715,43 +760,7 @@ export class UsersService {
     this.assertCanManageRoleChange(actorRole, currentUser.role, newRole);
 
     try {
-      const updatedUser = await this.prisma.user.update({
-        where: { id: targetUserId },
-        data: { role: newRole },
-        select: this.userSelect,
-      });
-
-      const anchorResult = await this.anchoringService.anchorAction({
-        actionType: ActionType.ROLE_CHANGE,
-        actorId: actorId!,
-        targetId: targetUserId,
-        readableDescription: `Role changed: ${currentUser.email} from ${currentUser.role} to ${newRole}`,
-        metadata: { oldRole: currentUser.role, newRole },
-      });
-
-      if (!anchorResult) {
-        this.logger.warn(
-          `Role change succeeded in DB but blockchain anchor returned null for user ${targetUserId} (actionType=${ActionType.ROLE_CHANGE})`,
-        );
-      } else {
-        this.logger.log(
-          `Role change anchored successfully: ${anchorResult.id} for user ${targetUserId}`,
-        );
-      }
-
-      try {
-        await this.mailService.sendRoleChangedEmail(
-          currentUser.email,
-          newRole,
-          currentUser.role,
-        );
-      } catch (emailError) {
-        this.logger.warn(
-          `Role change succeeded but failed to send email notification: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`,
-        );
-      }
-
-      return updatedUser;
+      return await this.executeRoleChange(targetUserId, newRole, actorId, currentUser);
     } catch (error) {
       if (this.isNotFoundError(error)) {
         throw new NotFoundException('User not found');

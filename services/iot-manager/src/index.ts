@@ -675,28 +675,7 @@ export const buildApp = (options: AppOptions = {}) => {
     return undefined;
   };
 
-  const resolveTelemetryRequestContext = async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<TelemetryRequestContext | null> => {
-    const token = getBearerTokenFromHeader(request);
-    if (!token) {
-      reply.code(401).send({
-        error: 'AUTHORIZATION_REQUIRED',
-        message: 'Authorization header with Bearer token is required',
-      });
-      return null;
-    }
-
-    const claims = decodeJwtPayload(token);
-    if (!claims) {
-      reply.code(401).send({
-        error: 'INVALID_TOKEN',
-        message: 'Unable to decode JWT payload',
-      });
-      return null;
-    }
-
+  const parseClaims = (claims: TelemetrySessionClaims): { role: string; userId: string } | null => {
     const rawRole = claims.role ?? (claims.roles?.[0] ?? undefined);
     const role = typeof rawRole === 'string' ? rawRole.trim().toUpperCase() : undefined;
     const userId =
@@ -704,81 +683,116 @@ export const buildApp = (options: AppOptions = {}) => {
       (typeof claims.identityId === 'string' && claims.identityId.trim().length > 0 && claims.identityId.trim()) ||
       (typeof claims.sub === 'string' && claims.sub.trim().length > 0 && claims.sub.trim());
 
-    if (!role || !userId) {
-      reply.code(401).send({
-        error: 'INVALID_SESSION_CLAIMS',
-        message: 'Token payload must include role and userId/identityId/sub',
+    if (!role || !userId) return null;
+    return { role, userId };
+  };
+
+  const fetchUserEcosystemsFromAuth = async (
+    config: AppConfig,
+    userId: string,
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<string[] | null> => {
+    if (!config.authUserEcosystemsUrl || !config.authInternalToken) {
+      reply.code(403).send({
+        error: 'USER_ECOSYSTEM_ACCESS_REQUIRED',
+        message: 'User role requires ecosystem membership in token or auth service configuration',
       });
       return null;
     }
+
+    try {
+      const response = await fetch(
+        `${config.authUserEcosystemsUrl.replace(/\/$/, '')}/${encodeURIComponent(userId)}/ecosystems`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.authInternalToken}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Unexpected status ${response.status}`);
+      }
+
+      const data = (await response.json()) as {
+        ecosystemIds?: string[];
+        ecosystems?: string[];
+      };
+
+      return normalizeEcosystemIds(data.ecosystemIds) ?? normalizeEcosystemIds(data.ecosystems) ?? [];
+    } catch (error) {
+      request.log.error({ error }, 'Unable to fetch user ecosystems from auth service');
+      reply.code(503).send({
+        error: 'AUTH_SERVICE_UNAVAILABLE',
+        message: 'Unable to resolve user ecosystems from auth service',
+      });
+      return null;
+    }
+  };
+
+  const resolveUserEcosystemsForRole = async (
+    role: string,
+    claims: TelemetrySessionClaims,
+    userId: string,
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<string[] | null> => {
+    const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN';
+
+    if (isAdminOrGlobalAdmin) return [];
 
     const claimEcosystemIds =
       normalizeEcosystemIds(claims.ecosystemIds) ??
       normalizeEcosystemIds(claims.ecosystems) ??
       normalizeEcosystemIds(claims.userEcosystems);
 
-    let ecosystemIds: string[] | null = null;
+    const ids = claimEcosystemIds ?? null;
+    if (ids && ids.length > 0) return ids;
 
-    const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN';
+    const fetchedIds = await fetchUserEcosystemsFromAuth(config, userId, request, reply);
+    if (fetchedIds === null) return null;
 
-    if (!isAdminOrGlobalAdmin) {
-      ecosystemIds = claimEcosystemIds ?? null;
-
-      if (!ecosystemIds || ecosystemIds.length === 0) {
-        if (!config.authUserEcosystemsUrl || !config.authInternalToken) {
-          reply.code(403).send({
-            error: 'USER_ECOSYSTEM_ACCESS_REQUIRED',
-            message: 'User role requires ecosystem membership in token or auth service configuration',
-          });
-          return null;
-        }
-
-        try {
-          const userEcosystemsResponse = await fetch(
-            `${config.authUserEcosystemsUrl.replace(/\/$/, '')}/${encodeURIComponent(userId)}/ecosystems`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${config.authInternalToken}`,
-              },
-            },
-          );
-
-          if (!userEcosystemsResponse.ok) {
-            throw new Error(`Unexpected status ${userEcosystemsResponse.status}`);
-          }
-
-          const data = (await userEcosystemsResponse.json()) as {
-            ecosystemIds?: string[];
-            ecosystems?: string[];
-          };
-
-          ecosystemIds = normalizeEcosystemIds(data.ecosystemIds) ?? normalizeEcosystemIds(data.ecosystems) ?? [];
-        } catch (error) {
-          request.log.error({ error }, 'Unable to fetch user ecosystems from auth service');
-          reply.code(503).send({
-            error: 'AUTH_SERVICE_UNAVAILABLE',
-            message: 'Unable to resolve user ecosystems from auth service',
-          });
-          return null;
-        }
-
-        if (!isAdminOrGlobalAdmin && (!ecosystemIds || ecosystemIds.length === 0)) {
-          reply.code(403).send({
-            error: 'NO_ECOSYSTEM_ACCESS',
-            message: 'User has no associated ecosystems',
-          });
-          return null;
-        }
-      }
+    if (fetchedIds.length === 0) {
+      reply.code(403).send({
+        error: 'NO_ECOSYSTEM_ACCESS',
+        message: 'User has no associated ecosystems',
+      });
+      return null;
     }
 
-    return {
-      role,
-      userId,
-      ecosystemIds,
-    };
+    return fetchedIds;
+  };
+
+  const resolveTelemetryRequestContext = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<TelemetryRequestContext | null> => {
+    const token = getBearerTokenFromHeader(request);
+    if (!token) {
+      reply.code(401).send({ error: 'AUTHORIZATION_REQUIRED', message: 'Authorization header with Bearer token is required' });
+      return null;
+    }
+
+    const claims = decodeJwtPayload(token);
+    if (!claims) {
+      reply.code(401).send({ error: 'INVALID_TOKEN', message: 'Unable to decode JWT payload' });
+      return null;
+    }
+
+    const parsed = parseClaims(claims);
+    if (!parsed) {
+      reply.code(401).send({ error: 'INVALID_SESSION_CLAIMS', message: 'Token payload must include role and userId/identityId/sub' });
+      return null;
+    }
+
+    const { role, userId } = parsed;
+    const ecosystemIds = await resolveUserEcosystemsForRole(role, claims, userId, request, reply);
+    if (ecosystemIds === null) return null;
+
+    return { role, userId, ecosystemIds: ecosystemIds.length > 0 ? ecosystemIds : null };
   };
 
   app.post(

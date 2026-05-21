@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import Header from '../components/layout/Header'
@@ -16,12 +16,12 @@ export default function MainLayout() {
   const [pendingCount, setPendingCount] = useState(0)
   const [, setRefreshKey] = useState(0)
 
-  const refreshNotificationCount = () => {
+  const refreshNotificationCount = useCallback(() => {
     if (authClaims?.sub) {
       getPendingCount().then(setPendingCount)
     }
     setRefreshKey(k => k + 1)
-  }
+  }, [authClaims?.sub])
 
   useEffect(() => {
     if (authClaims?.sub) {

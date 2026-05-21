@@ -49,6 +49,12 @@ export default function AuditDashboardPage() {
     }
   }, [events])
 
+  const percentageColorClass = summaryCards.percentage === 0
+    ? 'text-emerald-600'
+    : summaryCards.percentage < 50
+      ? 'text-amber-600'
+      : 'text-rose-600'
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
@@ -69,13 +75,7 @@ export default function AuditDashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               Porcentaje de Discrepancias Global
             </p>
-            <p className={`mt-2 text-2xl font-bold ${
-              summaryCards.percentage === 0 
-                ? 'text-emerald-600' 
-                : summaryCards.percentage < 50
-                ? 'text-amber-600'
-                : 'text-rose-600'
-            }`}>
+            <p className={`mt-2 text-2xl font-bold ${percentageColorClass}`}>
               {isLoading ? '-' : `${summaryCards.percentage}%`}
             </p>
           </div>

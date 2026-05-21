@@ -45,13 +45,132 @@ export class AuditService {
     }
   }
 
+  private resolveActorName(output: Record<string, unknown>): string {
+    if (output.ecosystemId) return `Ecosistema ${output.ecosystemId}`;
+    if (output.userId) return `Usuario ${output.userId}`;
+    if (output.ingestId) return `Ingesta ${output.ingestId}`;
+    if (output.signer && typeof output.signer === 'string') {
+      const signerParts = (output.signer as string).split('::');
+      return signerParts[0] || 'FireFly System';
+    }
+    return 'Sistema';
+  }
+
+  private resolveEventType(eventName: string): 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY' {
+    const lower = eventName.toLowerCase();
+    if (lower.includes('telemetry') || lower.includes('anchor')) return 'TELEMETRY';
+    if (lower.includes('batchpin') || lower.includes('batch_pin')) return 'FIREFLY';
+    return 'ADMINISTRATIVE';
+  }
+
+  private formatTimestamp(ts: string | number | undefined): string {
+    if (!ts) return new Date().toISOString();
+    if (typeof ts === 'number') {
+      return new Date(ts > 9999999999 ? ts : ts * 1000).toISOString();
+    }
+    const date = new Date(ts);
+    return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+  }
+
+  private async verifyTelemetryIntegrity(
+    eventType: string,
+    telemetryHash: string,
+    signature: string,
+    publicKey: string,
+    output: Record<string, unknown>,
+    eventId: string,
+  ): Promise<{ signatureValid: boolean; integrityStatus: 'VERIFIED' | 'DISCREPANCY'; dbRecord: Record<string, unknown> | null }> {
+    let signatureValid = false;
+    let integrityStatus: 'VERIFIED' | 'DISCREPANCY' = 'VERIFIED';
+    let dbRecord: Record<string, unknown> | null = null;
+
+    if (eventType !== 'TELEMETRY' || !telemetryHash || !signature || !publicKey) {
+      return { signatureValid, integrityStatus, dbRecord };
+    }
+
+    signatureValid = this.verifyEd25519Signature(telemetryHash, signature, publicKey);
+
+    if (!signatureValid) {
+      return { signatureValid, integrityStatus: 'DISCREPANCY', dbRecord };
+    }
+
+    const ingestId = output.ingestId?.toString() || eventId;
+    if (!ingestId) {
+      return { signatureValid, integrityStatus, dbRecord };
+    }
+
+    const telemetryDoc = await this.telemetryService.findByIngestId(ingestId);
+    if (!telemetryDoc) {
+      return { signatureValid, integrityStatus, dbRecord };
+    }
+
+    dbRecord = {
+      timestamp: telemetryDoc.timestamp,
+      payload: telemetryDoc.payload,
+      hash: telemetryDoc.hash,
+      metadata: telemetryDoc.metadata,
+    };
+
+    const isIntegrityValid = await this.telemetryService.verifyIntegrity(telemetryHash, ingestId);
+    if (!isIntegrityValid) {
+      integrityStatus = 'DISCREPANCY';
+    }
+
+    return { signatureValid, integrityStatus, dbRecord };
+  }
+
+  private async mapEventToTimelineItem(event: FireFlyEvent): Promise<AuditTimelineItem> {
+    const output = event.output || {};
+    const eventName = event.name || 'Evento Blockchain';
+    const telemetryHash = output.telemetryHash?.toString() || output.hash?.toString() || '';
+    const signature = output.signature?.toString() || '';
+    const publicKey = output.publicKey?.toString() || '';
+    const eventType = this.resolveEventType(eventName);
+
+    const { signatureValid, integrityStatus, dbRecord } = await this.verifyTelemetryIntegrity(
+      eventType, telemetryHash, signature, publicKey, output, event.id,
+    );
+
+    return {
+      eventId: event.id,
+      timestamp: this.formatTimestamp(event.timestamp),
+      action: eventName,
+      actorName: this.resolveActorName(output),
+      type: eventType,
+      integrityStatus,
+      blockchainTxId: event.tx?.blockchainId || event.tx?.id || '',
+      blockNumber: undefined,
+      telemetryHash,
+      ecosystemId: output.ecosystemId?.toString() || '',
+      ingestId: output.ingestId?.toString() || event.id,
+      output: output,
+      signatureValid,
+      dbRecord: dbRecord || {},
+    };
+  }
+
+  private filterTimelineByDate(
+    timeline: AuditTimelineItem[],
+    startDate?: string,
+    endDate?: string,
+  ): AuditTimelineItem[] {
+    if (!startDate && !endDate) return timeline;
+
+    return timeline.filter((item) => {
+      const eventTime = new Date(item.timestamp);
+      if (startDate && eventTime < new Date(startDate)) return false;
+      if (endDate && eventTime > new Date(endDate)) return false;
+      return true;
+    });
+  }
+
   async getTimeline(filters: TimelineFiltersDto): Promise<AuditTimelineResponse> {
     try {
       const params: { limit?: number; skip?: number; filter?: string } = {};
-      
+
       if (filters.limit) params.limit = filters.limit;
       if (filters.offset) params.skip = filters.offset;
-      
+
       if (filters.eventType) {
         if (filters.eventType === 'TELEMETRY') {
           params.filter = 'name=~Telemetry';
@@ -61,109 +180,17 @@ export class AuditService {
       }
 
       const fireflyResponse = await this.fireflyService.getEvents(params);
-
-      const events: FireFlyEvent[] = Array.isArray(fireflyResponse) 
-        ? fireflyResponse 
+      const events: FireFlyEvent[] = Array.isArray(fireflyResponse)
+        ? fireflyResponse
         : (fireflyResponse.items || []);
 
-      const timeline = await Promise.all(events.map(async (event: FireFlyEvent) => {
-        const output = event.output || {};
-        
-        let actorName = 'Sistema';
-        if (output.ecosystemId) {
-          actorName = `Ecosistema ${output.ecosystemId}`;
-        } else if (output.userId) {
-          actorName = `Usuario ${output.userId}`;
-        } else if (output.ingestId) {
-          actorName = `Ingesta ${output.ingestId}`;
-        } else if (output.signer && typeof output.signer === 'string') {
-          const signerParts = output.signer.split('::');
-          actorName = signerParts[0] || 'FireFly System';
-        }
+      const timeline = await Promise.all(events.map((event) => this.mapEventToTimelineItem(event)));
 
-        const eventName = event.name || 'Evento Blockchain';
-        
-        let eventType: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY' = 'ADMINISTRATIVE';
-        if (eventName.toLowerCase().includes('telemetry') || eventName.toLowerCase().includes('anchor')) {
-          eventType = 'TELEMETRY';
-        } else if (eventName.toLowerCase().includes('batchpin') || eventName.toLowerCase().includes('batch_pin')) {
-          eventType = 'FIREFLY';
-        }
-
-        const formatTimestamp = (ts: string | number | undefined): string => {
-          if (!ts) return new Date().toISOString();
-          if (typeof ts === 'number') {
-            return new Date(ts > 9999999999 ? ts : ts * 1000).toISOString();
-          }
-          const date = new Date(ts);
-          return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
-        };
-
-        const telemetryHash = output.telemetryHash?.toString() || output.hash?.toString() || '';
-        const signature = output.signature?.toString() || '';
-        const publicKey = output.publicKey?.toString() || '';
-
-        let signatureValid = false;
-        let integrityStatus: 'VERIFIED' | 'DISCREPANCY' = 'VERIFIED';
-        let dbRecord: Record<string, unknown> | null = null;
-
-        if (eventType === 'TELEMETRY' && telemetryHash && signature && publicKey) {
-          signatureValid = this.verifyEd25519Signature(telemetryHash, signature, publicKey);
-
-          if (!signatureValid) {
-            integrityStatus = 'DISCREPANCY';
-          } else {
-            const ingestId = output.ingestId?.toString() || event.id;
-            if (ingestId) {
-              const telemetryDoc = await this.telemetryService.findByIngestId(ingestId);
-              if (telemetryDoc) {
-                dbRecord = {
-                  timestamp: telemetryDoc.timestamp,
-                  payload: telemetryDoc.payload,
-                  hash: telemetryDoc.hash,
-                  metadata: telemetryDoc.metadata,
-                };
-                const isIntegrityValid = await this.telemetryService.verifyIntegrity(telemetryHash, ingestId);
-                if (!isIntegrityValid) {
-                  integrityStatus = 'DISCREPANCY';
-                }
-              }
-            }
-          }
-        }
-
-        return {
-          eventId: event.id,
-          timestamp: formatTimestamp(event.timestamp),
-          action: eventName,
-          actorName,
-          type: eventType,
-          integrityStatus,
-          blockchainTxId: event.tx?.blockchainId || event.tx?.id || '',
-          blockNumber: undefined,
-          telemetryHash,
-          ecosystemId: output.ecosystemId?.toString() || '',
-          ingestId: output.ingestId?.toString() || event.id,
-          output: output,
-          signatureValid,
-          dbRecord: dbRecord || {},
-        };
-      }));
-
-      let filteredTimeline = timeline;
-      
-      if (filters.startDate || filters.endDate) {
-        filteredTimeline = timeline.filter((item) => {
-          const eventTime = new Date(item.timestamp);
-          if (filters.startDate && eventTime < new Date(filters.startDate)) return false;
-          if (filters.endDate && eventTime > new Date(filters.endDate)) return false;
-          return true;
-        });
-      }
+      let filteredTimeline = this.filterTimelineByDate(timeline, filters.startDate, filters.endDate);
 
       if (filters.ecosystemId) {
         filteredTimeline = filteredTimeline.filter(
-          (item) => item.ecosystemId === filters.ecosystemId
+          (item) => item.ecosystemId === filters.ecosystemId,
         );
       }
 
