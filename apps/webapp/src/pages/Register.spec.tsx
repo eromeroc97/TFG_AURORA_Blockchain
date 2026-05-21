@@ -10,10 +10,10 @@ jest.mock('../api/axios', () => ({
   },
 }))
 
+const useAuthMock = jest.fn(() => ({ setSession: jest.fn() }))
+
 jest.mock('../context/auth-context', () => ({
-  useAuth: () => ({
-    setSession: jest.fn(),
-  }),
+  useAuth: () => useAuthMock(),
 }))
 
 const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>
@@ -21,6 +21,7 @@ const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>
 describe('Register page', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    useAuthMock.mockReturnValue({ setSession: jest.fn() })
   })
 
   it('renders the registration heading', () => {
@@ -70,6 +71,26 @@ describe('Register page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Solicitar registro/i }))
 
     expect(await screen.findByText(/Ya existe un usuario con ese email/i)).toBeInTheDocument()
+
+    ;(axios.isAxiosError as jest.Mock).mockRestore()
+  })
+
+  it('shows generic error on non-conflict failure', async () => {
+    jest.spyOn(axios, 'isAxiosError').mockReturnValue(true)
+    mockedApiClient.post.mockRejectedValueOnce({ response: { status: 500 } })
+
+    render(
+      <MemoryRouter>
+        <Register />
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('tu@email.com'), {
+      target: { value: 'fail@aurora.local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Solicitar registro/i }))
+
+    expect(await screen.findByText(/No se pudo procesar el registro ahora mismo/i)).toBeInTheDocument()
 
     ;(axios.isAxiosError as jest.Mock).mockRestore()
   })

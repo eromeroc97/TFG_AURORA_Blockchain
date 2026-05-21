@@ -84,4 +84,32 @@ describe('Account page', () => {
 
     expect(await screen.findByText(/Se ha enviado el enlace de recuperación/i)).toBeInTheDocument()
   })
+
+  it('redirects to login when not authenticated', async () => {
+    useAuthMock.mockReturnValue({
+      authClaims: null,
+      isHydrating: false,
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <Routes>
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/login" element={<div>Login page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Login page')).toBeInTheDocument()
+  })
+
+  it('cancels the password change modal', () => {
+    renderAccount('/account')
+
+    fireEvent.click(screen.getByRole('button', { name: /Solicitar Cambio de Contraseña/i }))
+    expect(screen.getByRole('button', { name: /Cancelar/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }))
+    expect(screen.queryByRole('button', { name: /Confirmar y Cerrar Sesión/i })).not.toBeInTheDocument()
+  })
 })

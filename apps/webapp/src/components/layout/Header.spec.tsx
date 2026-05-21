@@ -19,6 +19,7 @@ const renderHeader = (
               onSignOut={onSignOutMock}
               userEmail={props.userEmail}
               userRole={props.userRole}
+              pendingCount={props.pendingCount}
             />
           }
         />
@@ -77,5 +78,33 @@ describe('Header', () => {
 
     fireEvent.mouseDown(document.body)
     expect(screen.queryByRole('menu', { name: 'Perfil' })).not.toBeInTheDocument()
+  })
+
+  it('navigates to account page from menu', () => {
+    renderHeader('/dashboard', { userRole: 'ADMIN' })
+    fireEvent.click(screen.getByRole('button', { name: /ADMIN/i }))
+    const accountLink = screen.getByRole('menuitem', { name: /Ir a mi perfil/i })
+    expect(accountLink).toHaveAttribute('href', '/account')
+  })
+
+  it('navigates to notifications page from menu', () => {
+    renderHeader('/dashboard', { userRole: 'ADMIN' })
+    fireEvent.click(screen.getByRole('button', { name: /ADMIN/i }))
+    const notifLink = screen.getByRole('menuitem', { name: /Notificaciones/i })
+    expect(notifLink).toHaveAttribute('href', '/notifications')
+  })
+
+  it('shows notification badge when pendingCount > 0', () => {
+    renderHeader('/dashboard', { userRole: 'ADMIN', pendingCount: 3 })
+    fireEvent.click(screen.getByRole('button', { name: /ADMIN/i }))
+    const badges = screen.getAllByText('3')
+    expect(badges.length).toBe(2)
+  })
+
+  it('shows 9+ when pendingCount > 9', () => {
+    renderHeader('/dashboard', { userRole: 'ADMIN', pendingCount: 15 })
+    fireEvent.click(screen.getByRole('button', { name: /ADMIN/i }))
+    const badges = screen.getAllByText('9+')
+    expect(badges.length).toBe(2)
   })
 })

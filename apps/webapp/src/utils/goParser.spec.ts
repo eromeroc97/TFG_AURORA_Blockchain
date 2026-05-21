@@ -529,6 +529,46 @@ ${methods.join('\n')}`
         expect(() => parseGoCodeToFFI('   \n\t\n   ')).toThrow(/Contract API/)
       })
 
+      it('should handle trailing identifier as generic type input', () => {
+        const code = `
+package main
+import (
+  "github.com/hyperledger/fabric-contract-api-go/contractapi"
+)
+type C struct { contractapi.Contract }
+func (s *C) Method(ctx contractapi.TransactionContextInterface, unknown) error { return nil }
+`
+        const result = parseGoCodeToFFI(code)
+        const method = result.methods.find(m => m.name === 'Method')
+        expect(method?.params.find(p => p.name === 'input')?.type).toBe('string')
+      })
+
+      it('should handle unmatched closing paren with depth tracking', () => {
+        const code = `
+package main
+import (
+  "github.com/hyperledger/fabric-contract-api-go/contractapi"
+)
+type C struct { contractapi.Contract }
+func (s *C) Deep(ctx contractapi.TransactionContextInterface, nested func()) error { return nil }
+`
+        const result = parseGoCodeToFFI(code)
+        expect(result.methods.find(m => m.name === 'Deep')).toBeDefined()
+      })
+
+      it('should handle empty string in readUntil', () => {
+        const code = `
+package main
+import (
+  "github.com/hyperledger/fabric-contract-api-go/contractapi"
+)
+type C struct { contractapi.Contract }
+func
+`
+        const result = parseGoCodeToFFI(code)
+        expect(result.methods).toHaveLength(0)
+      })
+
       it('should throw ContractAPIError for code without Contract API', () => {
         expect(() => parseGoCodeToFFI(`
 package main

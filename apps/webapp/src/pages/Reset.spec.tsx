@@ -220,4 +220,141 @@ describe('Reset page', () => {
 
     isAxiosErrorSpy.mockRestore()
   })
+
+  it('shows error when passwords do not match', async () => {
+    const password = 'Password123!'
+
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+
+    fireEvent.change(screen.getByPlaceholderText('Nueva contraseña'), {
+      target: { value: password },
+    })
+    fireEvent.change(screen.getByPlaceholderText('Repite la nueva contraseña'), {
+      target: { value: 'DifferentPass1!' },
+    })
+
+    const form = screen.getByPlaceholderText('Nueva contraseña').closest('form')!
+    fireEvent.submit(form)
+
+    expect(await screen.findByText(/Las contraseñas no coinciden/i)).toBeInTheDocument()
+  })
+
+  it('shows error when token is invalid after validation', async () => {
+    mockedApiClient.post.mockResolvedValue({ data: { valid: false } } as never)
+
+    renderReset()
+
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
+  })
+
+  it('disables submit when policy is not met', async () => {
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+
+    fireEvent.change(screen.getByPlaceholderText('Nueva contraseña'), {
+      target: { value: 'short' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('Repite la nueva contraseña'), {
+      target: { value: 'short' },
+    })
+
+    expect(screen.getByRole('button', { name: /Guardar contraseña/i })).toBeDisabled()
+  })
+
+  it('shows HIBP error state when fetch fails', async () => {
+    const password = 'Password123!'
+    const digestHex = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase()
+
+    mockDigest.mockResolvedValueOnce(Uint8Array.from(Buffer.from(digestHex, 'hex')).buffer)
+    mockFetch.mockRejectedValueOnce(new Error('network error'))
+
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+    fillValidPassword(password)
+
+    fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
+
+    expect(await screen.findByText(/No se pudo verificar HIBP en este momento/i)).toBeInTheDocument()
+  })
+
+  it('redirects to login when token has invalid format', async () => {
+    renderReset('/reset?token=short')
+
+    expect(await screen.findByText('Login Page')).toBeInTheDocument()
+    expect(mockedApiClient.post).not.toHaveBeenCalled()
+  })
+
+  it('skips HIBP when password policy is not met', async () => {
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+
+    fireEvent.change(screen.getByPlaceholderText('Nueva contraseña'), {
+      target: { value: 'short' },
+    })
+    fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
+
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('shows HIBP request failed message when response is not ok', async () => {
+    const password = 'Password123!'
+    const digestHex = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase()
+
+    mockDigest.mockResolvedValueOnce(Uint8Array.from(Buffer.from(digestHex, 'hex')).buffer)
+    mockFetch.mockResolvedValueOnce({ ok: false, text: async () => '' })
+
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+    fillValidPassword(password)
+    fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
+
+    expect(await screen.findByText(/No se pudo verificar HIBP en este momento/i)).toBeInTheDocument()
+  })
+
+  it('shows generic error message when reset API fails with unknown error', async () => {
+    const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValue(true)
+    const password = 'Password123!'
+    const digestHex = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase()
+
+    mockDigest.mockResolvedValueOnce(Uint8Array.from(Buffer.from(digestHex, 'hex')).buffer)
+    mockFetch.mockResolvedValueOnce({ ok: true, text: async () => '' })
+    mockedApiClient.post
+      .mockResolvedValueOnce({ data: { valid: true } } as never)
+      .mockRejectedValueOnce({ response: { status: 500 } } as never)
+
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+    fillValidPassword(password)
+    fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByRole('button', { name: /Guardar contraseña/i }))
+
+    expect(await screen.findByText(/No se pudo actualizar la contraseña/i)).toBeInTheDocument()
+    isAxiosErrorSpy.mockRestore()
+  })
+
+  it('shows token expired message when reset returns 400', async () => {
+    const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValue(true)
+    const password = 'Password123!'
+    const digestHex = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase()
+
+    mockDigest.mockResolvedValueOnce(Uint8Array.from(Buffer.from(digestHex, 'hex')).buffer)
+    mockFetch.mockResolvedValueOnce({ ok: true, text: async () => '' })
+    mockedApiClient.post
+      .mockResolvedValueOnce({ data: { valid: true } } as never)
+      .mockRejectedValueOnce({ response: { status: 400 } } as never)
+
+    renderReset()
+    await screen.findByRole('heading', { name: /Define tu nueva contraseña/i })
+    fillValidPassword(password)
+    fireEvent.blur(screen.getByPlaceholderText('Nueva contraseña'))
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByRole('button', { name: /Guardar contraseña/i }))
+
+    expect(await screen.findByText(/El token de recuperación es inválido o ha expirado/i)).toBeInTheDocument()
+    isAxiosErrorSpy.mockRestore()
+  })
 })

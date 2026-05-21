@@ -56,4 +56,13 @@ describe('auth-session', () => {
     clearAuthAccessToken()
     expect(getAuthSession()).toEqual({ accessToken: null, claims: null })
   })
+
+  it('returns null when claims are missing required fields', () => {
+    const token = createToken({ sub: 'user-1' })
+    expect(decodeAccessTokenClaims(token)).toBeNull()
+  })
+
+  it('returns null when token split fails', () => {
+    expect(decodeAccessTokenClaims('no-dots')).toBeNull()
+  })
 })

@@ -125,4 +125,53 @@ describe('api axios client', () => {
       expect(authSession.getAuthSession().accessToken).toBeNull()
     })
   })
+
+  it('does not refresh when 401 on auth route', async () => {
+    await jest.isolateModulesAsync(async () => {
+      await import('./axios')
+
+      const apiInstance = instances[0]
+      const refreshInstance = instances[1]
+
+      apiInstance.request.mockResolvedValueOnce({ data: 'retried' })
+
+      const result = apiInstance.responseHandler?.onRejected?.({
+        response: { status: 401 },
+        config: { url: '/auth/login', headers: {} },
+      })
+
+      expect(refreshInstance.post).not.toHaveBeenCalled()
+      expect(apiInstance.request).not.toHaveBeenCalled()
+      await expect(result).rejects.toBeTruthy()
+    })
+  })
+
+  it('throws when refresh response is missing accessToken', async () => {
+    await jest.isolateModulesAsync(async () => {
+      await import('./axios')
+
+      const apiInstance = instances[0]
+      const refreshInstance = instances[1]
+
+      refreshInstance.post.mockResolvedValueOnce({ data: {} })
+
+      const result = apiInstance.responseHandler?.onRejected?.({
+        response: { status: 401 },
+        config: { url: '/projects', headers: {} },
+      })
+
+      await expect(result).rejects.toThrow('Refresh response missing accessToken')
+    })
+  })
+
+  it('does not add bearer token when no access token', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const { apiClient } = await import('./axios')
+      const apiInstance = instances[0]
+      const nextConfig = await apiInstance.requestHandler?.({ headers: {} })
+
+      expect(apiClient).toBe(apiInstance)
+      expect(nextConfig.headers.Authorization).toBeUndefined()
+    })
+  })
 })

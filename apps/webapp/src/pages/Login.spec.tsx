@@ -6,11 +6,10 @@ import Login from './Login'
 
 const navigateMock = jest.fn()
 const setSessionMock = jest.fn()
+const useAuthMock = jest.fn(() => ({ setSession: setSessionMock }))
 
 jest.mock('../context/auth-context', () => ({
-  useAuth: () => ({
-    setSession: setSessionMock,
-  }),
+  useAuth: () => useAuthMock(),
 }))
 
 jest.mock('react-router-dom', () => {
@@ -134,5 +133,67 @@ describe('Login page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Entrar/i }))
 
     expect(await screen.findByText(/No se pudo iniciar sesión/i)).toBeInTheDocument()
+  })
+
+  it('redirects to dashboard when already authenticated', async () => {
+    useAuthMock.mockReturnValue({
+      setSession: setSessionMock,
+      isAuthenticated: true,
+      isHydrating: false,
+    })
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/dashboard', { replace: true })
+    })
+  })
+
+  it('redirects to audit when authenticated user is AUDITOR', async () => {
+    useAuthMock.mockReturnValue({
+      setSession: setSessionMock,
+      isAuthenticated: true,
+      isHydrating: false,
+    })
+    localStorage.setItem('aurora_token', 'header.' + btoa(JSON.stringify({ role: 'AUDITOR' })) + '.signature')
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/audit', { replace: true })
+    })
+
+    localStorage.removeItem('aurora_token')
+  })
+
+  it('navigates to dashboard on success with default role', async () => {
+    useAuthMock.mockReturnValue({ setSession: setSessionMock })
+    mockedApiClient.post.mockResolvedValueOnce({ data: { accessToken: 'test-token' } })
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('tu@email.com'), {
+      target: { value: 'user@aurora.local' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('Tu contraseña'), {
+      target: { value: 'Password123!' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Entrar/i }))
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/dashboard', { replace: true })
+    })
   })
 })

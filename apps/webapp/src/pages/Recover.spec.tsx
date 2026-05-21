@@ -4,16 +4,26 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { apiClient } from '../api/axios'
 import Recover from './Recover'
 
+const navigateMock = jest.fn()
+
+jest.mock('react-router-dom', () => {
+  const actual = jest.requireActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  }
+})
+
 jest.mock('../api/axios', () => ({
   apiClient: {
     post: jest.fn(),
   },
 }))
 
+const useAuthMock = jest.fn(() => ({ setSession: jest.fn() }))
+
 jest.mock('../context/auth-context', () => ({
-  useAuth: () => ({
-    setSession: jest.fn(),
-  }),
+  useAuth: () => useAuthMock(),
 }))
 
 const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>
@@ -21,6 +31,7 @@ const mockedApiClient = apiClient as jest.Mocked<typeof apiClient>
 describe('Recover page', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    useAuthMock.mockReturnValue({ setSession: jest.fn() })
   })
 
   const renderRecover = (state?: Record<string, unknown>) =>
@@ -81,5 +92,34 @@ describe('Recover page', () => {
     ).toBeInTheDocument()
 
     ;(axios.isAxiosError as jest.Mock).mockRestore()
+  })
+
+  it('redirects to dashboard when already authenticated', async () => {
+    useAuthMock.mockReturnValue({
+      setSession: jest.fn(),
+      isAuthenticated: true,
+      isHydrating: false,
+    })
+
+    renderRecover()
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/dashboard', { replace: true })
+    })
+  })
+
+  it('shows generic error on network failure', async () => {
+    mockedApiClient.post.mockRejectedValueOnce(new Error('network error'))
+
+    renderRecover()
+
+    fireEvent.change(screen.getByPlaceholderText('tu@email.com'), {
+      target: { value: 'user@aurora.local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Enviar enlace de recuperacion/i }))
+
+    expect(
+      await screen.findByText(/No se pudo procesar la recuperación ahora mismo/i),
+    ).toBeInTheDocument()
   })
 })
