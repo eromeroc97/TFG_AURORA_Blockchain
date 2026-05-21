@@ -44,7 +44,7 @@ export default function DeploymentHelpModal({ className, disabled }: DeploymentH
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setIsOpen(false)} />
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setIsOpen(false)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsOpen(false) } }} />
           <div className="relative z-10 w-[80vw] max-h-[90vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl flex flex-col">
             <button
               onClick={() => setIsOpen(false)}

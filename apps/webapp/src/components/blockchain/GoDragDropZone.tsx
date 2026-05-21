@@ -88,6 +88,10 @@ export default function GoDragDropZone({ onJsonGenerated }: GoDragDropZoneProps)
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
+        role="button"
+        tabIndex={0}
+        aria-label="Seleccionar archivo .go"
         className={`
           cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-all
           ${isDragging

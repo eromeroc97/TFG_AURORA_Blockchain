@@ -658,7 +658,7 @@ export default function EcosystemsManagementPage() {
                 <>
                   <div className="mt-6 space-y-3">
                     {paginatedEcosystems.map((ecosystem) => (
-                    <article
+                    <div
                       key={ecosystem.id}
                       role="button"
                       tabIndex={0}
@@ -765,7 +765,7 @@ export default function EcosystemsManagementPage() {
                             )}
                         </div>
                       </div>
-                    </article>
+                    </div>
                   ))}
                 </div>
 
@@ -1104,8 +1104,9 @@ export default function EcosystemsManagementPage() {
 
             <div className="mt-6 space-y-4">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-900">Email del usuario</label>
+                <label htmlFor="share-email" className="block text-sm font-medium text-slate-900">Email del usuario</label>
                 <input
+                  id="share-email"
                   type="email"
                   value={shareEmail}
                   onChange={(event) => setShareEmail(event.target.value)}
@@ -1115,7 +1116,7 @@ export default function EcosystemsManagementPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-900">Rol de acceso</label>
+                <span className="block text-sm font-medium text-slate-900">Rol de acceso</span>
                 <div className="flex gap-3">
                   <button
                     type="button"

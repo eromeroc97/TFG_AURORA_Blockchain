@@ -257,7 +257,11 @@ export default function BlockchainManagementPage() {
 
           <div
             className={cardClasses}
+            role="button"
+            tabIndex={0}
+            aria-label="Ver organizaciones"
             onClick={() => openDetailModal('organizations')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('organizations') } }}
           >
             <div className="flex items-center gap-2">
               <Network className="h-5 w-5 text-sky-600" />
@@ -270,7 +274,11 @@ export default function BlockchainManagementPage() {
 
           <div
             className={cardClasses}
+            role="button"
+            tabIndex={0}
+            aria-label="Ver namespaces"
             onClick={() => openDetailModal('namespaces')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('namespaces') } }}
           >
             <div className="flex items-center gap-2">
               <Layers className="h-5 w-5 text-teal-600" />
@@ -283,7 +291,11 @@ export default function BlockchainManagementPage() {
 
           <div
             className={cardClasses}
+            role="button"
+            tabIndex={0}
+            aria-label="Ver eventos"
             onClick={() => openDetailModal('ledger')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetailModal('ledger') } }}
           >
             <div className="flex items-center gap-2">
               <Cpu className="h-5 w-5 text-teal-600" />
@@ -352,10 +364,11 @@ export default function BlockchainManagementPage() {
             <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="grid grid-cols-6 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                  <label htmlFor="events-namespace" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                     Namespace
                   </label>
                   <select
+                    id="events-namespace"
                     value={eventsNamespaceFilter}
                     onChange={(e) => {
                       setEventsNamespaceFilter(e.target.value)
@@ -370,10 +383,11 @@ export default function BlockchainManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                  <label htmlFor="events-source" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                     Fuente
                   </label>
                   <select
+                    id="events-source"
                     value={eventsSourceFilter}
                     onChange={(e) => {
                       setEventsSourceFilter(e.target.value)
@@ -386,10 +400,11 @@ export default function BlockchainManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                  <label htmlFor="events-tx" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                     TX
                   </label>
                   <input
+                    id="events-tx"
                     type="text"
                     value={eventsTxFilter}
                     onChange={(e) => {
@@ -401,10 +416,11 @@ export default function BlockchainManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                  <label htmlFor="events-date-from" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                     Desde
                   </label>
                   <input
+                    id="events-date-from"
                     type="date"
                     value={eventsDateFrom}
                     onChange={(e) => {
@@ -415,10 +431,11 @@ export default function BlockchainManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                  <label htmlFor="events-date-to" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                    Hasta
                   </label>
                   <input
+                    id="events-date-to"
                     type="date"
                     value={eventsDateTo}
                     onChange={(e) => {
@@ -619,10 +636,11 @@ export default function BlockchainManagementPage() {
             <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                  <label htmlFor="contract-status" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                     Estado
                   </label>
                   <select
+                    id="contract-status"
                     value={contractStatusFilter}
                     onChange={(e) => {
                       setContractStatusFilter(e.target.value)
@@ -637,10 +655,11 @@ export default function BlockchainManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+                  <label htmlFor="contract-namespace" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                     Namespace
                   </label>
                   <select
+                    id="contract-namespace"
                     value={contractChannelFilter}
                     onChange={(e) => {
                       setContractChannelFilter(e.target.value)
@@ -789,7 +808,7 @@ export default function BlockchainManagementPage() {
 
       {detailModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={closeDetailModal} />
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={closeDetailModal} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeDetailModal() } }} />
           <div className="relative z-10 w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
             <button
               onClick={closeDetailModal}
@@ -867,7 +886,7 @@ export default function BlockchainManagementPage() {
 
       {detailModal === 'event' && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setDetailModal(null)} />
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setDetailModal(null)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailModal(null) } }} />
           <div className="relative z-10 w-[80vw] max-h-[90vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl flex flex-col">
             <button
               onClick={() => setDetailModal(null)}
@@ -948,7 +967,7 @@ export default function BlockchainManagementPage() {
 
       {selectedContract && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedContract(null)} />
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setSelectedContract(null)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedContract(null) } }} />
           <div className="relative z-10 w-[80vw] max-h-[90vh] overflow-hidden rounded-3xl bg-white p-6 shadow-2xl flex flex-col">
             <div className="flex items-start justify-between">
               <div>
@@ -1050,7 +1069,7 @@ export default function BlockchainManagementPage() {
 
       {confirmDelete.open && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete({ open: false, name: '' })} />
+          <div className="absolute inset-0 bg-black/50" role="button" tabIndex={0} aria-label="Cerrar" onClick={() => setConfirmDelete({ open: false, name: '' })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmDelete({ open: false, name: '' }) } }} />
           <div className="relative z-10 w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">Eliminar Smart Contract</h3>
             <p className="mt-2 text-sm text-slate-600">

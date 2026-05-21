@@ -136,12 +136,13 @@ export default function AuditTimeline() {
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+              <label htmlFor="audit-start-date" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                 Fecha Desde
               </label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                 <input
+                  id="audit-start-date"
                   type="date"
                   value={filters.startDate || ''}
                   onChange={(e) => handleFilterChange('startDate', e.target.value)}
@@ -151,12 +152,13 @@ export default function AuditTimeline() {
             </div>
             
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+              <label htmlFor="audit-end-date" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                 Fecha Hasta
               </label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                 <input
+                  id="audit-end-date"
                   type="date"
                   value={filters.endDate || ''}
                   onChange={(e) => handleFilterChange('endDate', e.target.value)}
@@ -166,11 +168,12 @@ export default function AuditTimeline() {
             </div>
             
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+              <label htmlFor="audit-event-type" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
                 Tipo de Evento
               </label>
               <div className="relative">
                 <select
+                  id="audit-event-type"
                   value={filters.eventType || 'ALL'}
                   onChange={(e) => handleFilterChange('eventType', e.target.value === 'ALL' ? '' : e.target.value)}
                   className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent appearance-none bg-white"

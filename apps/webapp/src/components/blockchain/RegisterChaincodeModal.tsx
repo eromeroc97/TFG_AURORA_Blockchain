@@ -120,7 +120,7 @@ export default function RegisterChaincodeModal({
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="api-name" className="block text-sm font-medium text-slate-700">
               Nombre de la API Lógica
             </label>
             {isUpgrade ? (
@@ -130,6 +130,7 @@ export default function RegisterChaincodeModal({
               </div>
             ) : (
               <input
+                id="api-name"
                 type="text"
                 value={apiName}
                 onChange={(e) => setApiName(e.target.value)}
@@ -140,7 +141,7 @@ export default function RegisterChaincodeModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="fabric-channel" className="block text-sm font-medium text-slate-700">
               Nombre del Canal de Fabric
             </label>
             {isUpgrade ? (
@@ -150,6 +151,7 @@ export default function RegisterChaincodeModal({
               </div>
             ) : (
               <input
+                id="fabric-channel"
                 type="text"
                 value={channel}
                 onChange={(e) => setChannel(e.target.value)}
@@ -160,7 +162,7 @@ export default function RegisterChaincodeModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="chaincode-name" className="block text-sm font-medium text-slate-700">
               Nombre del Chaincode Físico
             </label>
             {isUpgrade ? (
@@ -170,6 +172,7 @@ export default function RegisterChaincodeModal({
               </div>
             ) : (
               <input
+                id="chaincode-name"
                 type="text"
                 value={chaincodeName}
                 onChange={(e) => setChaincodeName(e.target.value)}
@@ -188,10 +191,11 @@ export default function RegisterChaincodeModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="event-name" className="block text-sm font-medium text-slate-700">
               Nombre del Evento <span className="text-slate-400 font-normal">(opcional)</span>
             </label>
             <input
+              id="event-name"
               type="text"
               value={eventName}
               onChange={(e) => setEventName(e.target.value)}
@@ -204,10 +208,11 @@ export default function RegisterChaincodeModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="ffi-topic" className="block text-sm font-medium text-slate-700">
               Topic <span className="text-slate-400 font-normal">(opcional)</span>
             </label>
             <input
+              id="ffi-topic"
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
@@ -220,7 +225,7 @@ export default function RegisterChaincodeModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="ffi-json" className="block text-sm font-medium text-slate-700">
               JSON de la Interfaz (FFI) <span className="text-rose-500">*</span>
             </label>
             <div className="mt-1">
@@ -229,6 +234,7 @@ export default function RegisterChaincodeModal({
               />
             </div>
             <textarea
+              id="ffi-json"
               value={ffiJson}
               onChange={(e) => setFfiJson(e.target.value)}
               placeholder='{"name": "...", "version": "...", "methods": [...]}'
