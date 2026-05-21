@@ -50,7 +50,7 @@ function parseParameterBlock(paramStr: string): FireFlyParam[] {
   const rawParams: RawParam[] = []
   
   // Limpiar comentarios en línea o de bloque dentro de la firma (poco probable, pero robusto)
-  const cleanStr = paramStr.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '').trim()
+  const cleanStr = paramStr.replace(/(?:\/\*[\s\S]*?\*\/|\/\/.*$)/gm, '').trim()
   if (!cleanStr) return params
 
   const segments = cleanStr.split(',')

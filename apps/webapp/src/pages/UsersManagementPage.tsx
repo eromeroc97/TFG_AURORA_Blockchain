@@ -314,7 +314,7 @@ export default function UsersManagementPage() {
             </label>
 
             {(role === 'ADMIN' || role === 'GLOBAL_ADMIN') && (
-              <label className="block space-y-1">
+              <span className="block space-y-1">
                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Administración</span>
                 <button
                   type="button"
@@ -324,7 +324,7 @@ export default function UsersManagementPage() {
                   <Bell className="size-4" />
                   Enviar notificación global
                 </button>
-              </label>
+              </span>
             )}
           </div>
 
@@ -759,8 +759,9 @@ export default function UsersManagementPage() {
 
             <div className="mt-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700">Título</label>
+                <label htmlFor="notification-title" className="block text-sm font-medium text-slate-700">Título</label>
                 <input
+                  id="notification-title"
                   type="text"
                   value={notificationForm.title}
                   onChange={(e) => setNotificationForm((prev) => ({ ...prev, title: e.target.value }))}
@@ -770,8 +771,9 @@ export default function UsersManagementPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700">Mensaje</label>
+                <label htmlFor="notification-message" className="block text-sm font-medium text-slate-700">Mensaje</label>
                 <textarea
+                  id="notification-message"
                   value={notificationForm.message}
                   onChange={(e) => setNotificationForm((prev) => ({ ...prev, message: e.target.value }))}
                   placeholder="Escribe el mensaje de la notificación..."
@@ -782,7 +784,7 @@ export default function UsersManagementPage() {
 
               {notificationModal.type === 'global' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Roles destinatarios</label>
+                  <span className="block text-sm font-medium text-slate-700">Roles destinatarios</span>
                   <div className="mt-2 flex flex-wrap gap-3">
                     {['USER', 'AUDITOR', 'ADMIN'].map((r) => (
                       <label key={r} className="flex items-center gap-2 cursor-pointer">

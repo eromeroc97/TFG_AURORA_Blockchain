@@ -287,11 +287,12 @@ export default function Reset() {
               </div>
 
               <div className="space-y-4">
-                <label className="block space-y-2">
+                <label htmlFor="reset-password" className="block space-y-2">
                   <span className="text-sm font-medium text-primary">Contraseña</span>
                   <div className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-accent">
                     <LockKeyhole className="size-4 shrink-0 text-muted" />
                     <PasswordInput
+                      id="reset-password"
                       name="password"
                       autoComplete="new-password"
                       required
@@ -310,16 +311,17 @@ export default function Reset() {
                   </div>
                 </label>
 
-                <label className="block space-y-2">
+                <label htmlFor="reset-confirm-password" className="block space-y-2">
                   <span className="text-sm font-medium text-primary">Confirmar contraseña</span>
                   <div className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-accent">
                     <LockKeyhole className="size-4 shrink-0 text-muted" />
                     <PasswordInput
+                      id="reset-confirm-password"
                       name="confirmPassword"
                       autoComplete="new-password"
                       required
                       value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      onChange={(event) => setConfirmPassword(event.target.value)
                       className="w-full border-0 bg-transparent text-sm text-primary outline-none placeholder:text-muted"
                       placeholder="Repite la nueva contraseña"
                     />

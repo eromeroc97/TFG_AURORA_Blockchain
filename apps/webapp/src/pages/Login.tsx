@@ -114,11 +114,12 @@ export default function Login() {
                   </div>
                 </label>
 
-                <label className="block space-y-2">
+                <label htmlFor="login-password" className="block space-y-2">
                   <span className="text-sm font-medium text-primary">Contraseña</span>
                   <div className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 focus-within:border-accent">
                     <LockKeyhole className="size-4 shrink-0 text-muted" />
                     <PasswordInput
+                      id="login-password"
                       name="password"
                       autoComplete="current-password"
                       required
