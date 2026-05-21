@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { decodeRsaPublicKey } from './jwt-key.util';
+import { decodeRsaPublicKey, getJwtPublicKey } from './jwt-key.util';
 
 describe('jwt-key.util', () => {
   const { publicKey } = crypto.generateKeyPairSync('rsa', {
@@ -46,6 +46,32 @@ describe('jwt-key.util', () => {
       const result = decodeRsaPublicKey(base64Key, 'TEST_KEY');
 
       expect(result).toContain('-----BEGIN PUBLIC KEY-----');
+    });
+  });
+
+  describe('getJwtPublicKey', () => {
+    afterEach(() => {
+      delete process.env.JWT_PUBLIC_KEY;
+    });
+
+    it('should read JWT_PUBLIC_KEY from environment', () => {
+      process.env.JWT_PUBLIC_KEY = publicKey;
+
+      const result = getJwtPublicKey();
+
+      expect(result).toContain('-----BEGIN PUBLIC KEY-----');
+    });
+
+    it('should throw when JWT_PUBLIC_KEY is not set', () => {
+      delete process.env.JWT_PUBLIC_KEY;
+
+      expect(() => getJwtPublicKey()).toThrow('JWT_PUBLIC_KEY is not configured');
+    });
+
+    it('should throw when JWT_PUBLIC_KEY is malformed', () => {
+      process.env.JWT_PUBLIC_KEY = 'not-a-valid-key';
+
+      expect(() => getJwtPublicKey()).toThrow('JWT_PUBLIC_KEY is malformed');
     });
   });
 });

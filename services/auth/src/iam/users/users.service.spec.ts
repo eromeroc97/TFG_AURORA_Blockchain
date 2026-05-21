@@ -10,6 +10,8 @@ import { CryptoService } from '../../crypto/crypto.service';
 import { RedisService } from '../redis/redis.service';
 import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
 
+jest.mock('axios');
+
 describe('UsersService', () => {
   let service: UsersService;
   const prismaMock = {

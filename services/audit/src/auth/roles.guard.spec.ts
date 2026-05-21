@@ -99,5 +99,12 @@ describe('RolesGuard', () => {
 
       expect(result).toBe(true);
     });
+
+    it('should throw UnauthorizedException when user is missing', () => {
+      reflector.getAllAndOverride.mockReturnValue(['ADMIN']);
+      const context = createMockContext(undefined);
+
+      expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+    });
   });
 });

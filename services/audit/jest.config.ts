@@ -5,7 +5,13 @@ export default {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  collectCoverageFrom: ['**/*.(t|j)s'],
+  collectCoverageFrom: [
+    '**/*.(t|j)s',
+    '!**/*.module.ts',
+    '!**/*.dto.ts',
+    '!main.ts',
+    '!**/coverage/**',
+  ],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
 };

@@ -49,6 +49,21 @@ describe('FireFlyService', () => {
     });
   });
 
+  describe('constructor defaults', () => {
+    it('should use default baseUrl and namespace when config is not set', () => {
+      const svc = new FireFlyService(
+        {
+          get: jest.fn((key: string) => undefined),
+        } as any,
+        httpService as any,
+      );
+
+      expect((svc as any).baseUrl).toBe('http://firefly:5000');
+      expect((svc as any).namespace).toBe('default');
+      expect((svc as any).apiKey).toBe('');
+    });
+  });
+
   describe('getEvents', () => {
     it('should fetch events without options', async () => {
       const mockData = { items: [{ id: '1', name: 'event1' }] };

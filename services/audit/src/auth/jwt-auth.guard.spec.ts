@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 describe('JwtAuthGuard', () => {
@@ -10,6 +10,13 @@ describe('JwtAuthGuard', () => {
 
   it('should be defined', () => {
     expect(guard).toBeDefined();
+  });
+
+  describe('canActivate', () => {
+    it('should delegate to parent canActivate', async () => {
+      const mockContext = {} as ExecutionContext;
+      await expect(guard.canActivate(mockContext)).rejects.toThrow();
+    });
   });
 
   describe('handleRequest', () => {

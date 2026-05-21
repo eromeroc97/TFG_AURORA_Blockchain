@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import * as crypto from 'crypto';
 import { AuditService } from './audit.service';
 import { FireFlyService } from '../firefly/firefly.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
@@ -56,6 +57,23 @@ describe('AuditService', () => {
         'not-a-pem-key'
       );
       expect(result).toBe(false);
+    });
+
+    it('should return true for valid Ed25519 signature', () => {
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519', {
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+      const telemetryHash = 'test-hash-content';
+      const signature = crypto.sign(null, Buffer.from(telemetryHash), privateKey);
+      const signatureB64 = signature.toString('base64');
+
+      const result = (service as any).verifyEd25519Signature(
+        telemetryHash,
+        signatureB64,
+        publicKey,
+      );
+      expect(result).toBe(true);
     });
   });
 
@@ -467,6 +485,121 @@ describe('AuditService', () => {
       const result = await service.getTimeline({ limit: 50, offset: 0 });
 
       expect(result.timeline[0].ingestId).toBe('event-123');
+    });
+
+    it('should query telemetry and verify integrity when signature is valid', async () => {
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519', {
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+      const telemetryHash = 'valid-hash-content';
+      const signature = crypto.sign(null, Buffer.from(telemetryHash), privateKey);
+      const signatureB64 = signature.toString('base64');
+
+      fireflyService.getEvents.mockResolvedValue({
+        items: [
+          {
+            id: 'event-1',
+            name: 'TelemetryEvent',
+            timestamp: '2025-01-01',
+            output: {
+              telemetryHash,
+              signature: signatureB64,
+              publicKey,
+              ingestId: 'ingest-1',
+            },
+          },
+        ],
+      });
+      telemetryService.findByIngestId.mockResolvedValue({
+        timestamp: new Date('2025-01-01'),
+        payload: { temp: 25 },
+        hash: telemetryHash,
+        metadata: {},
+      });
+      telemetryService.verifyIntegrity.mockResolvedValue(true);
+
+      const result = await service.getTimeline({ limit: 50, offset: 0 });
+
+      expect(result.timeline[0].signatureValid).toBe(true);
+      expect(result.timeline[0].integrityStatus).toBe('VERIFIED');
+      expect(result.timeline[0].dbRecord).toEqual({
+        timestamp: expect.any(Date),
+        payload: { temp: 25 },
+        hash: telemetryHash,
+        metadata: {},
+      });
+    });
+
+    it('should set DISCREPANCY when telemetry integrity check fails', async () => {
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519', {
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+      const telemetryHash = 'valid-hash-content';
+      const signature = crypto.sign(null, Buffer.from(telemetryHash), privateKey);
+      const signatureB64 = signature.toString('base64');
+
+      fireflyService.getEvents.mockResolvedValue({
+        items: [
+          {
+            id: 'event-2',
+            name: 'TelemetryEvent',
+            timestamp: '2025-01-01',
+            output: {
+              telemetryHash,
+              signature: signatureB64,
+              publicKey,
+              ingestId: 'ingest-2',
+            },
+          },
+        ],
+      });
+      telemetryService.findByIngestId.mockResolvedValue({
+        timestamp: new Date('2025-01-01'),
+        payload: { temp: 25 },
+        hash: telemetryHash,
+        metadata: {},
+      });
+      telemetryService.verifyIntegrity.mockResolvedValue(false);
+
+      const result = await service.getTimeline({ limit: 50, offset: 0 });
+
+      expect(result.timeline[0].signatureValid).toBe(true);
+      expect(result.timeline[0].integrityStatus).toBe('DISCREPANCY');
+    });
+
+    it('should handle valid signature but no telemetry doc found', async () => {
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519', {
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+      const telemetryHash = 'valid-hash-content';
+      const signature = crypto.sign(null, Buffer.from(telemetryHash), privateKey);
+      const signatureB64 = signature.toString('base64');
+
+      fireflyService.getEvents.mockResolvedValue({
+        items: [
+          {
+            id: 'event-3',
+            name: 'TelemetryEvent',
+            timestamp: '2025-01-01',
+            output: {
+              telemetryHash,
+              signature: signatureB64,
+              publicKey,
+              ingestId: 'ingest-3',
+            },
+          },
+        ],
+      });
+      telemetryService.findByIngestId.mockResolvedValue(null);
+
+      const result = await service.getTimeline({ limit: 50, offset: 0 });
+
+      expect(result.timeline[0].signatureValid).toBe(true);
+      expect(result.timeline[0].integrityStatus).toBe('VERIFIED');
+      expect(result.timeline[0].dbRecord).toEqual({});
     });
   });
 
