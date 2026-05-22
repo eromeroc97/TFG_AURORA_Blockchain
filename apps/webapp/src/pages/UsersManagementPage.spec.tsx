@@ -428,8 +428,7 @@ describe('UsersManagementPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Clickable Eco')).toBeInTheDocument()
       })
-      const searchIcons = document.querySelectorAll('[title="Ver ecosistema"]')
-      if (searchIcons.length > 0) fireEvent.click(searchIcons[0])
+      fireEvent.click(screen.getByText('Clickable Eco'))
       expect(mockNavigate).toHaveBeenCalledWith('/ecosystems', { state: { selectedId: 'eco-1' } })
     })
   })

@@ -575,7 +575,7 @@ function UserInfoModal({
                               className="font-medium text-sky-700 hover:underline cursor-pointer"
                               onClick={() => navigate('/ecosystems', { state: { selectedId: eco.id } })}
                             >
-                              {eco.ecosystemName}
+                              {eco.name}
                             </a>
                           </td>
                           <td className="px-3 py-2">

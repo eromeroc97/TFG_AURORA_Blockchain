@@ -293,7 +293,7 @@ describe('NotificationsPage', () => {
 
   it('changes page size', async () => {
     const many = Array.from({ length: 15 }, (_, i) =>
-      mockNotification({ id: `n${i}`, title: `N${i}` }),
+      mockNotification({ id: `n${i}`, title: `N${i}`, createdAt: new Date(2025, 0, 1, 15 - i, 0).toISOString() }),
     )
     mockGetNotifications.mockResolvedValueOnce(many)
     render(
