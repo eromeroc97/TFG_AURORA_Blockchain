@@ -94,8 +94,6 @@ export default function AccountPage() {
         </p>
       </div>
 
-      {/* TODO: implementar dashboards específicos por rol (Investigador/Admin). */}
-
       {feedbackMessage ? (
         <div className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
           <CheckCircle2 className="size-4 shrink-0" />
