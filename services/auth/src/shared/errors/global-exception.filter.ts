@@ -174,12 +174,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     errorCode: string,
     sanitizedMessage: string,
   ): void {
-    const rawMessage =
-      exception instanceof Error
-        ? exception.message
-        : typeof exception === 'string'
-          ? exception
-          : JSON.stringify(exception);
+    let rawMessage: string
+    if (exception instanceof Error) {
+      rawMessage = exception.message
+    } else if (typeof exception === 'string') {
+      rawMessage = exception
+    } else {
+      rawMessage = JSON.stringify(exception)
+    }
     const stack = exception instanceof Error ? exception.stack : undefined;
 
     const metadata = {

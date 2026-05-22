@@ -108,11 +108,14 @@ function extractSmartContractItems(responseData: any): SmartContract[] {
   }
 
   if (responseData && typeof responseData === 'object') {
-    const payload = Array.isArray(responseData.items)
-      ? responseData.items
-      : Array.isArray(responseData.data)
-      ? responseData.data
-      : []
+    let payload: any[]
+    if (Array.isArray(responseData.items)) {
+      payload = responseData.items
+    } else if (Array.isArray(responseData.data)) {
+      payload = responseData.data
+    } else {
+      payload = []
+    }
 
     if (Array.isArray(payload)) {
       return payload.map(normalizeSmartContract)

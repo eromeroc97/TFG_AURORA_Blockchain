@@ -996,6 +996,32 @@ function ConfirmDeleteModal({
   )
 }
 
+function parseJsonString(rest: string): { formatted: string; consumed: number } | null {
+  if (!rest.startsWith('"')) return null
+  let j = 1
+  while (j < rest.length) {
+    if (rest[j] === '\\') { j += 2; continue }
+    if (rest[j] === '"') { j++; break }
+    j++
+  }
+  const str = rest.slice(0, j)
+  const afterColon = rest.slice(j).match(/^\s*:/)
+  if (afterColon) {
+    return { formatted: `<span class="text-sky-600">${str}</span>:`, consumed: j + afterColon[0].length }
+  }
+  return { formatted: `<span class="text-emerald-600">${str}</span>`, consumed: j }
+}
+
+function parseJsonKeyword(rest: string): string | null {
+  const match = rest.match(/^(true|false|null)\b/)
+  return match ? match[0] : null
+}
+
+function parseJsonNumber(rest: string): string | null {
+  const match = rest.match(/^-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?/)
+  return match ? match[0] : null
+}
+
 export default function BlockchainManagementPage() {
   const [detailModal, setDetailModal] = useState<ModalType>(null)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
@@ -1161,25 +1187,43 @@ export default function BlockchainManagementPage() {
   }
 
   const syntaxHighlightJson = (json: string): string => {
-    return json
+    const htmlEscaped = json
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?/g, (match, str, colon) => {
-        if (str) {
-          if (colon) {
-            return `<span class="text-sky-600">${str}</span>:`
-          }
-          return `<span class="text-emerald-600">${match}</span>`
-        }
-        if (match === 'true' || match === 'false') {
-          return `<span class="text-purple-600">${match}</span>`
-        }
-        if (match === 'null') {
-          return `<span class="text-rose-600">${match}</span>`
-        }
-        return `<span class="text-amber-600">${match}</span>`
-      })
+
+    const parts: string[] = []
+    let i = 0
+
+    while (i < htmlEscaped.length) {
+      const rest = htmlEscaped.slice(i)
+
+      const strResult = parseJsonString(rest)
+      if (strResult) {
+        parts.push(strResult.formatted)
+        i += strResult.consumed
+        continue
+      }
+
+      const kw = parseJsonKeyword(rest)
+      if (kw) {
+        parts.push(`<span class="${kw === 'null' ? 'text-rose-600' : 'text-purple-600'}">${kw}</span>`)
+        i += kw.length
+        continue
+      }
+
+      const num = parseJsonNumber(rest)
+      if (num) {
+        parts.push(`<span class="text-amber-600">${num}</span>`)
+        i += num.length
+        continue
+      }
+
+      parts.push(rest[0])
+      i++
+    }
+
+    return parts.join('')
   }
 
   return (

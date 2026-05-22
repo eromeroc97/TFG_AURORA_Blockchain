@@ -366,7 +366,7 @@ export class UsersService {
       },
     });
 
-    if (!tokenOwner || !tokenOwner.isActive) {
+    if (!tokenOwner?.isActive) {
       throw new ForbiddenException('La cuenta no está activa para actualizar contraseña');
     }
 

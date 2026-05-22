@@ -359,7 +359,14 @@ function ChartsRow({
             <PieChart>
               <Pie data={data.successRatio} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={48} paddingAngle={4}>
                 {data.successRatio.map((entry) => {
-                  const cellFill = entry.name === 'Anclajes OK' ? '#14b8a6' : entry.name === 'Fallidos' ? '#f97316' : '#a855f7'
+                  let cellFill: string
+                  if (entry.name === 'Anclajes OK') {
+                    cellFill = '#14b8a6'
+                  } else if (entry.name === 'Fallidos') {
+                    cellFill = '#f97316'
+                  } else {
+                    cellFill = '#a855f7'
+                  }
                   return (
                     <Cell
                       key={entry.name}

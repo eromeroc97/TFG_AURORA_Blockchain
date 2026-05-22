@@ -49,11 +49,14 @@ export default function AuditDashboardPage() {
     }
   }, [events])
 
-  const percentageColorClass = summaryCards.percentage === 0
-    ? 'text-emerald-600'
-    : summaryCards.percentage < 50
-      ? 'text-amber-600'
-      : 'text-rose-600'
+  let percentageColorClass: string
+  if (summaryCards.percentage === 0) {
+    percentageColorClass = 'text-emerald-600'
+  } else if (summaryCards.percentage < 50) {
+    percentageColorClass = 'text-amber-600'
+  } else {
+    percentageColorClass = 'text-rose-600'
+  }
 
   return (
     <div className="min-h-screen p-6">

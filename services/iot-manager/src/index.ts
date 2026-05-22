@@ -826,8 +826,6 @@ export const buildApp = (options: AppOptions = {}) => {
     async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply) => {
       const authContext = (request as AuthenticatedFastifyRequest).authContext;
       const ecosystemId = authContext?.ecosystemId;
-      const publicKey = authContext?.publicKey;
-
       if (!ecosystemId) {
         return reply.code(401).send({
           error: 'UNAUTHENTICATED_REQUEST',

@@ -204,7 +204,9 @@ function tryParseMethod(code: string, cursor: number, len: number): { method: Fi
 
   pos = receiver.cursor
   const ident = readIdentifier(code, pos, len)
-  if (!ident.value || ident.value[0] !== ident.value[0].toUpperCase()) return { method: null, cursor: ident.cursor }
+  if (!ident.value) return { method: null, cursor: ident.cursor }
+  const firstCharUpper = ident.value.charAt(0).toUpperCase()
+  if (!ident.value.startsWith(firstCharUpper)) return { method: null, cursor: ident.cursor }
 
   pos = skipWhitespaceAndComments(code, ident.cursor, len)
   if (code[pos] !== '(') return { method: null, cursor: pos }

@@ -21,12 +21,12 @@ async function bootstrap() {
 
   app.use((request: Request, response: Response, next: NextFunction) => {
     const incomingRequestId = request.headers['x-request-id'];
-    const requestIdFromHeader =
-      typeof incomingRequestId === 'string'
-        ? incomingRequestId
-        : Array.isArray(incomingRequestId)
-          ? incomingRequestId[0]
-          : undefined;
+    let requestIdFromHeader: string | undefined
+    if (typeof incomingRequestId === 'string') {
+      requestIdFromHeader = incomingRequestId
+    } else if (Array.isArray(incomingRequestId)) {
+      requestIdFromHeader = incomingRequestId[0]
+    }
 
     request.requestId = requestIdFromHeader?.trim() || randomUUID();
     response.setHeader('x-request-id', request.requestId);

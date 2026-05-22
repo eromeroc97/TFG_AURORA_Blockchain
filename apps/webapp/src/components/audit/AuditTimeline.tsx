@@ -45,6 +45,59 @@ const transformToAuditEvent = (item: AuditAnchor): AuditEvent => ({
   },
 })
 
+function renderTimelineContent(
+  isLoading: boolean,
+  error: string | null,
+  events: AuditEvent[],
+  fetchEvents: () => void,
+  expandedEventId: string | null,
+  handleToggle: (id: string) => void,
+) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+        <p className="text-sm text-red-700">{error}</p>
+        <button
+          onClick={fetchEvents}
+          className="mt-2 text-sm font-medium text-red-600 hover:text-red-700"
+        >
+          Reintentar
+        </button>
+      </div>
+    )
+  }
+  if (events.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-sm text-slate-500">No hay eventos para los filtros seleccionados</p>
+      </div>
+    )
+  }
+  return (
+    <Virtuoso
+      style={{ height: '600px' }}
+      totalCount={events.length}
+      itemContent={(index) => {
+        const event = events[index]
+        return (
+          <AuditTimelineItem
+            event={event}
+            isExpanded={expandedEventId === event.eventId}
+            onToggle={handleToggle}
+          />
+        )
+      }}
+    />
+  )
+}
+
 export default function AuditTimeline() {
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -226,51 +279,7 @@ export default function AuditTimeline() {
       )}
 
       <div className="p-4">
-        {(() => {
-          if (isLoading) {
-            return (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-              </div>
-            )
-          }
-          if (error) {
-            return (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
-                <p className="text-sm text-red-700">{error}</p>
-                <button
-                  onClick={fetchEvents}
-                  className="mt-2 text-sm font-medium text-red-600 hover:text-red-700"
-                >
-                  Reintentar
-                </button>
-              </div>
-            )
-          }
-          if (events.length === 0) {
-            return (
-              <div className="text-center py-12">
-                <p className="text-sm text-slate-500">No hay eventos para los filtros seleccionados</p>
-              </div>
-            )
-          }
-          return (
-            <Virtuoso
-              style={{ height: '600px' }}
-              totalCount={events.length}
-              itemContent={(index) => {
-                const event = events[index]
-                return (
-                  <AuditTimelineItem
-                    event={event}
-                    isExpanded={expandedEventId === event.eventId}
-                    onToggle={handleToggle}
-                  />
-                )
-              }}
-            />
-          )
-        })()}
+        {renderTimelineContent(isLoading, error, events, fetchEvents, expandedEventId, handleToggle)}
       </div>
     </div>
   )

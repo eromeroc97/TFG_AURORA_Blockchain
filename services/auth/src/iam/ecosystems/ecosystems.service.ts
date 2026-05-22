@@ -686,15 +686,6 @@ export class EcosystemsService {
       select: { email: true },
     });
 
-    const existingAccess = await this.prisma.ecosystemAccess.findUnique({
-      where: {
-        ecosystemId_userId: {
-          ecosystemId,
-          userId: targetUser.id,
-        },
-      },
-    });
-
     const existingPendingNotification = await this.prisma.notification.findFirst({
       where: {
         userId: targetUser.id,

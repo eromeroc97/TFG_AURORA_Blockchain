@@ -241,7 +241,7 @@ export class MongoTelemetryStore implements TelemetryStore {
   async save(input: SaveTelemetryInput): Promise<SaveTelemetryResult> {
     const collection = await this.ensureCollection();
     const telemetryId = new (await import('mongodb')).ObjectId().toString();
-    const result = await collection.insertOne({
+    await collection.insertOne({
       timestamp: input.timestamp,
       metadata: {
         telemetryId,

@@ -36,13 +36,19 @@ export default function AuditEventCard({ event, isExpanded, onToggle }: AuditEve
     return 'Telemetría';
   };
 
-  const cardBackgroundColor = isExpanded
-    ? isDiscrepancy ? 'rgb(255 237 213 / 0.3)' : 'rgb(241 245 249 / 0.5)'
-    : 'transparent';
+  let cardBackgroundColor = 'transparent';
+  if (isExpanded) {
+    cardBackgroundColor = isDiscrepancy
+      ? 'rgb(255 237 213 / 0.3)'
+      : 'rgb(241 245 249 / 0.5)';
+  }
 
-  const cardBorderClass = isExpanded
-    ? isDiscrepancy ? 'border-orange-300' : 'border-slate-300'
-    : 'border-transparent hover:border-slate-200';
+  let cardBorderClass = 'border-transparent hover:border-slate-200';
+  if (isExpanded) {
+    cardBorderClass = isDiscrepancy
+      ? 'border-orange-300'
+      : 'border-slate-300';
+  }
 
   return (
     <div className="relative">
