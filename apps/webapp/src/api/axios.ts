@@ -80,6 +80,28 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
+let isRefreshing = false
+let failedQueue: Array<{
+  config: AxiosRequestConfig
+  resolve: (value: unknown) => void
+  reject: (reason: unknown) => void
+}> = []
+
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach(({ config, resolve, reject }) => {
+    if (error) {
+      reject(error)
+    } else if (token) {
+      config.headers = config.headers ?? {}
+      config.headers.Authorization = `Bearer ${token}`
+      config._retry = true
+      resolve(apiClient.request(config))
+    }
+  })
+
+  failedQueue = []
+}
+
 const refreshAccessToken = async () => {
   const response = await refreshClient.post('/auth/refresh', undefined, {
     skipAuthRefresh: true,
@@ -108,19 +130,32 @@ apiClient.interceptors.response.use(
       !originalConfig._retry &&
       !isAuthRoute(originalConfig.url)
     ) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ config: originalConfig, resolve, reject })
+        })
+      }
+
       originalConfig._retry = true
+      isRefreshing = true
 
       try {
         const nextAccessToken = await refreshAccessToken()
+
+        processQueue(null, nextAccessToken)
 
         originalConfig.headers = originalConfig.headers ?? {}
         originalConfig.headers.Authorization = `Bearer ${nextAccessToken}`
 
         return apiClient.request(originalConfig)
       } catch (refreshError) {
+        processQueue(refreshError, null)
         clearAuthAccessToken()
         unauthorizedHandler?.(error)
+
         return Promise.reject(refreshError)
+      } finally {
+        isRefreshing = false
       }
     }
 

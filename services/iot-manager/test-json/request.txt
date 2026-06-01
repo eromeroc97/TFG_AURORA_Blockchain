@@ -4,7 +4,7 @@ Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -
 Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-9jH-zKejzlqdMsbufRHh9QTLIabbRtETdFiyuADNjo8' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/02-test.json' -UseBasicParsing
 
 
-Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-7-4gRfizDVTz2jRAhjjzoAEITTtxdPNNHfVMgxAYqyg' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/03-test.json' -UseBasicParsing
+Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-mxTi-C53o3hrrX9vvBhD2OqDM8uwfnhBwWCx64arLa0' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/03-test.json' -UseBasicParsing
 
 docker-compose up -d --build webapp
 
