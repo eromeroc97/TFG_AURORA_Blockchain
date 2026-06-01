@@ -1,0 +1,129 @@
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam rectangle {
+  BorderColor #333333
+  FontColor #333333
+}
+skinparam arrow {
+  Color #444444
+  FontColor #333333
+  FontSize 11
+}
+
+title **<size:22>AURORA Smart Home - Arquitectura del Sistema</size>**
+caption TFG - Universidad de Castilla-La Mancha (UCLM)
+
+
+' =========================================================================
+' ACTORES EXTERNOS
+' =========================================================================
+rectangle "Sistemas Externos" <<system>> as Ext #F0F0F0 {
+  actor Usuario as Usr
+  actor "Dispositivo IoT" as IoT
+}
+
+' =========================================================================
+' INFRAESTRUCTURA
+' =========================================================================
+rectangle "Infraestructura" <<system>> as Infra #E8E8E8 {
+  rectangle "Traefik\nAPI Gateway" as Traefik #C0C0C0
+}
+
+' =========================================================================
+' FRONTEND
+' =========================================================================
+rectangle "Frontend" <<system>> as FE #D4E6F1 {
+  rectangle "Webapp\nReact + Vite\n(Caddy)" as Webapp #85C1E9
+}
+
+' =========================================================================
+' BACKEND
+' =========================================================================
+rectangle "Backend" <<system>> as BE #D5F5E3 {
+  node "Auth Service\nNestJS + Prisma" as Auth #82E0AA
+  node "IoT Manager\nFastify" as IoTMgr #82E0AA
+  node "Blockchain Manager\nNestJS" as BCMgr #82E0AA
+  node "Audit Service\nNestJS" as Audit #82E0AA
+}
+
+' =========================================================================
+' ALMACENAMIENTO
+' =========================================================================
+rectangle "Almacenamiento" <<system>> as Data #FCF3CF {
+  database PostgreSQL as PG #F4D03F
+  database MongoDB as MDB #F4D03F
+  database Redis as RDB #F4D03F
+}
+
+' =========================================================================
+' BLOCKCHAIN (sistema independiente)
+' =========================================================================
+rectangle "Blockchain" <<system>> as BC #F5B7B1 {
+  node "Hyperledger\nFireFly" as FF #E74C3C
+  node "Hyperledger Fabric\nred-tfg (2 nodos)" as Fabric #F1948A {
+    rectangle "aurora-telemetry-anchor" as CT #E74C3C
+    rectangle "aurora-actions-anchor" as CA #E74C3C
+  }
+}
+
+' =========================================================================
+' OBSERVABILIDAD
+' =========================================================================
+rectangle "Observabilidad" <<system>> as OBS #E8DAEF {
+  rectangle Seq as Seq #BB8FCE
+  rectangle Mailpit as MP #BB8FCE
+}
+
+
+' =========================================================================
+' FLUJOS PRINCIPALES
+' =========================================================================
+
+Usr --> Traefik : HTTPS (JWT)
+IoT --> Traefik : HTTPS (API Key)
+
+Traefik --> Webapp : /*
+
+Traefik --> Auth : /api/auth/*\n/api/users/*\n/api/ecosystems/*
+Traefik --> IoTMgr : /api/telemetry/*\n/api/iot/*
+Traefik --> BCMgr : /api/blockchain/*
+Traefik --> Audit : /api/audit/*
+
+IoTMgr --> Auth : Internal API\n(validar API key,\nfirmar hash)
+IoTMgr --> MDB : Time Series
+IoTMgr --> RDB : API Key Cache
+Auth --> PG : Prisma ORM
+Auth --> RDB : Sesiones/Blacklist
+Audit --> MDB : Consultas
+
+IoTMgr --> FF : Invocar chaincode
+Auth --> FF : Broadcast anchors
+BCMgr --> FF : Query ledger
+FF --> Fabric : gRPC
+Fabric --> CT : AnchorTelemetry
+Fabric --> CA : AnchorAction
+
+Auth --> Seq : Logs
+IoTMgr --> Seq : Logs
+Auth --> MP : SMTP
+
+
+' =========================================================================
+' LEYENDA
+' =========================================================================
+legend right
+  **Leyenda**
+  |<#F0F0F0> Sistemas Externos
+  |<#E8E8E8> Infraestructura
+  |<#D4E6F1> Frontend
+  |<#D5F5E3> Backend
+  |<#FCF3CF> Almacenamiento
+  |<#F5B7B1> **Blockchain**
+  |<#E8DAEF> Observabilidad
+  ---
+  **Auth:** JWT (web), API Key (IoT)
+end legend
+
+@enduml

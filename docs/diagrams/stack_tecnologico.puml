@@ -1,0 +1,65 @@
+@startmindmap
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
++ **AURORA Smart Home**\n**Stack Tecnologico**
+
+++ **<size:14>Frontend</size>**
++++ React 19 + Vite 8
++++ Tailwind CSS
++++ Caddy 2.8.4 (servidor estatico)
+
+++ **<size:14>Backend</size>**
++++ Auth Service
+++++ NestJS 10 + Node 22
+++++ Prisma ORM + PostgreSQL
+++++ Argon2id (hash contrasenas)
+++++ JWT RS256 (autenticacion)
+++++ AES-256-GCM (cifrado claves)
++++ IoT Manager
+++++ Fastify 5 + Node 20
+++++ Ajv (validacion esquemas)
+++++ Redis (cache API Keys)
++++ Blockchain Manager
+++++ NestJS
+++++ FireFly SDK
++++ Audit Service
+++++ NestJS + MongoDB
+
+++ **<size:14>Almacenamiento</size>**
++++ PostgreSQL 15 - identity_vault
+++++ Usuarios, Identidades, Ecosystems, Devices
++++ MongoDB 7.0 - iot_data
+++++ Time Series: telemetry_events
++++ Redis 7
+++++ Auth: sesiones + token blacklist
+++++ IoT: cache API Keys (cache-aside)
+
+++ **<size:14>Blockchain</size>**
++++ Hyperledger FireFly (orquestador)
++++ Hyperledger Fabric
+++++ 2 nodos, canal mychannel
+++++ Chaincode: aurora-telemetry-anchor (Go)
++++++ AnchorTelemetry, QueryByIngestID, QueryByHash, QueryByEcosystem
+++++ Chaincode: aurora-actions-anchor (Go)
++++++ 18 tipos de accion (ACCOUNT_INIT, ROLE_CHANGE, ...)
+
+++ **<size:14>Infraestructura</size>**
++++ Docker Compose (17 servicios)
++++ Traefik (API Gateway)
++++ Docker Socket Proxy
++++ Cloudflare Tunnel (conexion FireFly)
+
+++ **<size:14>Observabilidad / Dev</size>**
++++ Seq - logs centralizados
++++ Mailpit - SMTP test
++++ Mongo Express - admin MongoDB
++++ Redis Commander - admin Redis
+
+++ **<size:14>Lenguajes</size>**
++++ TypeScript (apps y servicios backend)
++++ Go (chaincodes Fabric)
++++ YAML / Dockerfile (infraestructura)
+
+@endmindmap

@@ -1,0 +1,90 @@
+@startuml
+' Modelo Conceptual de Dominio — AURORA
+' Revisado contra implementación: auth-service (Prisma), iot-manager, audit-service, chaincodes
+
+hide circle
+hide empty members
+
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BorderColor #2E4057
+    BackgroundColor #F0F4F8
+    FontColor #1A1A2E
+}
+skinparam enum {
+    BorderColor #2E4057
+    BackgroundColor #E8EEF5
+    FontColor #1A1A2E
+}
+skinparam defaultTextAlignment center
+
+' ===== Entidades del dominio =====
+
+class Usuario {
+    email
+    estado : EstadoUsuario
+    fechaRegistro
+    fechaUltimoCambioContraseña
+}
+
+enum Rol {
+    USER
+    AUDITOR
+    ADMIN
+    GLOBAL_ADMIN
+}
+
+class Identidad {
+    tipo : TipoIdentidad
+    clavePublica
+}
+
+class EcosistemaIoT {
+    nombre
+    latitud
+    longitud
+    estaEnLinea
+    ultimaConexion
+}
+
+class AccesoEcosistema {
+    rol : RolAcceso
+}
+
+class Dispositivo {
+    nombre
+    categoria : CategoriaDispositivo
+    habitacion
+    direccionMAC
+    fabricante
+}
+
+class Telemetria {
+    timestamp
+    payload
+    hashIntegridad
+    latitud
+    longitud
+    estadoAnclaje : EstadoAnclaje
+}
+
+class AnclajeBlockchain {
+    hashReferencia
+    firmaDigital
+    idTransaccion
+    fechaAnclaje
+}
+
+' ===== Relaciones =====
+
+Usuario "0..1" -- "0..1" Identidad : posee
+EcosistemaIoT "1" -- "1" Identidad : posee
+Usuario "1" -- "1" Rol
+Usuario "1" -- "1..*" EcosistemaIoT : gestiona
+Usuario "1" -- "0..*" AccesoEcosistema : recibe
+EcosistemaIoT "1" -- "0..*" AccesoEcosistema : concede
+EcosistemaIoT "1" -- "0..*" Dispositivo : contiene
+Dispositivo "1" -- "0..*" Telemetria : emite
+Telemetria "0..1" -- "1" AnclajeBlockchain : queda registrada en
+
+@enduml

@@ -1,0 +1,164 @@
+@startuml
+' Diagrama de Casos de Uso — AURORA Smart Home
+' Revisado contra implementación: auth-service, iot-manager, blockchain-manager, audit-service
+
+left to right direction
+
+skinparam backgroundColor #FEFEFE
+skinparam actor {
+    BorderColor #2E4057
+    BackgroundColor #D6E4F0
+    FontColor #1A1A2E
+}
+skinparam usecase {
+    BorderColor #2E4057
+    BackgroundColor #F0F4F8
+    FontColor #1A1A2E
+}
+skinparam arrow {
+    Color #2E4057
+    FontColor #1A1A2E
+}
+skinparam package {
+    BorderColor #2E4057
+    BackgroundColor #F8FAFC
+    FontColor #1A1A2E
+}
+
+title **Casos de Uso - AURORA Smart Home**
+
+' ===== Actores =====
+actor "Usuario no registrado" as UNR
+actor Usuario as U
+actor Auditor as A
+actor Administrador as Adm
+actor "Administrador Global" as GA
+actor Sistema as Sys
+actor "Dispositivo IoT" as IoT
+
+' Generalizaciones de actores
+U --|> UNR
+A --|> U
+Adm --|> U
+GA --|> Adm
+
+' ================================================================
+' Épica 1: Gestión de Identidad y Autenticación
+' ================================================================
+package "Gestión de Identidad y Autenticación" {
+    usecase "Registrarse" as UC01
+    usecase "Iniciar Sesión" as UC02
+    usecase "Cerrar Sesión" as UC03
+    usecase "Recuperar Contraseña" as UC04
+    usecase "Consultar Perfil" as UC05
+
+    UNR --> UC01
+    UNR --> UC04
+    U --> UC02
+    U --> UC03
+    U --> UC05
+
+    UC02 ..> "Validar Contraseña" : <<include>>
+    "Validar Contraseña" -- Sys
+}
+
+' ================================================================
+' Épica 2: Administración de Usuarios y Roles
+' ================================================================
+package "Administración de Usuarios y Roles" {
+    usecase "Aprobar Registros" as UC06
+    usecase "Revocar Cuentas" as UC07
+    usecase "Gestionar Roles" as UC08
+
+    Adm --> UC06
+    Adm --> UC07
+    Adm --> UC08
+}
+
+' ================================================================
+' Épica 3: Gestión de Ecosistemas IoT
+' ================================================================
+package "Gestión de Ecosistemas IoT" {
+    usecase "Crear o Editar Ecosistema" as UC09
+    usecase "Delegar Accesos" as UC10
+    usecase "Gestionar Invitaciones" as UC11
+    usecase "Monitorizar Estado" as UC12
+
+    U --> UC09
+    U --> UC10
+    U --> UC11
+
+    UC09 ..> "Generar Credenciales" : <<include>>
+    "Generar Credenciales" -- Sys
+    UC12 -- Sys
+}
+
+' ================================================================
+' Épica 4: Gestión de Dispositivos
+' ================================================================
+package "Gestión de Dispositivos" {
+    usecase "Descubrir Dispositivos" as UC13
+    usecase "Editar Dispositivos" as UC14
+    usecase "Buscar Dispositivos" as UC15
+
+    UC13 -- Sys
+    U --> UC14
+    U --> UC15
+}
+
+' ================================================================
+' Épica 5: Telemetría y Métricas
+' ================================================================
+package "Telemetría y Métricas" {
+    usecase "Recibir Telemetría" as UC16
+    usecase "Consultar Telemetría" as UC17
+    usecase "Visualizar Métricas" as UC18
+
+    IoT --> UC16
+    U --> UC17
+    U --> UC18
+    A --> UC17
+
+    UC16 ..> "Validar API Key" : <<include>>
+    UC16 ..> "Anclar en Blockchain" : <<include>>
+    "Validar API Key" -- Sys
+}
+
+' ================================================================
+' Épica 6: Auditoría y Trazabilidad (Blockchain)
+' ================================================================
+package "Auditoría y Trazabilidad" {
+    usecase "Anclar Acción Administrativa" as UC19
+    usecase "Verificar Integridad" as UC20
+    usecase "Consultar Línea Temporal" as UC21
+    usecase "Monitorizar Red Blockchain" as UC22
+    usecase "Gestionar Contratos" as UC23
+
+    A --> UC21
+    A --> UC20
+    GA --> UC22
+    GA --> UC23
+
+    UC06 ..> UC19 : <<include>>
+    UC07 ..> UC19 : <<include>>
+    UC08 ..> UC19 : <<include>>
+    UC10 ..> UC19 : <<include>>
+    UC19 -- Sys
+
+    UC20 ..> UC21 : <<extend>>
+}
+
+' ================================================================
+' Épica 7: Comunicaciones y Notificaciones
+' ================================================================
+package "Comunicaciones y Notificaciones" {
+    usecase "Enviar Notificaciones Automáticas" as UC24
+    usecase "Enviar Comunicados" as UC25
+    usecase "Enviar Correos Transaccionales" as UC26
+
+    UC24 -- Sys
+    Adm --> UC25
+    UC26 -- Sys
+}
+
+@enduml
