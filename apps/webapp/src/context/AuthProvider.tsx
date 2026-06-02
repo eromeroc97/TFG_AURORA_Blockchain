@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { apiClient } from '../api/axios'
+import { refreshClient } from '../api/axios'
 import {
   clearAuthAccessToken,
   getAuthSession,
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const bootstrapSession = async () => {
       try {
-        const response = await apiClient.post('/auth/refresh', undefined, {
+        const response = await refreshClient.post('/auth/refresh', undefined, {
           skipAuthRefresh: true,
         })
 

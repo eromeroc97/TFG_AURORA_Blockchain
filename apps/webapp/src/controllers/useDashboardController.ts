@@ -2,12 +2,18 @@ import { useEffect, useState } from 'react'
 import { getMapEcosystems } from '../services/dashboard.service'
 import type { AccessMapEcosystem } from '../services/ecosystems.service'
 
-export function useDashboardController() {
+export function useDashboardController(enabled = true) {
   const [ecosystems, setEcosystems] = useState<AccessMapEcosystem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const loadEcosystems = async () => {
+    if (!enabled) {
+      setEcosystems([])
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -24,7 +30,7 @@ export function useDashboardController() {
 
   useEffect(() => {
     void loadEcosystems()
-  }, [])
+  }, [enabled])
 
   return {
     ecosystems,

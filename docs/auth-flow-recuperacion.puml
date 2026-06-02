@@ -1,0 +1,26 @@
+@startuml
+skinparam ParticipantPadding 15
+skinparam BoxPadding 5
+
+actor Cliente as C
+participant API as API
+participant Argon2 as A2
+database DB as DB
+participant Email as ML
+participant HIBP as HIBP
+
+C -> API: POST /auth/recover { email }
+API -> DB: FIND user by email
+API -> A2: argon2.hash(rawToken)
+API -> DB: CREATE passwordResetToken
+API -> ML: sendRecoverEmail(link)
+API --> C: 200 "Si la cuenta existe..."
+
+C -> API: POST /auth/reset { token, password }
+API -> A2: argon2.verify(tokenHash, rawToken)
+API -> HIBP: GET /range/{sha1prefix} (k-anonymity)
+API -> A2: argon2.hash(newPassword)
+API -> DB: UPDATE user { passwordHash, status: ACTIVE }
+API --> C: 200 "Contraseña actualizada"
+
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+skinparam ParticipantPadding 15
+skinparam BoxPadding 5
+
+actor Cliente as C
+participant API as API
+database DB as DB
+participant Email as ML
+participant Blockchain as BC
+
+C -> API: DELETE /users/:id
+API -> DB: UPDATE user → REVOKED
+API -> BC: anchor(ACCOUNT_REVOKE)
+API -> ML: sendAccountDeletedEmail
+API --> C: 200 { id, email, role, status }
+
+@enduml

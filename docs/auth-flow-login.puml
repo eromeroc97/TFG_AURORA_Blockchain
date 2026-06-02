@@ -1,0 +1,21 @@
+@startuml
+skinparam ParticipantPadding 15
+skinparam BoxPadding 5
+
+actor Cliente as C
+participant API as API
+participant Argon2 as A2
+database DB as DB
+participant Blockchain as BC
+
+C -> API: POST /auth/login { email, password }
+API -> DB: FIND user by email
+API -> A2: argon2.verify(hash, password)
+API -> API: sign JWT RS256 (access + refresh)
+API -> A2: argon2.hash(refreshToken)
+API -> DB: SAVE hashedRefreshToken
+API -> BC: anchor(AUTH_LOGIN)
+API -> API: setHttpOnlyCookie(refreshToken)
+API --> C: 200 { accessToken, expiresIn }
+
+@enduml

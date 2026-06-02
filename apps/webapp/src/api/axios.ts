@@ -44,7 +44,7 @@ export const apiClient = axios.create({
  * Cliente separado para refresh de tokens.
  * No usa interceptores para evitar ciclos infinitos.
  */
-const refreshClient = axios.create({
+export const refreshClient = axios.create({
   baseURL: authApiBasePath,
   withCredentials: true,
 })

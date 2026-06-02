@@ -24,14 +24,14 @@ import { useUsersController } from '../controllers/useUsersController'
 import { useServiceHealthController } from '../controllers/useServiceHealthController'
 
 export default function MainDashboard() {
-  const { authClaims } = useAuth()
+  const { authClaims, isAuthenticated } = useAuth()
   const role = (authClaims?.role ?? 'USER').toUpperCase()
   const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
   const canViewUserCount = role !== 'USER'
 
-  const { ecosystems, isLoading: isMapLoading, error: mapError } = useDashboardController()
+  const { ecosystems, isLoading: isMapLoading, error: mapError } = useDashboardController(isAuthenticated)
   const { data, error: telemetryError, range, changeRange } = useTelemetryController()
-  const { users } = useUsersController(canViewUserCount)
+  const { users } = useUsersController(canViewUserCount && isAuthenticated)
   const { services } = useServiceHealthController()
 
   const ranges: TelemetryRange[] = ['30m', '1h', '12h', '24h', '1w', '1M', '1y']

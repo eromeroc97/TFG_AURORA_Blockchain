@@ -1,0 +1,30 @@
+@startuml
+skinparam ParticipantPadding 15
+skinparam BoxPadding 5
+
+actor Cliente as C
+participant API as API
+participant Argon2 as A2
+database DB as DB
+participant Email as ML
+participant Blockchain as BC
+
+C -> API: POST /users { email }
+API -> A2: argon2.hash(password)
+API -> DB: CREATE user (status: PENDING)
+API -> BC: anchor(ACCOUNT_INIT)
+API -> ML: sendWelcomeEmail(email)
+API --> C: 201 { id, email, role }
+
+note right #FFE0E0: Admin aprueba
+C -> API: POST /users/:id/approve
+API -> DB: CREATE identity (Ed25519 keypair)
+API -> BC: anchor(IDENTITY_CREATED, publicKey)
+API -> DB: UPDATE user → ACTIVE
+API -> A2: argon2.hash(resetToken)
+API -> DB: CREATE passwordResetToken
+API -> BC: anchor(ACCOUNT_APPROVE)
+API -> ML: sendVerifyEmail(link)
+API --> C: 200 OK
+
+@enduml
