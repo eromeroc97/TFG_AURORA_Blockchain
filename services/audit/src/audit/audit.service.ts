@@ -52,14 +52,6 @@ export class AuditService {
       if (filters.limit) params.limit = filters.limit;
       if (filters.offset) params.skip = filters.offset;
       
-      if (filters.eventType) {
-        if (filters.eventType === 'TELEMETRY') {
-          params.filter = 'name=~Telemetry';
-        } else if (filters.eventType === 'ADMINISTRATIVE') {
-          params.filter = 'name=~';
-        }
-      }
-
       const fireflyResponse = await this.fireflyService.getEvents(params);
 
       const events: FireFlyEvent[] = Array.isArray(fireflyResponse) 
@@ -84,10 +76,12 @@ export class AuditService {
         const eventName = event.name || 'Evento Blockchain';
         
         let eventType: 'TELEMETRY' | 'ADMINISTRATIVE' | 'FIREFLY' = 'ADMINISTRATIVE';
-        if (eventName.toLowerCase().includes('telemetry') || eventName.toLowerCase().includes('anchor')) {
-          eventType = 'TELEMETRY';
-        } else if (eventName.toLowerCase().includes('batchpin') || eventName.toLowerCase().includes('batch_pin')) {
+        if (/batch[-_]?pin/i.test(eventName)) {
           eventType = 'FIREFLY';
+        } else if (eventName === 'TelemetryAnchored') {
+          eventType = 'TELEMETRY';
+        } else if (eventName === 'ActionAnchored') {
+          eventType = 'ADMINISTRATIVE';
         }
 
         const formatTimestamp = (ts: string | number | undefined): string => {
@@ -101,18 +95,30 @@ export class AuditService {
 
         const telemetryHash = output.telemetryHash?.toString() || output.hash?.toString() || '';
         const signature = output.signature?.toString() || '';
-        const publicKey = output.publicKey?.toString() || '';
+        const publicKey = output.publicKey?.toString() || output.public_key?.toString() || '';
 
-        let signatureValid = false;
+        let signatureValid: boolean | undefined = undefined;
         let integrityStatus: 'VERIFIED' | 'DISCREPANCY' = 'VERIFIED';
         let dbRecord: Record<string, unknown> | null = null;
 
-        if (eventType === 'TELEMETRY' && telemetryHash && signature && publicKey) {
-          signatureValid = this.verifyEd25519Signature(telemetryHash, signature, publicKey);
+        if (signature && publicKey) {
+          if (eventType === 'TELEMETRY' && telemetryHash) {
+            signatureValid = this.verifyEd25519Signature(telemetryHash, signature, publicKey);
+          } else if (eventType === 'ADMINISTRATIVE') {
+            const canonicalPayload = JSON.stringify({
+              action_id: output.action_id?.toString() || '',
+              action_type: output.action_type?.toString() || '',
+              actor_id: output.actor_id?.toString() || '',
+              nonce: output.nonce?.toString() || '',
+              target_id: output.target_id?.toString() || '',
+            });
+            const sha256Hash = crypto.createHash('sha256').update(canonicalPayload, 'utf8').digest('hex');
+            signatureValid = this.verifyEd25519Signature(sha256Hash, signature, publicKey);
+          }
 
-          if (!signatureValid) {
+          if (signatureValid === false) {
             integrityStatus = 'DISCREPANCY';
-          } else {
+          } else if (signatureValid === true && eventType === 'TELEMETRY') {
             const ingestId = output.ingestId?.toString() || event.id;
             if (ingestId) {
               const telemetryDoc = await this.telemetryService.findByIngestId(ingestId);
@@ -151,9 +157,15 @@ export class AuditService {
       }));
 
       let filteredTimeline = timeline;
-      
+
+      if (filters.eventName) {
+        filteredTimeline = filteredTimeline.filter(
+          (item) => item.action === filters.eventName
+        );
+      }
+
       if (filters.startDate || filters.endDate) {
-        filteredTimeline = timeline.filter((item) => {
+        filteredTimeline = filteredTimeline.filter((item) => {
           const eventTime = new Date(item.timestamp);
           if (filters.startDate && eventTime < new Date(filters.startDate)) return false;
           if (filters.endDate && eventTime > new Date(filters.endDate)) return false;

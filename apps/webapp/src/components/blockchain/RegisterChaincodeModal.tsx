@@ -33,7 +33,7 @@ export default function RegisterChaincodeModal({
       if (isUpgrade && initialContract) {
         setApiName(initialContract.name)
         setChannel(initialContract.channel)
-        setChaincodeName(initialContract.name)
+        setChaincodeName(initialContract.chaincodeName)
         setFfiJson('')
         setEventName('')
         setTopic('')
@@ -65,9 +65,9 @@ export default function RegisterChaincodeModal({
         apiName: apiName.trim(),
         channel: channel.trim(),
         chaincodeName: chaincodeName.trim(),
-        ffiJson: ffiJson.trim(),
-        eventName: eventName.trim() || undefined,
-        topic: topic.trim() || undefined,
+        ...(ffiJson.trim() ? { ffiJson: ffiJson.trim() } : {}),
+        eventName: eventName.trim(),
+        topic: topic.trim(),
       })
       setSuccess(true)
       onSuccess?.()
@@ -83,8 +83,9 @@ export default function RegisterChaincodeModal({
 
   const isFormValid = (() => {
     if (!apiName.trim() || !channel.trim() || !chaincodeName.trim()) return false
-    if (!ffiJson.trim()) return false
-    if (isUpgrade) return true
+    if (!eventName.trim()) return false
+    if (!topic.trim()) return false
+    if (!isUpgrade && !ffiJson.trim()) return false
     return true
   })()
 
@@ -121,7 +122,7 @@ export default function RegisterChaincodeModal({
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Nombre de la API Lógica
+              Nombre de la API Lógica <span className="text-rose-500">*</span>
             </label>
             {isUpgrade ? (
               <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
@@ -141,42 +142,28 @@ export default function RegisterChaincodeModal({
 
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Nombre del Canal de Fabric
+              Nombre del Canal de Fabric <span className="text-rose-500">*</span>
             </label>
-            {isUpgrade ? (
-              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-                <Lock className="size-4" />
-                {channel}
-              </div>
-            ) : (
-              <input
-                type="text"
-                value={channel}
-                onChange={(e) => setChannel(e.target.value)}
-                placeholder="ej. firefly"
-                className="w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
-              />
-            )}
+            <input
+              type="text"
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              placeholder="ej. firefly"
+              className="w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700">
-              Nombre del Chaincode Físico
+              Nombre del Chaincode Físico <span className="text-rose-500">*</span>
             </label>
-            {isUpgrade ? (
-              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-                <Lock className="size-4" />
-                {chaincodeName}
-              </div>
-            ) : (
-              <input
-                type="text"
-                value={chaincodeName}
-                onChange={(e) => setChaincodeName(e.target.value)}
-                placeholder="ej. aurora-telemetry-anchor"
-                className="w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
-              />
-            )}
+            <input
+              type="text"
+              value={chaincodeName}
+              onChange={(e) => setChaincodeName(e.target.value)}
+              placeholder="ej. aurora-telemetry-anchor"
+              className="w-full rounded-xl border border-border px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-accent"
+            />
           </div>
 
           {isUpgrade && (
@@ -187,9 +174,9 @@ export default function RegisterChaincodeModal({
             </div>
           )}
 
-          <div>
+            <div>
             <label className="block text-sm font-medium text-slate-700">
-              Nombre del Evento <span className="text-slate-400 font-normal">(opcional)</span>
+              Nombre del Evento <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -203,9 +190,9 @@ export default function RegisterChaincodeModal({
             </p>
           </div>
 
-          <div>
+            <div>
             <label className="block text-sm font-medium text-slate-700">
-              Topic <span className="text-slate-400 font-normal">(opcional)</span>
+              Topic <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"

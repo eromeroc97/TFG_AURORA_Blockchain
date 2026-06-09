@@ -9,7 +9,7 @@ import { useAuth } from '../context/auth-context'
 export default function Recover() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAuthenticated, isHydrating } = useAuth()
+  const { isAuthenticated, isHydrating, authClaims } = useAuth()
   const [email, setEmail] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -17,9 +17,10 @@ export default function Recover() {
 
   useEffect(() => {
     if (!isHydrating && isAuthenticated) {
-      navigate('/dashboard', { replace: true })
+      const role = (authClaims?.role ?? '').toUpperCase()
+      navigate(role === 'AUDITOR' ? '/audit' : '/dashboard', { replace: true })
     }
-  }, [isAuthenticated, isHydrating, navigate])
+  }, [isAuthenticated, isHydrating, navigate, authClaims])
 
   useEffect(() => {
     const state = location.state as

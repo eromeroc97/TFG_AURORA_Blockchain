@@ -77,20 +77,20 @@ describe('AuditService', () => {
       expect(result.timeline).toEqual([]);
     });
 
-    it('should filter by event type TELEMETRY', async () => {
+    it('should filter by event name TelemetryAnchored', async () => {
       fireflyService.getEvents.mockResolvedValue({
         items: [
-          { id: '1', name: 'TelemetryEvent', timestamp: '2025-01-01', output: { telemetryHash: 'hash1', signature: 'sig1', publicKey: 'pub1' } },
-          { id: '2', name: 'BatchPinEvent', timestamp: '2025-01-02', output: {} },
+          { id: '1', name: 'TelemetryAnchored', timestamp: '2025-01-01', output: { telemetryHash: 'hash1', signature: 'sig1', publicKey: 'pub1' } },
+          { id: '2', name: 'batch_pin', timestamp: '2025-01-02', output: {} },
         ],
       });
       telemetryService.findByIngestId.mockResolvedValue(null);
 
-      const result = await service.getTimeline({ eventType: 'TELEMETRY', limit: 50, offset: 0 });
+      const result = await service.getTimeline({ eventName: 'TelemetryAnchored', limit: 50, offset: 0 });
 
-      expect(fireflyService.getEvents).toHaveBeenCalledWith(
-        expect.objectContaining({ filter: 'name=~Telemetry' })
-      );
+      expect(result.timeline).toHaveLength(1);
+      expect(result.timeline[0].action).toBe('TelemetryAnchored');
+      expect(result.timeline[0].type).toBe('TELEMETRY');
     });
 
     it('should filter by ecosystem ID', async () => {
@@ -290,18 +290,19 @@ describe('AuditService', () => {
       expect(result.timeline[0].timestamp).toBeDefined();
     });
 
-    it('should filter by event type ADMINISTRATIVE', async () => {
+    it('should filter by event name ActionAnchored', async () => {
       fireflyService.getEvents.mockResolvedValue({
         items: [
-          { id: '1', name: 'SomeEvent', timestamp: '2025-01-01', output: {} },
+          { id: '1', name: 'ActionAnchored', timestamp: '2025-01-01', output: { action_type: 'add_role' } },
+          { id: '2', name: 'TelemetryAnchored', timestamp: '2025-01-02', output: {} },
         ],
       });
 
-      const result = await service.getTimeline({ eventType: 'ADMINISTRATIVE', limit: 50, offset: 0 });
+      const result = await service.getTimeline({ eventName: 'ActionAnchored', limit: 50, offset: 0 });
 
-      expect(fireflyService.getEvents).toHaveBeenCalledWith(
-        expect.objectContaining({ filter: 'name=~' })
-      );
+      expect(result.timeline).toHaveLength(1);
+      expect(result.timeline[0].action).toBe('ActionAnchored');
+      expect(result.timeline[0].type).toBe('ADMINISTRATIVE');
     });
 
     it('should handle events as array directly', async () => {
@@ -441,16 +442,16 @@ describe('AuditService', () => {
       expect(result.timeline[0].eventId).toBe('2');
     });
 
-    it('should filter by eventType and ecosystemId together', async () => {
+    it('should filter by eventName and ecosystemId together', async () => {
       fireflyService.getEvents.mockResolvedValue({
         items: [
-          { id: '1', name: 'TelemetryEvent', timestamp: '2025-01-01', output: { ecosystemId: 'eco-1' } },
-          { id: '2', name: 'TelemetryEvent', timestamp: '2025-01-02', output: { ecosystemId: 'eco-2' } },
+          { id: '1', name: 'TelemetryAnchored', timestamp: '2025-01-01', output: { ecosystemId: 'eco-1' } },
+          { id: '2', name: 'TelemetryAnchored', timestamp: '2025-01-02', output: { ecosystemId: 'eco-2' } },
         ],
       });
       telemetryService.findByIngestId.mockResolvedValue(null);
 
-      const result = await service.getTimeline({ eventType: 'TELEMETRY', ecosystemId: 'eco-1', limit: 50, offset: 0 });
+      const result = await service.getTimeline({ eventName: 'TelemetryAnchored', ecosystemId: 'eco-1', limit: 50, offset: 0 });
 
       expect(result.timeline).toHaveLength(1);
       expect(result.timeline[0].ecosystemId).toBe('eco-1');

@@ -11,11 +11,12 @@ import type { AuditEvent } from './types';
 
 interface AuditEventCardProps {
   event: AuditEvent;
+  userRole?: string;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
-export default function AuditEventCard({ event, isExpanded, onToggle }: AuditEventCardProps) {
+export default function AuditEventCard({ event, userRole, isExpanded, onToggle }: AuditEventCardProps) {
   const isVerified = event.integrityStatus === 'VERIFIED';
   const isDiscrepancy = event.integrityStatus === 'DISCREPANCY';
 
@@ -117,6 +118,7 @@ export default function AuditEventCard({ event, isExpanded, onToggle }: AuditEve
         <div className="ml-14">
           <EventDetailPanel 
             event={event} 
+            userRole={userRole}
             onClose={onToggle} 
           />
         </div>

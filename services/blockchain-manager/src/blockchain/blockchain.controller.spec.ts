@@ -381,48 +381,46 @@ describe('BlockchainController', () => {
       expect(result.ffiId).toBe('ffi-123');
     });
 
-    it('should register chaincode without listener when eventName is not provided', async () => {
-      const dtoWithoutEvent = {
+    it('should register only listener when no ffiJson provided (upgrade mode)', async () => {
+      const dtoUpgrade = {
         apiName: 'my-api',
         channel: 'my-channel',
         chaincodeName: 'my-chaincode',
-        ffiJson: JSON.stringify({ name: 'TestFFI', namespace: 'default' }),
+        eventName: 'TelemetryAnchored',
+        topic: 'auditoria-iot',
       };
       const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
-      mockFireflyService.registerContractInterface.mockResolvedValue({ id: 'ffi-456' });
-      mockFireflyService.registerApi.mockResolvedValue({ id: 'api-456' });
+      mockFireflyService.getContractListenersByLocation.mockResolvedValue([]);
+      mockFireflyService.registerEventListener.mockResolvedValue({ id: 'listener-456' });
 
-      const result = await controller.registerChaincode(dtoWithoutEvent, mockRequest as any);
+      const result = await controller.registerChaincode(dtoUpgrade, mockRequest as any);
 
-      expect(mockFireflyService.registerContractInterface).toHaveBeenCalled();
-      expect(mockFireflyService.registerApi).toHaveBeenCalled();
-      expect(mockFireflyService.registerEventListener).not.toHaveBeenCalled();
+      expect(mockFireflyService.registerContractInterface).not.toHaveBeenCalled();
+      expect(mockFireflyService.registerApi).not.toHaveBeenCalled();
+      expect(mockFireflyService.registerEventListener).toHaveBeenCalled();
       expect(result.success).toBe(true);
     });
 
-    it('should use default topic when eventName is provided but topic is not', async () => {
-      const dtoWithEventOnly = {
+    it('should remove existing listeners before creating the new one', async () => {
+      const dtoUpgrade = {
         apiName: 'my-api',
         channel: 'my-channel',
         chaincodeName: 'my-chaincode',
-        ffiJson: JSON.stringify({ name: 'TestFFI', namespace: 'default' }),
-        eventName: 'ActionAnchored',
+        eventName: 'TelemetryAnchored',
+        topic: 'auditoria-iot',
       };
       const mockRequest = { user: { role: 'GLOBAL_ADMIN' } };
-      mockFireflyService.registerContractInterface.mockResolvedValue({ id: 'ffi-789' });
-      mockFireflyService.registerApi.mockResolvedValue({ id: 'api-789' });
-      mockFireflyService.registerEventListener.mockResolvedValue({ id: 'listener-789' });
+      mockFireflyService.getContractListenersByLocation.mockResolvedValue([
+        { id: 'listener-old-1', name: 'old-listener' },
+      ]);
+      mockFireflyService.deleteContractListener.mockResolvedValue(undefined);
+      mockFireflyService.registerEventListener.mockResolvedValue({ id: 'listener-new' });
 
-      await controller.registerChaincode(dtoWithEventOnly, mockRequest as any);
+      const result = await controller.registerChaincode(dtoUpgrade, mockRequest as any);
 
-      expect(mockFireflyService.registerEventListener).toHaveBeenCalledWith(
-        'default',
-        expect.objectContaining({
-          name: expect.stringContaining('listener-my-api-'),
-          topic: 'default',
-          event: expect.objectContaining({ name: 'ActionAnchored' }),
-        })
-      );
+      expect(mockFireflyService.deleteContractListener).toHaveBeenCalledWith('default', 'listener-old-1');
+      expect(mockFireflyService.registerEventListener).toHaveBeenCalled();
+      expect(result.success).toBe(true);
     });
 
     it('should throw error for invalid JSON in ffiJson', async () => {

@@ -14,14 +14,14 @@ export class RegisterChaincodeDto {
   chaincodeName: string;
 
   @IsString()
+  @IsOptional()
+  ffiJson?: string;
+
+  @IsString()
   @IsNotEmpty()
-  ffiJson: string;
+  eventName: string;
 
   @IsString()
-  @IsOptional()
-  eventName?: string;
-
-  @IsString()
-  @IsOptional()
-  topic?: string;
+  @IsNotEmpty()
+  topic: string;
 }

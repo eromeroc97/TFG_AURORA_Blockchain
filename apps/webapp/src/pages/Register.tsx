@@ -8,7 +8,7 @@ import { useAuth } from '../context/auth-context'
 
 export default function Register() {
   const navigate = useNavigate()
-  const { isAuthenticated, isHydrating } = useAuth()
+  const { isAuthenticated, isHydrating, authClaims } = useAuth()
   const [email, setEmail] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -16,9 +16,10 @@ export default function Register() {
 
   useEffect(() => {
     if (!isHydrating && isAuthenticated) {
-      navigate('/dashboard', { replace: true })
+      const role = (authClaims?.role ?? '').toUpperCase()
+      navigate(role === 'AUDITOR' ? '/audit' : '/dashboard', { replace: true })
     }
-  }, [isAuthenticated, isHydrating, navigate])
+  }, [isAuthenticated, isHydrating, navigate, authClaims])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

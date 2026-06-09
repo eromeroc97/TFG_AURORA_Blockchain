@@ -5,6 +5,7 @@ export interface SmartContract {
   name: string
   version: string
   channel: string
+  chaincodeName: string
   status: 'deploying' | 'active' | 'failed'
   createdAt: string
 }
@@ -92,11 +93,14 @@ function normalizeSmartContract(item: any): SmartContract {
     ? item.status
     : 'active'
 
+  const location = item?.location || {}
+
   return {
     id: String(item?.id ?? item?.name ?? ''),
     name: String(item?.name ?? item?.interface?.name ?? 'Desconocido'),
     version: String(item?.version ?? item?.interface?.version ?? '-'),
-    channel: String(item?.channel ?? item?.namespace ?? 'default'),
+    channel: String(location?.channel ?? item?.channel ?? item?.namespace ?? 'default'),
+    chaincodeName: String(location?.chaincode ?? item?.chaincodeName ?? item?.name ?? ''),
     status: normalizedStatus as SmartContract['status'],
     createdAt: String(item?.createdAt ?? item?.created ?? new Date().toISOString()),
   }
@@ -229,9 +233,9 @@ export interface RegisterChaincodeRequest {
   apiName: string
   channel: string
   chaincodeName: string
-  ffiJson: string
-  eventName?: string
-  topic?: string
+  ffiJson?: string
+  eventName: string
+  topic: string
 }
 
 export interface RegisterChaincodeResponse {

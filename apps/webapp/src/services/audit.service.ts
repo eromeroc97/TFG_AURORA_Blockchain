@@ -63,7 +63,7 @@ export interface AuditFilters {
   ecosystemId?: string
   startDate?: string
   endDate?: string
-  eventType?: 'TELEMETRY' | 'ADMIN'
+  eventName?: string
   limit?: number
   offset?: number
 }
@@ -75,7 +75,7 @@ export async function getAuditTimeline(filters: AuditFilters): Promise<AuditTime
         ecosystemId: filters.ecosystemId,
         startDate: filters.startDate,
         endDate: filters.endDate,
-        eventType: filters.eventType,
+        eventName: filters.eventName,
         limit: filters.limit || 50,
         offset: filters.offset || 0,
       },

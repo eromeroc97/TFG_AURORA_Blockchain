@@ -15,33 +15,19 @@ import { useAuth } from '../context/auth-context'
  */
 export default function Login() {
   const navigate = useNavigate()
-  const { isAuthenticated, isHydrating, setSession } = useAuth()
+  const { isAuthenticated, isHydrating, authClaims, setSession } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const getRoleFromToken = (token: string): string => {
-    try {
-      const [, payload] = token.split('.')
-      if (!payload) return ''
-      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-      const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4)
-      const parsed = JSON.parse(atob(padded))
-      return (parsed.role || '').toUpperCase()
-    } catch {
-      return ''
-    }
-  }
-
   useEffect(() => {
-    if (!isHydrating && isAuthenticated) {
-      const token = localStorage.getItem('aurora_token') || ''
-      const role = getRoleFromToken(token)
+    if (!isHydrating && isAuthenticated && authClaims) {
+      const role = (authClaims.role || '').toUpperCase()
       const redirectTo = role === 'AUDITOR' ? '/audit' : '/dashboard'
       navigate(redirectTo, { replace: true })
     }
-  }, [isAuthenticated, isHydrating, navigate])
+  }, [isAuthenticated, isHydrating, navigate, authClaims])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -50,8 +36,10 @@ export default function Login() {
 
     try {
       const response = await apiClient.post('/auth/login', { email, password })
-      setSession(response.data.accessToken)
-      const role = (localStorage.getItem('aurora_role') || '').toUpperCase()
+      const token = response.data.accessToken
+      setSession(token)
+      const parsed = JSON.parse(atob(token.split('.')[1]))
+      const role = (parsed.role || '').toUpperCase()
       const redirectTo = role === 'AUDITOR' ? '/audit' : '/dashboard'
       navigate(redirectTo, { replace: true })
     } catch (error) {

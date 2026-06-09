@@ -14,6 +14,7 @@ import Reset from './pages/Reset'
 import RequireAuth from './components/routes/RequireAuth'
 import RequireAdmin from './components/routes/RequireAdmin'
 import RequireAuditor from './components/routes/RequireAuditor'
+import RequireNonAuditor from './components/routes/RequireNonAuditor'
 import UsersManagementPage from './pages/UsersManagementPage'
 import MainLayout from './layouts/MainLayout'
 
@@ -47,7 +48,9 @@ function App() {
           <Route path="/error" element={<ErrorPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
-              <Route path="/dashboard" element={<MainDashboard />} />
+              <Route element={<RequireNonAuditor />}>
+                <Route path="/dashboard" element={<MainDashboard />} />
+              </Route>
               <Route element={<RequireAuditor />}>
                 <Route path="/audit" element={<AuditDashboardPage />} />
               </Route>

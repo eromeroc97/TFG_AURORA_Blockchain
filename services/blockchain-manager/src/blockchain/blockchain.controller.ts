@@ -183,39 +183,52 @@ export class BlockchainController {
     }
 
     const namespace = 'default';
-    let ffiId: string;
+    let ffiId: string | undefined;
 
-    const parsedFfi = JSON.parse(dto.ffiJson);
+    if (dto.ffiJson) {
+      const parsedFfi = JSON.parse(dto.ffiJson);
 
-    const ffiResponse = await this.fireflyService.registerContractInterface(namespace, parsedFfi);
-    ffiId = ffiResponse.id;
+      const ffiResponse = await this.fireflyService.registerContractInterface(namespace, parsedFfi);
+      ffiId = ffiResponse.id;
 
-    await this.fireflyService.registerApi(namespace, {
-      name: dto.apiName,
-      interface: { id: ffiId },
-      location: {
-        channel: dto.channel,
-        chaincode: dto.chaincodeName,
-      },
-    });
-
-    if (dto.eventName) {
-      await this.fireflyService.registerEventListener(namespace, {
-        name: `listener-${dto.apiName}-${Date.now()}`,
-        topic: dto.topic ?? 'default',
+      await this.fireflyService.registerApi(namespace, {
+        name: dto.apiName,
+        interface: { id: ffiId },
         location: {
           channel: dto.channel,
           chaincode: dto.chaincodeName,
         },
-        event: {
-          name: dto.eventName,
-        },
       });
     }
 
+    // Remove existing listeners for this chaincode location, then create the new one
+    const existingListeners = await this.fireflyService.getContractListenersByLocation(namespace, {
+      channel: dto.channel,
+      chaincode: dto.chaincodeName,
+    });
+    for (const listener of existingListeners) {
+      try {
+        await this.fireflyService.deleteContractListener(namespace, listener.id);
+      } catch {
+        // Listener may already be gone; continue
+      }
+    }
+
+    await this.fireflyService.registerEventListener(namespace, {
+      name: `listener-${dto.apiName}-${Date.now()}`,
+      topic: dto.topic,
+      location: {
+        channel: dto.channel,
+        chaincode: dto.chaincodeName,
+      },
+      event: {
+        name: dto.eventName,
+      },
+    });
+
     return {
       success: true,
-      message: 'Chaincode registrado correctamente',
+      message: dto.ffiJson ? 'Chaincode registrado correctamente' : 'Listener actualizado correctamente',
       ffiId,
     };
   }

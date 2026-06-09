@@ -5,9 +5,13 @@ import { useAuth } from '../context/auth-context'
 
 export default function ErrorPage() {
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, authClaims } = useAuth()
+  const role = (authClaims?.role ?? '').toUpperCase()
 
-  const fallbackPath = useMemo(() => (isAuthenticated ? '/dashboard' : '/login'), [isAuthenticated])
+  const fallbackPath = useMemo(
+    () => (isAuthenticated ? (role === 'AUDITOR' ? '/audit' : '/dashboard') : '/login'),
+    [isAuthenticated, role],
+  )
 
   const handleBack = () => {
     if (window.history.length > 1) {

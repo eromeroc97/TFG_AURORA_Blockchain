@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import { Filter, X, Calendar, ChevronDown } from 'lucide-react'
 import { getAuditTimeline, type AuditFilters, type AuditAnchor } from '../../services/audit.service'
+import { useAuth } from '../../context/auth-context'
 import AuditEventCard from './AuditEventCard'
 import type { AuditEvent } from './types'
 
@@ -28,6 +29,7 @@ const transformToAuditEvent = (item: AuditAnchor): AuditEvent => ({
 })
 
 export default function AuditTimeline() {
+  const { authClaims } = useAuth()
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -35,13 +37,18 @@ export default function AuditTimeline() {
   const [filters, setFilters] = useState<AuditFilters>({
     startDate: '',
     endDate: '',
-    eventType: undefined,
+    eventName: undefined,
     limit: 50,
     offset: 0,
   })
   
   const [showFilters, setShowFilters] = useState(false)
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
+
+  const availableEventNames = useMemo(() => {
+    const names = new Set(events.map((e) => e.action))
+    return Array.from(names).sort()
+  }, [events])
 
   const fetchEvents = useCallback(async () => {
     setIsLoading(true)
@@ -79,7 +86,7 @@ export default function AuditTimeline() {
     setFilters({
       startDate: '',
       endDate: '',
-      eventType: undefined,
+      eventName: undefined,
       limit: 50,
       offset: 0,
     })
@@ -89,7 +96,7 @@ export default function AuditTimeline() {
     let count = 0
     if (filters.startDate) count++
     if (filters.endDate) count++
-    if (filters.eventType) count++
+    if (filters.eventName) count++
     return count
   }, [filters])
 
@@ -171,14 +178,14 @@ export default function AuditTimeline() {
               </label>
               <div className="relative">
                 <select
-                  value={filters.eventType || 'ALL'}
-                  onChange={(e) => handleFilterChange('eventType', e.target.value === 'ALL' ? '' : e.target.value)}
+                  value={filters.eventName || 'ALL'}
+                  onChange={(e) => handleFilterChange('eventName', e.target.value === 'ALL' ? '' : e.target.value)}
                   className="w-full rounded-xl border border-border px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent appearance-none bg-white"
                 >
                   <option value="ALL">Todos</option>
-                  <option value="TELEMETRY">Telemetría</option>
-                  <option value="ADMINISTRATIVE">Administrativo</option>
-                  <option value="FIREFLY">FireFly</option>
+                  {availableEventNames.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
               </div>
@@ -233,6 +240,7 @@ export default function AuditTimeline() {
                 <AuditEventCard
                   key={event.eventId}
                   event={event}
+                  userRole={authClaims?.role}
                   isExpanded={expandedEventId === event.eventId}
                   onToggle={() => handleToggle(event.eventId)}
                 />

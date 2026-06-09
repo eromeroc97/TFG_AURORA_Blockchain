@@ -7,7 +7,7 @@ export default function RequireAdmin() {
   const isAdminOrGlobalAdmin = role === 'ADMIN' || role === 'GLOBAL_ADMIN'
 
   if (!isAdminOrGlobalAdmin) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to={role === 'AUDITOR' ? '/audit' : '/dashboard'} replace />
   }
 
   return <Outlet />
