@@ -68,6 +68,7 @@ type TelemetrySessionClaims = {
 	ecosystemIds?: string[];
 	ecosystems?: string[];
 	userEcosystems?: string[];
+	exp?: number;
 };
 
 type TelemetryRequestContext = {
@@ -643,7 +644,14 @@ export const buildApp = (options: AppOptions = {}) => {
 
     try {
       const decoded = Buffer.from(parseBase64Url(payloadSegment), 'base64').toString('utf8');
-      return JSON.parse(decoded) as TelemetrySessionClaims;
+      const claims = JSON.parse(decoded) as TelemetrySessionClaims;
+
+      if (claims.exp && Date.now() >= claims.exp * 1000) {
+        console.error('JWT has expired');
+        return null;
+      }
+
+      return claims;
     } catch {
       return null;
     }

@@ -3,7 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { StringValue } from 'ms';
-import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 import { ActionsAnchorService } from '../../blockchain/anchoring/actions-anchor.service';
 import { ActionType } from '../../blockchain/anchoring/action-types.enum';
@@ -45,7 +44,6 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-    private readonly redisService: RedisService,
     private readonly anchoringService: ActionsAnchorService,
   ) {}
 
@@ -189,7 +187,6 @@ export class AuthService {
 
 	async logout(userId: string) {
 		await this.usersService.updateRefreshTokenHash(userId, null);
-		await this.redisService.addToBlacklist(userId, 300);
 		await this.anchoringService.anchorAction({
 			actionType: ActionType.AUTH_LOGOUT,
 			actorId: userId,

@@ -41,16 +41,14 @@ export class DevicesController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  @UseGuards(JwtAuthGuard)
   update(@Param('id') id: string, @Body() updateDeviceDto: UpdateDeviceDto, @Req() request: AuthenticatedRequest) {
-    return this.devicesService.update(id, updateDeviceDto, request.user?.sub);
+    return this.devicesService.update(id, updateDeviceDto, request.user?.sub, request.user?.role);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.GLOBAL_ADMIN)
+  @UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.devicesService.remove(id, request.user?.sub);
+    return this.devicesService.remove(id, request.user?.sub, request.user?.role);
   }
 }

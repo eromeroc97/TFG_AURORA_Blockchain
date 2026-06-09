@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
+import { AccessRole, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
@@ -292,7 +292,36 @@ export class DevicesService {
     return deviceData;
   }
 
-  async update(id: string, updateDeviceDto: UpdateDeviceDto, actorId?: string) {
+  async update(id: string, updateDeviceDto: UpdateDeviceDto, actorId?: string, actorRole?: Role) {
+    const isAdmin = actorRole === Role.ADMIN || actorRole === Role.GLOBAL_ADMIN;
+
+    if (!isAdmin && actorId) {
+      const device = await this.prisma.device.findUnique({
+        where: { id },
+        select: {
+          ecosystem: {
+            select: {
+              ownerId: true,
+              accesses: { select: { userId: true, role: true } },
+            },
+          },
+        },
+      });
+
+      if (!device) {
+        throw new NotFoundException('Device not found');
+      }
+
+      const isOwner = device.ecosystem.ownerId === actorId;
+      const isEditor = device.ecosystem.accesses.some(
+        (a) => a.userId === actorId && a.role === AccessRole.EDITOR,
+      );
+
+      if (!isOwner && !isEditor) {
+        throw new NotFoundException('Device not found');
+      }
+    }
+
     const normalizedMacAddress = updateDeviceDto.macAddress
       ? this.normalizeMacAddress(updateDeviceDto.macAddress)
       : undefined;
@@ -330,7 +359,36 @@ export class DevicesService {
     }
   }
 
-  async remove(id: string, actorId?: string) {
+  async remove(id: string, actorId?: string, actorRole?: Role) {
+    const isAdmin = actorRole === Role.ADMIN || actorRole === Role.GLOBAL_ADMIN;
+
+    if (!isAdmin && actorId) {
+      const device = await this.prisma.device.findUnique({
+        where: { id },
+        select: {
+          ecosystem: {
+            select: {
+              ownerId: true,
+              accesses: { select: { userId: true, role: true } },
+            },
+          },
+        },
+      });
+
+      if (!device) {
+        throw new NotFoundException('Device not found');
+      }
+
+      const isOwner = device.ecosystem.ownerId === actorId;
+      const isEditor = device.ecosystem.accesses.some(
+        (a) => a.userId === actorId && a.role === AccessRole.EDITOR,
+      );
+
+      if (!isOwner && !isEditor) {
+        throw new NotFoundException('Device not found');
+      }
+    }
+
     try {
       const device = await this.prisma.device.findUnique({
         where: { id },
