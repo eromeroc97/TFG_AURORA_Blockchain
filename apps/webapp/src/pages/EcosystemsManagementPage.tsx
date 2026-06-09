@@ -1202,16 +1202,23 @@ export default function EcosystemsManagementPage() {
                       <div key={user.userId} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-slate-900">{user.userEmail}</p>
-                          <p className="text-xs text-slate-500">
-                            {new Date(user.createdAt).toLocaleDateString('es-ES')}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-slate-500">
+                              {new Date(user.createdAt).toLocaleDateString('es-ES')}
+                            </p>
+                            {user.status === 'PENDING' && (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-medium text-amber-700">
+                                Pendiente
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <select
                             value={user.role}
                             onChange={(e) => promptRoleChange(shareModalEcosystem.id, user.userId, user.userEmail, user.role, e.target.value as AccessRole)}
-                            disabled={updatingAccessRole === user.userId}
-                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                            disabled={updatingAccessRole === user.userId || user.status === 'PENDING'}
+                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <option value="VIEWER">Viewer</option>
                             <option value="EDITOR">Editor</option>

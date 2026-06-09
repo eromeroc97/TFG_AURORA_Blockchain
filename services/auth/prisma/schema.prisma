@@ -76,6 +76,7 @@ enum NotificationStatus {
   READ
   ACCEPTED
   REJECTED
+  CANCELLED
 }
 
 enum ActorType {

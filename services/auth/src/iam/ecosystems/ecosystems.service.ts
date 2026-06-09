@@ -783,8 +783,20 @@ export class EcosystemsService {
       throw new NotFoundException('El usuario no tiene acceso a este ecosistema');
     }
 
-    if (access.status !== 'VALID') {
+    if (access.status !== 'VALID' && access.status !== 'PENDING') {
       throw new BadRequestException('No se puede revocar un acceso que no está activo');
+    }
+
+    if (access.status === 'PENDING') {
+      await this.prisma.notification.updateMany({
+        where: {
+          userId: targetUserId,
+          referenceId: ecosystemId,
+          type: NotificationType.ECOSYSTEM_DELEGATION_REQUEST,
+          status: 'PENDING',
+        },
+        data: { status: 'CANCELLED' },
+      });
     }
 
     await this.prisma.ecosystemAccess.update({
@@ -869,7 +881,7 @@ export class EcosystemsService {
     }
 
     const accesses = await this.prisma.ecosystemAccess.findMany({
-      where: { ecosystemId, status: 'VALID' },
+      where: { ecosystemId, status: { in: ['VALID', 'PENDING'] } },
       include: {
         user: {
           select: {
@@ -889,6 +901,7 @@ export class EcosystemsService {
       userStatus: access.user.status,
       userIsActive: access.user.isActive,
       role: access.role,
+      status: access.status,
       createdAt: access.createdAt,
       updatedAt: access.updatedAt,
     }));

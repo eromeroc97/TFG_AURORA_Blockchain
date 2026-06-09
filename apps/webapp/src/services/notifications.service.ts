@@ -1,7 +1,7 @@
 import { apiClient } from '../api/axios'
 
 export type NotificationCategory = 'READ_ONLY' | 'ACTION_EXPECTED'
-export type NotificationStatus = 'PENDING' | 'READ' | 'ACCEPTED' | 'REJECTED'
+export type NotificationStatus = 'PENDING' | 'READ' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED'
 export type NotificationType = 'ECOSYSTEM_DELEGATION_REQUEST' | 'ADMINISTRATOR_NOTIFICATION'
 export type TargetType = 'INDIVIDUAL' | 'GLOBAL'
 export type ActorType = 'USER' | 'SYSTEM'

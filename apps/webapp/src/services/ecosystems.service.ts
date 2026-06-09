@@ -35,6 +35,7 @@ export type EcosystemAccess = {
   userEmail: string
   role: 'VIEWER' | 'EDITOR'
   createdAt: string
+  status: string
 }
 
 type ApiEcosystem = {

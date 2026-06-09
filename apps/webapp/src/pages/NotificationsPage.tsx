@@ -34,6 +34,8 @@ const getStatusLabel = (status: string): string => {
       return 'Aceptada'
     case 'REJECTED':
       return 'Rechazada'
+    case 'CANCELLED':
+      return 'Cancelada'
     default:
       return status
   }
@@ -46,6 +48,7 @@ const getStatusStyle = (status: string): string => {
     case 'READ':
     case 'ACCEPTED':
     case 'REJECTED':
+    case 'CANCELLED':
       return 'italic text-slate-500'
     default:
       return 'text-slate-900'
@@ -199,6 +202,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
               { value: 'READ', label: 'Leída' },
               { value: 'ACCEPTED', label: 'Aceptada' },
               { value: 'REJECTED', label: 'Rechazada' },
+              { value: 'CANCELLED', label: 'Cancelada' },
             ]}
           />
 
@@ -270,7 +274,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             notification.status === 'PENDING'
                               ? 'bg-amber-100 text-amber-800'
-                              : notification.status === 'READ'
+                              : notification.status === 'READ' || notification.status === 'CANCELLED'
                                 ? 'bg-slate-100 text-slate-600'
                                 : notification.status === 'ACCEPTED'
                                   ? 'bg-emerald-100 text-emerald-800'
@@ -354,7 +358,7 @@ const [pageSize, setPageSize] = useState<typeof DEFAULT_PAGE_SIZE>(DEFAULT_PAGE_
                   className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium ${
                     selectedNotification.status === 'PENDING'
                       ? 'bg-amber-100 text-amber-800'
-                      : selectedNotification.status === 'READ'
+                      : selectedNotification.status === 'READ' || selectedNotification.status === 'CANCELLED'
                         ? 'bg-slate-100 text-slate-600'
                         : selectedNotification.status === 'ACCEPTED'
                           ? 'bg-emerald-100 text-emerald-800'
