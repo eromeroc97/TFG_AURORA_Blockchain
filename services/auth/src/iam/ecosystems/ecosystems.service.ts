@@ -814,6 +814,26 @@ export class EcosystemsService {
         revokedUserId: targetUserId,
       },
     });
+
+    if (access.status === 'VALID') {
+      await this.notificationsService.create({
+        category: NotificationCategory.READ_ONLY,
+        type: NotificationType.ECOSYSTEM_DELEGATION_RESPONSE,
+        targetType: 'INDIVIDUAL',
+        actorType: 'USER',
+        actorId,
+        userId: targetUserId,
+        referenceId: ecosystemId,
+        referenceType: ReferenceType.ECOSYSTEM,
+        title: 'Acceso revocado',
+        message: `Tu acceso al ecosistema "${ecosystem.name}" ha sido revocado por el propietario`,
+        metadata: {
+          ecosystemId,
+          ecosystemName: ecosystem.name,
+          result: 'REVOKED_BY_OWNER',
+        },
+      } as CreateNotificationDto);
+    }
   }
 
   async updateAccessRole(ecosystemId: string, actorId: string, targetUserId: string, newRole: AccessRole): Promise<void> {
@@ -865,6 +885,25 @@ export class EcosystemsService {
         newRole,
       },
     });
+
+    await this.notificationsService.create({
+      category: NotificationCategory.READ_ONLY,
+      type: NotificationType.ECOSYSTEM_DELEGATION_RESPONSE,
+      targetType: 'INDIVIDUAL',
+      actorType: 'USER',
+      actorId,
+      userId: targetUserId,
+      referenceId: ecosystemId,
+      referenceType: ReferenceType.ECOSYSTEM,
+      title: 'Rol de acceso actualizado',
+      message: `Tu rol en el ecosistema "${ecosystem.name}" ha cambiado de ${oldRole} a ${newRole}`,
+      metadata: {
+        ecosystemId,
+        ecosystemName: ecosystem.name,
+        oldRole,
+        newRole,
+      },
+    } as CreateNotificationDto);
   }
 
   async getEcosystemAccesses(ecosystemId: string, actorId: string) {
