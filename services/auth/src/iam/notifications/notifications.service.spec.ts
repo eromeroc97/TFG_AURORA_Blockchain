@@ -28,6 +28,8 @@ describe('NotificationsService', () => {
     },
     ecosystemAccess: {
       create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
     },
   };
 
@@ -256,7 +258,7 @@ describe('NotificationsService', () => {
       await expect(service.respondToNotification('notif-123', 'user-123', 'ACCEPTED')).rejects.toThrow(BadRequestException);
     });
 
-    it('should update notification to ACCEPTED and create ecosystem access', async () => {
+    it('should update notification to ACCEPTED and activate ecosystem access', async () => {
       const notification = {
         id: 'notif-123',
         userId: 'user-456',
@@ -268,12 +270,15 @@ describe('NotificationsService', () => {
         referenceType: 'ECOSYSTEM',
         metadata: { ecosystemId: 'eco-789', targetUserId: 'user-456', role: AccessRole.VIEWER },
       };
+      const existingAccess = { id: 'access-1', status: 'PENDING' };
       const updatedNotification = { ...notification, status: NotificationStatus.ACCEPTED };
       prismaMock.notification.findUnique.mockResolvedValue(notification);
       prismaMock.notification.update.mockResolvedValue(updatedNotification);
       prismaMock.ecosystem.findUnique.mockResolvedValue({ name: 'Test Ecosystem' });
       prismaMock.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
       prismaMock.notification.create.mockResolvedValue({ id: 'response-notif' });
+      prismaMock.ecosystemAccess.findUnique.mockResolvedValue(existingAccess);
+      prismaMock.ecosystemAccess.update.mockResolvedValue({ ...existingAccess, status: 'VALID' });
       mailMock.sendEcosystemDelegationResponseEmail.mockResolvedValue(undefined);
 
       const result = await service.respondToNotification('notif-123', 'user-456', 'ACCEPTED');
@@ -282,8 +287,14 @@ describe('NotificationsService', () => {
         where: { id: 'notif-123' },
         data: { status: 'ACCEPTED', respondedAt: expect.any(Date) },
       });
-      expect(prismaMock.ecosystemAccess.create).toHaveBeenCalledWith({
-        data: { ecosystemId: 'eco-789', userId: 'user-456', role: AccessRole.VIEWER },
+      expect(prismaMock.ecosystemAccess.findUnique).toHaveBeenCalledWith({
+        where: {
+          ecosystemId_userId: { ecosystemId: 'eco-789', userId: 'user-456' },
+        },
+      });
+      expect(prismaMock.ecosystemAccess.update).toHaveBeenCalledWith({
+        where: { id: 'access-1' },
+        data: { status: 'VALID', role: AccessRole.VIEWER },
       });
       expect(result).toEqual(updatedNotification);
     });

@@ -398,6 +398,7 @@ export class EcosystemsService {
         ...this.ecosystemSelect,
         ownerId: true,
         accesses: {
+          where: { status: 'VALID' },
           select: { userId: true },
         },
       },
@@ -435,6 +436,7 @@ export class EcosystemsService {
       select: {
         ownerId: true,
         accesses: {
+          where: { status: 'VALID' },
           select: { userId: true },
         },
       },
@@ -600,7 +602,7 @@ export class EcosystemsService {
     });
 
     const delegatedEcosystems = await this.prisma.ecosystemAccess.findMany({
-      where: { userId },
+      where: { userId, status: 'VALID' },
       include: {
         ecosystem: {
           select: {
@@ -695,8 +697,30 @@ export class EcosystemsService {
       },
     });
 
-    if (existingAccess) {
+    if (existingAccess && existingAccess.status === 'VALID') {
       throw new BadRequestException('El usuario ya tiene acceso a este ecosistema');
+    }
+
+    if (existingAccess && existingAccess.status === 'PENDING') {
+      throw new BadRequestException('Ya existe una invitación pendiente para este usuario');
+    }
+
+    if (existingAccess && existingAccess.status === 'REVOKED') {
+      await this.prisma.ecosystemAccess.update({
+        where: { id: existingAccess.id },
+        data: { status: 'PENDING', role: role ?? AccessRole.VIEWER },
+      });
+    }
+
+    if (!existingAccess) {
+      await this.prisma.ecosystemAccess.create({
+        data: {
+          ecosystemId,
+          userId: targetUser.id,
+          role: role ?? AccessRole.VIEWER,
+          status: 'PENDING',
+        },
+      });
     }
 
     await this.notificationsService.create({
@@ -759,8 +783,13 @@ export class EcosystemsService {
       throw new NotFoundException('El usuario no tiene acceso a este ecosistema');
     }
 
-    await this.prisma.ecosystemAccess.delete({
+    if (access.status !== 'VALID') {
+      throw new BadRequestException('No se puede revocar un acceso que no está activo');
+    }
+
+    await this.prisma.ecosystemAccess.update({
       where: { id: access.id },
+      data: { status: 'REVOKED' },
     });
 
     await this.anchoringService.anchorAction({
@@ -801,6 +830,10 @@ export class EcosystemsService {
       throw new NotFoundException('El usuario no tiene acceso a este ecosistema');
     }
 
+    if (access.status !== 'VALID') {
+      throw new BadRequestException('No se puede cambiar el rol de un acceso que no está activo');
+    }
+
     const oldRole = access.role;
 
     await this.prisma.ecosystemAccess.update({
@@ -836,7 +869,7 @@ export class EcosystemsService {
     }
 
     const accesses = await this.prisma.ecosystemAccess.findMany({
-      where: { ecosystemId },
+      where: { ecosystemId, status: 'VALID' },
       include: {
         user: {
           select: {
@@ -863,7 +896,7 @@ export class EcosystemsService {
 
   async getUserAccesses(userId: string) {
     const accesses = await this.prisma.ecosystemAccess.findMany({
-      where: { userId },
+      where: { userId, status: 'VALID' },
       include: {
         ecosystem: {
           select: {
@@ -932,12 +965,12 @@ export class EcosystemsService {
         createdAt: true,
         updatedAt: true,
         ownerId: true,
-        _count: { select: { accesses: true } },
+        _count: { select: { accesses: { where: { status: 'VALID' } } } },
       },
     });
 
     const delegatedEcosystems = await this.prisma.ecosystemAccess.findMany({
-      where: { userId },
+      where: { userId, status: 'VALID' },
       include: {
         ecosystem: {
           select: {
@@ -999,6 +1032,10 @@ export class EcosystemsService {
       throw new NotFoundException('No tienes acceso a este ecosistema');
     }
 
+    if (access.status !== 'VALID') {
+      throw new BadRequestException('No puedes abandonar un acceso que no está activo');
+    }
+
     if (access.ecosystem.ownerId === userId) {
       throw new BadRequestException('No puedes abandonar tu propio ecosistema');
     }
@@ -1013,8 +1050,9 @@ export class EcosystemsService {
       select: { email: true },
     });
 
-    await this.prisma.ecosystemAccess.delete({
+    await this.prisma.ecosystemAccess.update({
       where: { id: access.id },
+      data: { status: 'REVOKED' },
     });
 
     await this.anchoringService.anchorAction({

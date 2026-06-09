@@ -155,13 +155,44 @@ export class NotificationsService {
     if (response === 'ACCEPTED' && notification.type === NotificationType.ECOSYSTEM_DELEGATION_REQUEST) {
       const metadata = notification.metadata as { ecosystemId: string; targetUserId: string; role: AccessRole } | null;
       if (metadata?.ecosystemId && metadata?.targetUserId) {
-        await this.prisma.ecosystemAccess.create({
-          data: {
-            ecosystemId: metadata.ecosystemId,
-            userId: metadata.targetUserId,
-            role: metadata.role ?? AccessRole.VIEWER,
+        const access = await this.prisma.ecosystemAccess.findUnique({
+          where: {
+            ecosystemId_userId: {
+              ecosystemId: metadata.ecosystemId,
+              userId: metadata.targetUserId,
+            },
           },
         });
+
+        if (!access) {
+          throw new BadRequestException('La invitación ha expirado o ya no es válida');
+        }
+
+        await this.prisma.ecosystemAccess.update({
+          where: { id: access.id },
+          data: { status: 'VALID', role: metadata.role ?? AccessRole.VIEWER },
+        });
+      }
+    }
+
+    if (response === 'REJECTED' && notification.type === NotificationType.ECOSYSTEM_DELEGATION_REQUEST) {
+      const metadata = notification.metadata as { ecosystemId: string; targetUserId: string } | null;
+      if (metadata?.ecosystemId && metadata?.targetUserId) {
+        const access = await this.prisma.ecosystemAccess.findUnique({
+          where: {
+            ecosystemId_userId: {
+              ecosystemId: metadata.ecosystemId,
+              userId: metadata.targetUserId,
+            },
+          },
+        });
+
+        if (access && access.status === 'PENDING') {
+          await this.prisma.ecosystemAccess.update({
+            where: { id: access.id },
+            data: { status: 'REVOKED' },
+          });
+        }
       }
     }
 

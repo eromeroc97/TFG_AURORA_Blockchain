@@ -5,7 +5,3 @@ Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -
 
 
 Invoke-WebRequest -Uri 'http://localhost/api/telemetry/v1/ingest' -Method Post -Headers @{ 'x-api-key' = 'AUR-mxTi-C53o3hrrX9vvBhD2OqDM8uwfnhBwWCx64arLa0' } -ContentType 'application/json' -InFile 'services/iot-manager/test-json/03-test.json' -UseBasicParsing
-
-docker-compose up -d --build webapp
-
-docker-compose up -d --build auth-service mailpit iot-manager docker-socket-proxy api-gateway postgres-db mongo-db redis seq
