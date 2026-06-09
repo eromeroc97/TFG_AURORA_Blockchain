@@ -46,6 +46,19 @@ export default function EcosystemsManagementPage() {
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
   const [revokingEcosystemId, setRevokingEcosystemId] = useState<string | null>(null)
+  const [confirmRevoke, setConfirmRevoke] = useState<{
+    ecosystemId: string
+    userId: string
+    userEmail: string
+  } | null>(null)
+
+  const [confirmRoleChange, setConfirmRoleChange] = useState<{
+    ecosystemId: string
+    userId: string
+    userEmail: string
+    currentRole: AccessRole
+    newRole: AccessRole
+  } | null>(null)
 
   const [activeTab, setActiveTab] = useState<'my-ecosystems' | 'shared-with-me'>('my-ecosystems')
   const ecosystems = activeTab === 'my-ecosystems' ? myEcosystems : sharedWithMe
@@ -193,6 +206,28 @@ export default function EcosystemsManagementPage() {
     } finally {
       setRevokingEcosystemId(null)
     }
+  }
+
+  const promptRevoke = (ecosystemId: string, userId: string, userEmail: string) => {
+    setConfirmRevoke({ ecosystemId, userId, userEmail })
+  }
+
+  const executeRevoke = async () => {
+    if (!confirmRevoke) return
+    const { ecosystemId, userId } = confirmRevoke
+    setConfirmRevoke(null)
+    await handleRevokeSharing(ecosystemId, userId)
+  }
+
+  const promptRoleChange = (ecosystemId: string, userId: string, userEmail: string, currentRole: AccessRole, newRole: AccessRole) => {
+    setConfirmRoleChange({ ecosystemId, userId, userEmail, currentRole, newRole })
+  }
+
+  const executeRoleChange = async () => {
+    if (!confirmRoleChange) return
+    const { ecosystemId, userId, newRole } = confirmRoleChange
+    setConfirmRoleChange(null)
+    await handleUpdateRole(ecosystemId, userId, newRole)
   }
 
   const handleUpdateRole = async (ecosystemId: string, userId: string, newRole: AccessRole) => {
@@ -750,6 +785,19 @@ export default function EcosystemsManagementPage() {
                               Compartir
                             </button>
                           )}
+                          {isUser && ecosystem.ownerId === userId && ecosystem.isShared && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openShareModal(ecosystem)
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs text-primary hover:bg-surface/50"
+                            >
+                              <Users className="size-3" />
+                              Gestionar
+                            </button>
+                          )}
                           {ecosystem.accessType === 'DELEGATED' ? (
                               <span className="text-xs font-medium px-2 py-1 rounded-full bg-teal-500/10 text-teal-600">
                                 {ecosystem.accessRole === 'EDITOR' ? 'Editor' : 'Viewer'}
@@ -1153,15 +1201,15 @@ export default function EcosystemsManagementPage() {
                     {sharedUsers.map((user) => (
                       <div key={user.userId} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-900">{user.email}</p>
+                          <p className="truncate text-sm font-medium text-slate-900">{user.userEmail}</p>
                           <p className="text-xs text-slate-500">
-                            {new Date(user.grantedAt).toLocaleDateString('es-ES')}
+                            {new Date(user.createdAt).toLocaleDateString('es-ES')}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <select
                             value={user.role}
-                            onChange={(e) => handleUpdateRole(shareModalEcosystem.id, user.userId, e.target.value as AccessRole)}
+                            onChange={(e) => promptRoleChange(shareModalEcosystem.id, user.userId, user.userEmail, user.role, e.target.value as AccessRole)}
                             disabled={updatingAccessRole === user.userId}
                             className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
                           >
@@ -1170,7 +1218,7 @@ export default function EcosystemsManagementPage() {
                           </select>
                           <button
                             type="button"
-                            onClick={() => handleRevokeSharing(shareModalEcosystem.id, user.userId)}
+                            onClick={() => promptRevoke(shareModalEcosystem.id, user.userId, user.userEmail)}
                             disabled={revokingEcosystemId === user.userId}
                             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                           >
@@ -1206,6 +1254,77 @@ export default function EcosystemsManagementPage() {
                 className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSharing ? 'Compartiendo...' : 'Compartir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRevoke && (
+        <div className="fixed inset-0 z-[100] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Revocar acceso</h3>
+                <p className="text-sm leading-6 text-slate-500">
+                  ¿Estás seguro de que quieres revocar el acceso a <strong>{confirmRevoke.userEmail}</strong>?
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmRevoke(null)}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={executeRevoke}
+                disabled={revokingEcosystemId === confirmRevoke.ecosystemId}
+                className="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {revokingEcosystemId === confirmRevoke.ecosystemId ? 'Revocando...' : 'Revocar acceso'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRoleChange && (
+        <div className="fixed inset-0 z-[100] h-dvh w-screen flex items-center justify-center bg-black/25 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[1.5rem] border border-border bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <Edit3 className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Cambiar rol</h3>
+                <p className="text-sm leading-6 text-slate-500">
+                  ¿Estás seguro de que quieres cambiar el rol de <strong>{confirmRoleChange.userEmail}</strong> de{' '}
+                  <strong>{confirmRoleChange.currentRole}</strong> a <strong>{confirmRoleChange.newRole}</strong>?
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmRoleChange(null)}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={executeRoleChange}
+                disabled={updatingAccessRole === confirmRoleChange.userId}
+                className="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {updatingAccessRole === confirmRoleChange.userId ? 'Cambiando...' : 'Cambiar rol'}
               </button>
             </div>
           </div>

@@ -32,9 +32,9 @@ export type AccessMapEcosystem = {
 
 export type EcosystemAccess = {
   userId: string
-  email: string
+  userEmail: string
   role: 'VIEWER' | 'EDITOR'
-  grantedAt: string
+  createdAt: string
 }
 
 type ApiEcosystem = {
@@ -45,6 +45,7 @@ type ApiEcosystem = {
   longitude: number | null
   accessType?: 'OWNER' | 'DELEGATED'
   accessRole?: 'VIEWER' | 'EDITOR'
+  isShared?: boolean
 }
 
 type ApiDevice = {
@@ -205,6 +206,8 @@ export async function getMyEcosystems(): Promise<AccessMapEcosystem[]> {
 
     const ecosystemsWithDevices = await Promise.all(
       response.data.map(async (ecosystem) => {
+        const isDelegated = ecosystem.accessType === 'DELEGATED'
+        const isShared = isDelegated || ecosystem.isShared === true
         try {
           const devicesResponse = await apiClient.get<ApiDevice[]>(`/ecosystems/${ecosystem.id}/devices`)
           return {
@@ -213,8 +216,8 @@ export async function getMyEcosystems(): Promise<AccessMapEcosystem[]> {
             ownerId: ecosystem.ownerId,
             lat: ecosystem.latitude,
             lng: ecosystem.longitude,
-            isShared: false,
-            accessType: 'OWNER' as const,
+            isShared,
+            accessType: ecosystem.accessType ?? 'OWNER',
             accessRole: ecosystem.accessRole,
             devices: devicesResponse.data.map(mapApiDeviceToAccessMap),
           }
@@ -225,8 +228,8 @@ export async function getMyEcosystems(): Promise<AccessMapEcosystem[]> {
             ownerId: ecosystem.ownerId,
             lat: ecosystem.latitude,
             lng: ecosystem.longitude,
-            isShared: false,
-            accessType: 'OWNER' as const,
+            isShared,
+            accessType: ecosystem.accessType ?? 'OWNER',
             accessRole: ecosystem.accessRole,
             devices: [],
           }

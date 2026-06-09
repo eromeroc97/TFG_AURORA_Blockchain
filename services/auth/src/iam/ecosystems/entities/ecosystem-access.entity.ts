@@ -27,4 +27,5 @@ export class EcosystemWithAccessType {
 	updatedAt!: Date;
 	accessType!: 'OWNER' | 'DELEGATED';
 	accessRole?: AccessRole;
+	isShared?: boolean;
 }

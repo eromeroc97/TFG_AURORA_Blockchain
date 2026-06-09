@@ -695,17 +695,8 @@ export class EcosystemsService {
       },
     });
 
-    const existingPendingNotification = await this.prisma.notification.findFirst({
-      where: {
-        userId: targetUser.id,
-        referenceId: ecosystemId,
-        type: NotificationType.ECOSYSTEM_DELEGATION_REQUEST,
-        status: { in: ['PENDING', 'ACCEPTED', 'REJECTED'] },
-      },
-    });
-
-    if (existingPendingNotification) {
-      throw new BadRequestException('Ya existe una petición pendiente para este ecosistema');
+    if (existingAccess) {
+      throw new BadRequestException('El usuario ya tiene acceso a este ecosistema');
     }
 
     await this.notificationsService.create({
@@ -941,6 +932,7 @@ export class EcosystemsService {
         createdAt: true,
         updatedAt: true,
         ownerId: true,
+        _count: { select: { accesses: true } },
       },
     });
 
@@ -967,6 +959,7 @@ export class EcosystemsService {
     const ownerResult = ownedEcosystems.map((eco) => ({
       ...eco,
       accessType: 'OWNER' as const,
+      isShared: eco._count.accesses > 0,
     }));
 
     const delegatedResult = delegatedEcosystems
