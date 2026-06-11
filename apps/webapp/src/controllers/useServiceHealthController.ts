@@ -15,11 +15,6 @@ const serviceDefinitions = [
     envKey: 'VITE_FIREFLY_HEALTH_URL',
   },
   {
-    id: 'threadIntelligence',
-    name: 'Thread Intelligence',
-    envKey: 'VITE_THREAD_INTELLIGENCE_HEALTH_URL',
-  },
-  {
     id: 'iotManager',
     name: 'Motor de Telemetría',
     envKey: 'VITE_IOT_MANAGER_HEALTH_URL',
@@ -36,25 +31,14 @@ const serviceDefinitions = [
   },
 ]
 
-const getHealthUrl = (envKey: string) => {
-  const rawUrl = (import.meta.env as Record<string, string | undefined>)[envKey] ?? ''
-  if (!rawUrl) {
-    return ''
-  }
-
-  try {
-    const parsed = new URL(rawUrl, window.location.href)
-    const isLocalHost = ['localhost', '127.0.0.1'].includes(parsed.hostname)
-
-    if (isLocalHost && parsed.pathname.startsWith('/api')) {
-      return `${parsed.pathname}${parsed.search}`
-    }
-  } catch {
-    // Si no es una URL absoluta, devolvemos tal cual.
-  }
-
-  return rawUrl
+const HEALTH_PATHS: Record<string, string> = {
+  VITE_FIREFLY_HEALTH_URL: '/api/firefly/health',
+  VITE_IOT_MANAGER_HEALTH_URL: '/api/telemetry/health',
+  VITE_AUTH_HEALTH_URL: '/api/auth/health',
+  VITE_AUDIT_HEALTH_URL: '/api/audit/health',
 }
+
+const getHealthUrl = (envKey: string) => HEALTH_PATHS[envKey] ?? ''
 
 const checkServiceHealth = async (url: string): Promise<{ status: 'Online' | 'Offline'; message?: string }> => {
   if (!url) {

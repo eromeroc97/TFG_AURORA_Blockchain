@@ -19,7 +19,7 @@ import { MailService } from './mail.service';
             auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
           },
         defaults: {
-          from: 'noreply@aurora-gsya.uclm.es',
+          from: process.env.MAIL_FROM ?? 'noreply@aurora.es',
         },
         template: {
           dir: join(__dirname, 'templates'),

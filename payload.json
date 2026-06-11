@@ -1,0 +1,24 @@
+{
+  "latitude": 38.981061548021955,
+  "longitude": -3.9341387956169624,
+  "devices": [
+    {
+      "mac_addr": "80-64-6F-9D-91-02",
+      "name": "athom-smart-plug-v2-9d9102"
+    },
+    {
+      "mac_addr": "44-29-1E-91-AE-3E",
+      "name": "amazon-609a5e3f5"
+    },
+    {
+      "mac_addr": "08-91-15-22-05-5B"
+    },
+    {
+      "mac_addr": "80-64-6F-9D-8D-76",
+      "name" : "athom-smart-plug-v2-9d8b76"
+    },
+    {
+      "mac_addr": "44-29-1E-91-3D-2A"
+    }
+  ]
+}

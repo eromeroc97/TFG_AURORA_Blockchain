@@ -6,6 +6,7 @@ import { loadConfig, type AppConfig } from './config';
 import { DeviceDiscoveryService } from './device-discovery';
 import { MongoTelemetryStore, type TelemetryStore } from './telemetry-store';
 import { FireFlyService } from './firefly-service';
+import { sendToSeq } from './seq';
 
 /**
  * Resultado de validación de API key.
@@ -528,6 +529,7 @@ export const buildApp = (options: AppOptions = {}) => {
       }
     } catch (error) {
       request.log.warn({ error }, 'Redis API key cache unavailable while reading');
+      sendToSeq('Warning', 'Redis API key cache unavailable while reading', { error: String(error) });
     }
 
     const cachedInvalid = invalidApiKeyCache.get(cacheKey);
@@ -554,6 +556,7 @@ export const buildApp = (options: AppOptions = {}) => {
       });
     } catch (error) {
       request.log.error({ error }, 'API key validation provider is unavailable');
+      sendToSeq('Error', 'API key validation provider is unavailable', { error: String(error) });
       reply.code(503).send({
         error: 'AUTH_PROVIDER_UNAVAILABLE',
         message: 'API key validation provider is unavailable',
@@ -579,6 +582,7 @@ export const buildApp = (options: AppOptions = {}) => {
       });
     } catch (error) {
       request.log.warn({ error }, 'Redis API key cache unavailable while writing');
+      sendToSeq('Warning', 'Redis API key cache unavailable while writing', { error: String(error) });
     }
 
     (request as AuthenticatedFastifyRequest).authContext = {
@@ -608,6 +612,7 @@ export const buildApp = (options: AppOptions = {}) => {
       return publicKey.export({ type: 'spki', format: 'pem' }) as string;
     } catch (err) {
       console.error('Key conversion error:', err);
+      sendToSeq('Error', 'Key conversion error', { error: String(err) });
       return key;
     }
   };
@@ -634,10 +639,12 @@ export const buildApp = (options: AppOptions = {}) => {
         
         if (!isValid) {
           console.error('JWT signature verification failed');
+          sendToSeq('Error', 'JWT signature verification failed');
           return null;
         }
       } catch (err) {
         console.error('JWT verification error:', err);
+        sendToSeq('Error', 'JWT verification error', { error: String(err) });
         return null;
       }
     }
@@ -648,6 +655,7 @@ export const buildApp = (options: AppOptions = {}) => {
 
       if (claims.exp && Date.now() >= claims.exp * 1000) {
         console.error('JWT has expired');
+        sendToSeq('Error', 'JWT has expired');
         return null;
       }
 
@@ -765,6 +773,7 @@ export const buildApp = (options: AppOptions = {}) => {
           ecosystemIds = normalizeEcosystemIds(data.ecosystemIds) ?? normalizeEcosystemIds(data.ecosystems) ?? [];
         } catch (error) {
           request.log.error({ error }, 'Unable to fetch user ecosystems from auth service');
+          sendToSeq('Error', 'Unable to fetch user ecosystems from auth service', { error: String(error) });
           reply.code(503).send({
             error: 'AUTH_SERVICE_UNAVAILABLE',
             message: 'Unable to resolve user ecosystems from auth service',
@@ -885,6 +894,7 @@ export const buildApp = (options: AppOptions = {}) => {
         signingPublicKey = signResult.publicKey;
       } catch (signError) {
         request.log.error({ error: signError }, 'Failed to get signature from auth-service');
+        sendToSeq('Error', 'Failed to get signature from auth-service', { error: String(signError) });
         await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
         return reply.code(500).send({
           error: 'SIGNING_FAILED',
@@ -902,10 +912,11 @@ export const buildApp = (options: AppOptions = {}) => {
       signature,
       publicKey: signingPublicKey,
     });
-  } catch (broadcastError) {
-    request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly/Fabric');
-    await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
-    return reply.code(500).send({
+    } catch (broadcastError) {
+      request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly/Fabric');
+      sendToSeq('Error', 'Failed to broadcast to FireFly/Fabric', { error: String(broadcastError) });
+      await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
+      return reply.code(500).send({
       error: 'BROADCAST_FAILED',
       message: 'Failed to broadcast telemetry to blockchain',
     });
@@ -953,6 +964,7 @@ const start = async () => {
     });
   } catch (err) {
     app.log.error(err);
+    sendToSeq('Error', 'Failed to start IoT Manager', { error: String(err) });
     process.exit(1);
   }
 };

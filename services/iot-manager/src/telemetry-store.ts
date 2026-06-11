@@ -217,13 +217,7 @@ export class MongoTelemetryStore implements TelemetryStore {
     const existing = await this.db.listCollections({ name: TELEMETRY_COLLECTION }).toArray();
 
     if (existing.length === 0) {
-      await this.db.createCollection(TELEMETRY_COLLECTION, {
-        timeseries: {
-          timeField: 'timestamp',
-          metaField: 'metadata',
-          granularity: 'seconds',
-        },
-      });
+      await this.db.createCollection(TELEMETRY_COLLECTION, {});
     }
 
     this.collection = this.db.collection<TelemetryDocument>(TELEMETRY_COLLECTION);
@@ -409,9 +403,10 @@ export class MongoTelemetryStore implements TelemetryStore {
               {
                 $group: {
                   _id: {
-                    $dateTrunc: {
+                    $dateToString: {
+                      format: '%Y-%m-%dT%H:%M:00',
                       date: '$timestamp',
-                      unit: 'minute',
+                      timezone: 'Europe/Madrid',
                     },
                   },
                   tx: { $sum: { $ifNull: ['$sizeBytes', 0] } },
@@ -420,13 +415,7 @@ export class MongoTelemetryStore implements TelemetryStore {
               {
                 $project: {
                   _id: 0,
-                  timestamp: {
-                    $dateToString: {
-                      format: '%Y-%m-%dT%H:%M:%S',
-                      date: '$_id',
-                      timezone: 'Europe/Madrid',
-                    },
-                  },
+                  timestamp: '$_id',
                   tx: '$tx',
                 },
               },

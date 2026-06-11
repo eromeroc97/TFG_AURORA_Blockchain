@@ -147,7 +147,7 @@ export class MailService {
       template: './new-notification',
       context: {
         notification_title: notificationTitle,
-        action_url: 'http://localhost/notifications',
+        action_url: `${process.env.FRONTEND_URL ?? 'http://localhost'}/notifications`,
       },
     });
 
@@ -168,7 +168,7 @@ export class MailService {
       template: './new-notification',
       context: {
         notification_title: notificationTitle,
-        action_url: 'http://localhost/notifications',
+        action_url: `${process.env.FRONTEND_URL ?? 'http://localhost'}/notifications`,
       },
     });
 
