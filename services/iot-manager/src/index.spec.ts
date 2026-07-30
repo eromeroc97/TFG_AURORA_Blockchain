@@ -87,6 +87,12 @@ const createMockTelemetryStore = (savedInputs: SaveTelemetryInput[]): TelemetryS
       const { mac_addr, ...rest } = devicePayload
       return rest
     },
+    findById: async (id: string) => {
+      return null
+    },
+    findPendingAnchors: async () => {
+      return []
+    },
     close: async () => {
       return
     },

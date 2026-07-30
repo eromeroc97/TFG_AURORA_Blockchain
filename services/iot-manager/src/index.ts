@@ -308,6 +308,130 @@ export const buildApp = (options: AppOptions = {}) => {
   const deviceDiscovery = new DeviceDiscoveryService(config);
   const fireflyService = new FireFlyService();
 
+  const MAX_BG_RETRIES = 5;
+  const BG_RETRY_DELAY_MS = 2_000;
+  const RECOVERY_INTERVAL_MS = 5 * 60 * 1_000;
+
+  const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+  const processAnchorInBackground = async (
+    ingestId: string,
+    ecosystemId: string,
+    hash: string,
+    log: FastifyRequest['log'],
+  ): Promise<void> => {
+    for (let attempt = 0; attempt < MAX_BG_RETRIES; attempt++) {
+      let signature = '';
+      let publicKey = '';
+
+      try {
+        // Protección 1: Pre-check MongoDB
+        const doc = await telemetryStore.findById(ingestId);
+        if (!doc) {
+          log.error({ ingestId }, 'Telemetry document not found for background anchoring');
+          return;
+        }
+        if (doc.metadata.anchorStatus === 'ANCHORED') {
+          log.info({ ingestId }, 'Already anchored, skipping background task');
+          return;
+        }
+
+        // Paso 5: Auth signing
+        const signResponse = await fetch(config.authSignUrl!, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.authInternalToken}`,
+          },
+          body: JSON.stringify({ ecosystemId, hash }),
+        });
+
+        if (!signResponse.ok) {
+          throw new Error(`Sign request failed: ${signResponse.status}`);
+        }
+
+        const signResult = (await signResponse.json()) as {
+          signature: string;
+          publicKey: string;
+        };
+        signature = signResult.signature;
+        publicKey = signResult.publicKey;
+
+        // Paso 7: FireFly anchor (con idempotencyKey + timeout + confirm)
+        const txId = await fireflyService.anchorTelemetry({
+          ingestId,
+          ecosystemId,
+          telemetryHash: hash,
+          signature,
+          publicKey,
+        });
+
+        // Paso 8: MongoDB UPDATE a ANCHORED
+        await telemetryStore.updateAnchorStatus(
+          ingestId,
+          'ANCHORED',
+          signature,
+          publicKey,
+          txId,
+        );
+
+        log.info({ ingestId, txId, attempt }, 'Background anchoring completed');
+        return;
+      } catch (error) {
+        // Protección 2: Detectar duplicado en Fabric
+        const errData = (error as any)?.data || '';
+        const chaincodeErr = (error as any)?.chaincodeError || '';
+
+        if (
+          chaincodeErr.includes('ya existe un anclaje') ||
+          errData.includes('ya existe un anclaje')
+        ) {
+          log.info({ ingestId }, 'Anchor already exists in Fabric (duplicate detected), updating status');
+          await telemetryStore.updateAnchorStatus(
+            ingestId,
+            'ANCHORED',
+            signature,
+            publicKey,
+            '',
+          );
+          return;
+        }
+
+        log.error(
+          { error, ingestId, attempt, maxRetries: MAX_BG_RETRIES },
+          'Background anchoring attempt failed',
+        );
+
+        if (attempt < MAX_BG_RETRIES - 1) {
+          await sleep(BG_RETRY_DELAY_MS * Math.pow(2, attempt));
+        }
+      }
+    }
+
+    log.error({ ingestId }, 'Background anchoring failed after all retries');
+    await telemetryStore.updateAnchorStatus(ingestId, 'FAILED', '', '');
+  };
+
+  const recoverPendingAnchors = async (log: FastifyRequest['log']) => {
+    try {
+      const pending = await telemetryStore.findPendingAnchors();
+      if (pending.length > 0) {
+        log.info({ count: pending.length }, 'Recovering pending anchors');
+        for (const item of pending) {
+          void processAnchorInBackground(
+            item.telemetryId,
+            item.ecosystemId,
+            item.hash,
+            log,
+          );
+        }
+      }
+    } catch (error) {
+      log.error({ error }, 'Failed to recover pending anchors');
+    }
+  };
+
   const apiKeyValidator = options.apiKeyValidator ?? buildDefaultApiKeyValidator(config);
   const positiveTtlMs = options.positiveTtlMs ?? config.iotApiKeyPositiveTtlMs ?? DEFAULT_POSITIVE_TTL_MS;
   const negativeTtlMs = options.negativeTtlMs ?? config.iotApiKeyNegativeTtlMs ?? DEFAULT_NEGATIVE_TTL_MS;
@@ -829,7 +953,6 @@ export const buildApp = (options: AppOptions = {}) => {
     async (request: FastifyRequest<{ Body: IngestRequestBody }>, reply) => {
       const authContext = (request as AuthenticatedFastifyRequest).authContext;
       const ecosystemId = authContext?.ecosystemId;
-      const publicKey = authContext?.publicKey;
 
       if (!ecosystemId) {
         return reply.code(401).send({
@@ -851,13 +974,10 @@ export const buildApp = (options: AppOptions = {}) => {
         devices: request.body.devices,
       };
 
-      // Step 4: Calculate SHA-256 hash (payload + GPS)
       const hash = buildPayloadHash(payload, request.body.latitude, request.body.longitude);
-
-      // Calculate size in bytes of the ingested JSON
       const rawBodyBytes = Buffer.byteLength(JSON.stringify(request.body));
 
-      // Step 3: Persist with PENDING_ANCHOR status
+      // Persistir con PENDING_ANCHOR (punto de no retorno)
       const savedTelemetry = await telemetryStore.save({
         ecosystemId,
         latitude: request.body.latitude,
@@ -868,64 +988,15 @@ export const buildApp = (options: AppOptions = {}) => {
         sizeBytes: rawBodyBytes,
       });
 
-      // Step 5: Request signature from auth-service (KMS)
-      let signature: string;
-      let signingPublicKey: string;
+      // Background: firmar + anclar en FireFly + actualizar MongoDB
+      void processAnchorInBackground(
+        savedTelemetry.id,
+        ecosystemId,
+        hash,
+        request.log,
+      );
 
-      try {
-        const signResponse = await fetch(config.authSignUrl!, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${config.authInternalToken}`,
-          },
-          body: JSON.stringify({ ecosystemId, hash }),
-        });
-
-        if (!signResponse.ok) {
-          const errorBody = await signResponse.text();
-          throw new Error(
-            `Sign request failed: ${signResponse.status} ${signResponse.statusText}: ${errorBody}`,
-          );
-        }
-
-        const signResult = await signResponse.json() as { signature: string; publicKey: string };
-        signature = signResult.signature;
-        signingPublicKey = signResult.publicKey;
-      } catch (signError) {
-        request.log.error({ error: signError }, 'Failed to get signature from auth-service');
-        sendToSeq('Error', 'Failed to get signature from auth-service', { error: String(signError) });
-        await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
-        return reply.code(500).send({
-          error: 'SIGNING_FAILED',
-          message: 'Failed to sign telemetry data',
-        });
-      }
-
-  // Step 7: Invocar FireFly para anclar en Fabric (reemplaza el mock)
-  let txId: string;
-  try {
-    txId = await fireflyService.anchorTelemetry({
-      ingestId: savedTelemetry.id,
-      ecosystemId,
-      telemetryHash: hash,
-      signature,
-      publicKey: signingPublicKey,
-    });
-    } catch (broadcastError) {
-      request.log.error({ error: broadcastError }, 'Failed to broadcast to FireFly/Fabric');
-      sendToSeq('Error', 'Failed to broadcast to FireFly/Fabric', { error: String(broadcastError) });
-      await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'FAILED', '', '');
-      return reply.code(500).send({
-      error: 'BROADCAST_FAILED',
-      message: 'Failed to broadcast telemetry to blockchain',
-    });
-  }
-
-      // Step 8: Update status to ANCHORED
-      await telemetryStore.updateAnchorStatus(savedTelemetry.id, 'ANCHORED', signature, signingPublicKey, txId);
-
-      // Run device discovery in background (not part of the 8-step flow, but needed)
+      // Device discovery (background)
       void Promise.resolve().then(async () => {
         await deviceDiscovery.discoverAndSync(
           {
@@ -936,16 +1007,24 @@ export const buildApp = (options: AppOptions = {}) => {
         );
       });
 
+      // Responder inmediatamente
       return reply.code(202).send({
-        ingestId: savedTelemetry.id,
         status: 'ACCEPTED',
-        ecosystemId,
-        hash,
-        txId,
-        receivedAt: new Date(now()).toISOString(),
+        message: 'Telemetry data received and stored successfully',
+        ingestId: savedTelemetry.id,
       });
     },
   );
+
+  // Startup recovery: reprocesar PENDING_ANCHOR huérfanos al arrancar
+  void Promise.resolve().then(async () => {
+    await recoverPendingAnchors(app.log);
+  });
+
+  // Recovery periódico cada 5 minutos
+  setInterval(() => {
+    void recoverPendingAnchors(app.log);
+  }, RECOVERY_INTERVAL_MS);
 
   return app;
 };

@@ -46,7 +46,10 @@ type FireFlyInvokeResponse = {
   id?: string;
   tx?: string;
   status?: string;
+  error?: string;
 };
+
+const FIREFLY_TIMEOUT_MS = 60_000;
 
 type FireFlyConfig = {
   apiUrl: string;
@@ -83,9 +86,13 @@ export class FireFlyService {
   }
 
   async anchorTelemetry(data: AnchorTelemetryDto): Promise<string> {
-    const url = `${this.config.apiUrl}/namespaces/${this.config.namespace}/apis/${this.config.apiName}/invoke/${this.config.methodName}`;
+    const baseUrl = `${this.config.apiUrl}/namespaces/${this.config.namespace}/apis/${this.config.apiName}/invoke/${this.config.methodName}`;
+    const url = `${baseUrl}?confirm=true`;
 
     this.logger.log('Anchoring telemetry to Fabric', { url, ingestId: data.ingestId });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FIREFLY_TIMEOUT_MS);
 
     let response: Response;
     try {
@@ -95,6 +102,7 @@ export class FireFlyService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: data.ingestId,
           input: {
             ingestId: data.ingestId,
             ecosystemId: data.ecosystemId,
@@ -103,10 +111,13 @@ export class FireFlyService {
             publicKey: data.publicKey,
           },
         }),
+        signal: controller.signal,
       });
     } catch (networkError) {
       this.logger.error('Network error calling FireFly', { error: String(networkError), ingestId: data.ingestId });
       throw networkError;
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
@@ -131,10 +142,27 @@ export class FireFlyService {
     }
 
     const result = (await response.json()) as FireFlyInvokeResponse;
-    const txId = result.id;
+
+    // Verificar si la operación falló en Fabric
+    if (result.status === 'Failed') {
+      const chaincodeError = result.error || 'Unknown chaincode error';
+      this.logger.error('FireFly chaincode invoke failed', {
+        status: result.status,
+        error: chaincodeError,
+        ingestId: data.ingestId,
+      });
+
+      throw Object.assign(new Error(`Chaincode invoke failed: ${chaincodeError}`), {
+        status: response.status,
+        data: JSON.stringify(result),
+        chaincodeError,
+      });
+    }
+
+    const txId = result.tx || result.id;
 
     if (!txId) {
-      this.logger.warn('FireFly response missing id field', { result, ingestId: data.ingestId });
+      this.logger.warn('FireFly response missing operation ID', { result, ingestId: data.ingestId });
       throw new Error('FireFly response missing operation ID');
     }
 

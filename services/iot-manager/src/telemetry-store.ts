@@ -116,6 +116,25 @@ export interface TelemetryStore {
   save(input: SaveTelemetryInput): Promise<SaveTelemetryResult>;
 
   /**
+   * Busca un documento de telemetría por su ID.
+   *
+   * @param id - ID del documento (telemetryId)
+   * @returns Promise con el documento o null
+   */
+  findById(id: string): Promise<TelemetryDocument | null>;
+
+  /**
+   * Busca todos los documentos pendientes de anclaje.
+   *
+   * @returns Promise con lista de registros pendientes
+   */
+  findPendingAnchors(): Promise<Array<{
+    telemetryId: string;
+    ecosystemId: string;
+    hash: string;
+  }>>;
+
+  /**
    * Actualiza el estado de anclaje.
    *
    * @param id - ID del documento
@@ -286,6 +305,40 @@ export class MongoTelemetryStore implements TelemetryStore {
         },
       },
     );
+  }
+
+  /**
+   * Busca un documento de telemetría por su ID.
+   *
+   * @param id - ID del documento (telemetryId)
+   * @returns Promise con el documento o null
+   */
+  async findById(id: string): Promise<TelemetryDocument | null> {
+    const collection = await this.ensureCollection();
+    return collection.findOne({ 'metadata.telemetryId': id });
+  }
+
+  /**
+   * Busca todos los documentos pendientes de anclaje.
+   *
+   * @returns Promise con lista de registros pendientes
+   */
+  async findPendingAnchors() {
+    const collection = await this.ensureCollection();
+    const docs = await collection
+      .find({ 'metadata.anchorStatus': 'PENDING_ANCHOR' })
+      .project({
+        'metadata.telemetryId': 1,
+        'metadata.ecosystemId': 1,
+        hash: 1,
+        _id: 0,
+      })
+      .toArray();
+    return docs.map((doc) => ({
+      telemetryId: doc.metadata.telemetryId,
+      ecosystemId: doc.metadata.ecosystemId,
+      hash: doc.hash,
+    }));
   }
 
   /**
